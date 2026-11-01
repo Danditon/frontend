@@ -1,0 +1,20 @@
+# 환경 변수
+.env
+.env.*
+!.env.example
+
+# 의존성·빌드 결과
+node_modules/
+dist/
+build/
+.next/
+out/
+coverage/
+
+# 로그
+*.log
+
+# 에디터·OS
+.idea/
+.vscode/
+.DS_Store

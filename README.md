@@ -3,10 +3,13 @@
 떠난 사람이 그리워하는 대구·경북의 장소를, 남아 있는 사람과 여행자가 퀘스트로 대신 다녀와 안부를 전하는 서비스입니다.
 
 ## 👥 TEAM
+
 | 👑 BE / Leader | ⚙️ BE | 💻 FE | 💻 FE | 🤖 AI | 🎨 DESIGN |
 | :---: | :---: | :---: | :---: | :---: | :---: |
 | <img src="https://github.com/psj-1228.png" width="100" height="100" alt="박성준" /> | <img src="https://github.com/kyj5311.png" width="100" height="100" alt="김영재" /> | <img src="https://github.com/Hengjju.png" width="100" height="100" alt="정형주" /> | <img src="https://github.com/njm0927.png" width="100" height="100" alt="남재민" /> | <img src="https://github.com/YounghanKang.png" width="100" height="100" alt="강영한" /> | |
 | [박성준](https://github.com/psj-1228) | [김영재](https://github.com/kyj5311) | [정형주](https://github.com/Hengjju) | [남재민](https://github.com/njm0927) | [강영한](https://github.com/YounghanKang) | 오세은 |
+
+<br>
 
 ## 1. 🛠️ 기술 스택 (Tech Stack)
 
@@ -25,7 +28,7 @@
 | Icons | Lucide React | 아이콘 |
 | Package Manager | npm | 패키지 관리 |
 
-
+<br>
 
 ## 2. 📁 프로젝트 폴더 구조 (Project Structure)
 
@@ -63,6 +66,8 @@ src/
 └── main.tsx                   # React 진입점
 ```
 
+<br>
+
 ## 3. 🚀 개발환경 실행 방법 (Getting Started)
 
 ### 요구 환경
@@ -99,6 +104,8 @@ npm run lint
 # 프로덕션 빌드
 npm run build
 ```
+
+<br>
 
 ## 4. 📝 커밋 메시지
 

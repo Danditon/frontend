@@ -11,7 +11,7 @@ permissions:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   check:
@@ -37,3 +37,86 @@ jobs:
 
       - name: 타입 검사 및 빌드
         run: npm run build
+
+  deploy:
+    name: Deploy to Ubuntu EC2
+    needs: check
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+    concurrency:
+      group: frontend-production
+      cancel-in-progress: false
+    steps:
+      - name: Checkout checked commit
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install and build for production
+        env:
+          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+        run: |
+          npm ci
+          npm run build
+          test -s dist/index.html
+
+      - name: Configure SSH
+        env:
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+          EC2_KNOWN_HOSTS: ${{ secrets.EC2_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          test -n "$EC2_SSH_KEY"
+          test -n "$EC2_KNOWN_HOSTS"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$EC2_SSH_KEY" > ~/.ssh/id_ed25519
+          printf '%s\n' "$EC2_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
+
+      - name: Upload release and switch current
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+          EC2_PORT: ${{ vars.EC2_PORT || '22' }}
+        run: |
+          set -euo pipefail
+          [[ "$EC2_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*$ ]]
+          [[ "$EC2_USER" =~ ^[a-z_][a-z0-9_-]*$ ]]
+          [[ "$EC2_PORT" =~ ^[0-9]+$ ]]
+          release="${GITHUB_SHA}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          ssh_options=(-i ~/.ssh/id_ed25519 -p "$EC2_PORT" -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15)
+          ssh "${ssh_options[@]}" -l "$EC2_USER" "$EC2_HOST" "mkdir -p /var/www/frontend/releases/$release"
+          rsync -az -e "ssh -i $HOME/.ssh/id_ed25519 -p $EC2_PORT -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15" \
+            dist/ "$EC2_USER@$EC2_HOST:/var/www/frontend/releases/$release/"
+          ssh "${ssh_options[@]}" -l "$EC2_USER" "$EC2_HOST" bash -s -- "$release" <<'REMOTE'
+          set -euo pipefail
+          cd /var/www/frontend
+          test -s "releases/$1/index.html"
+          previous=$(readlink current || true)
+          ln -s "releases/$1" "current-$1"
+          mv -Tf "current-$1" current
+          if ! curl --fail --silent --show-error --max-time 15 \
+            -H 'Host: frontend.local' http://127.0.0.1/healthz -o "releases/$1/healthcheck.tmp" || \
+            ! cmp -s "releases/$1/index.html" "releases/$1/healthcheck.tmp"; then
+            if [ -n "$previous" ]; then
+              ln -s "$previous" "rollback-$1"
+              mv -Tf "rollback-$1" current
+            else
+              rm current
+            fi
+            exit 1
+          fi
+          rm -f "releases/$1/healthcheck.tmp"
+          REMOTE
+
+      - name: Remove SSH credentials
+        if: always()
+        run: rm -f ~/.ssh/id_ed25519 ~/.ssh/known_hosts

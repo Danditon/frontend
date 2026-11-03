@@ -6,8 +6,8 @@
 
 | 👑 BE / Leader | ⚙️ BE | 💻 FE | 💻 FE | 🤖 AI | 🎨 DESIGN |
 | :---: | :---: | :---: | :---: | :---: | :---: |
-| <img src="https://github.com/psj-1228.png" width="100" height="100" alt="박성준" /> | <img src="https://github.com/kyj5311.png" width="100" height="100" alt="김영재" /> | <img src="https://github.com/Hengjju.png" width="100" height="100" alt="정형주" /> | <img src="https://github.com/njm0927.png" width="100" height="100" alt="남재민" /> | <img src="https://github.com/YounghanKang.png" width="100" height="100" alt="강영한" /> | |
-| [박성준](https://github.com/psj-1228) | [김영재](https://github.com/kyj5311) | [정형주](https://github.com/Hengjju) | [남재민](https://github.com/njm0927) | [강영한](https://github.com/YounghanKang) | 오세은 |
+| <img src="https://github.com/psj-1228.png" width="100" height="100" alt="박성준" /> | <img src="https://github.com/kyj5311.png" width="100" height="100" alt="김영재" /> | <img src="https://github.com/Hengjju.png" width="100" height="100" alt="정형주" /> | <img src="https://github.com/njm0927.png" width="100" height="100" alt="남재민" /> | <img src="https://github.com/YounghanKang.png" width="100" height="100" alt="강영한" /> |<img src="https://github.com/oseun33.png" width="100" height="100" alt="오세은" /> |
+| [박성준](https://github.com/psj-1228) | [김영재](https://github.com/kyj5311) | [정형주](https://github.com/Hengjju) | [남재민](https://github.com/njm0927) | [강영한](https://github.com/YounghanKang) | [오세은](https://github.com/oseun33) |
 
 <br>
 

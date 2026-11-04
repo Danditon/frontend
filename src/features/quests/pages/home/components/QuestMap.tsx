@@ -8,7 +8,7 @@ type KakaoLatLng = {
 }
 
 // 지도 객체의 타입.
-// relayout은 지도 영역의 크기가 바뀌었을 때 다시 계산하는 기능입니다.
+// relayout은 지도 영역의 크기가 바뀌었을 때 다시 계산하는 기능
 type KakaoMap = {
   relayout(): void
 }
@@ -102,8 +102,8 @@ export default function QuestMap() {
       ref={containerRef}
       aria-label="퀘스트 지도"
       // 지도는 실제 높이가 있어야 보입니다.
-      // 우선 500px로 표시하고, 화면 배치 단계에서 조정하면 됩니다.
-      style={{ width: '100%', height: '500px' }}
+      // 부모 화면 영역의 너비와 높이를 모두 채웁니다.
+      className="absolute inset-0 z-0 h-full w-full"
     />
   )
 }

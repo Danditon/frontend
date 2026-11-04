@@ -67,21 +67,33 @@ export default function QuestVerifyPage() {
       ref={input}
       type="file"
       className="sr-only"
-      accept="image/jpeg,image/png,image/webp"
+      accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
       aria-label="인증 사진 선택"
-      onChange={(e) => {
+      onChange={async (e) => {
         const file = e.target.files?.[0];
+        e.currentTarget.value = "";
         if (!file) return;
         if (
           file.size > 10 * 1024 * 1024 ||
-          !["image/jpeg", "image/png", "image/webp"].includes(file.type)
+          !/\.(jpe?g|png|webp)$/i.test(file.name) ||
+          (file.type !== "" &&
+            !["image/jpeg", "image/png", "image/webp"].includes(file.type))
         ) {
           setError("10MB 이하 JPG, PNG, WEBP 사진을 선택해 주세요.");
           return;
         }
-        setPhoto(URL.createObjectURL(file));
-        setError("");
-        go("compare");
+        const url = URL.createObjectURL(file);
+        try {
+          const image = new Image();
+          image.src = url;
+          await image.decode();
+          setPhoto(url);
+          setError("");
+          go("compare");
+        } catch {
+          URL.revokeObjectURL(url);
+          setError("사진을 열 수 없어요. 정상적인 JPG, PNG, WEBP 사진을 선택해 주세요.");
+        }
       }}
     />
   );

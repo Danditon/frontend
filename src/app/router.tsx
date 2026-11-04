@@ -1,7 +1,7 @@
 import { createBrowserRouter } from 'react-router'
 import { RootLayout } from '@/app/layouts/RootLayout'
 import LoginPage from '@/features/auth/pages/LoginPage'
-import QuestMapPage from '@/features/quests/pages/QuestMapPage'
+import QuestMapPage from '@/features/quests/pages/home/QuestMapPage'
 import QuestCreatePage from '@/features/quests/pages/QuestCreatePage'
 import QuestDetailPage from '@/features/quests/pages/QuestDetailPage'
 import QuestVerifyPage from '@/features/quests/pages/QuestVerifyPage'

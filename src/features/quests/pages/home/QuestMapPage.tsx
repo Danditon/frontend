@@ -26,7 +26,7 @@ export default function QuestMapPage() {
         </p>
       )}
 
-      {/* 개발 중에만 조회한 좌표를 표시합니다. 내 위치 마커는 다음 단계에서 연결합니다. */}
+      {/* 개발 중에만 조회된 좌표와 정확도를 표시해 위치 조회 결과를 확인합니다. */}
       {import.meta.env.DEV && position && (
         <output
           aria-live="polite"

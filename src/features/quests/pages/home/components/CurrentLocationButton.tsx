@@ -1,4 +1,4 @@
-//위치 조회 버튼
+//위치 조회 버튼 컴포넌트입니다. 클릭 시 부모인 QuestMapPage에서 전달한 위치 조회 함수를 실행합니다.
 import { LocateFixed, LoaderCircle } from 'lucide-react'
 import { Button } from '@/shared/components/ui/button'
 

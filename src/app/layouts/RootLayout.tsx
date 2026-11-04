@@ -1,19 +1,23 @@
-import { Link, Outlet } from 'react-router'
-
+import { Outlet, useLocation } from "react-router";
+import { BatteryFull, Signal, Wifi } from "lucide-react";
+import "@/shared/styles/memories.css";
 export function RootLayout() {
+  const { pathname } = useLocation();
+  const scoped = pathname.startsWith("/me") || pathname.endsWith("/verify");
   return (
-    <div className="mx-auto min-h-screen max-w-5xl p-6">
-      <header className="mb-8 space-y-4">
-        <Link to="/" className="text-xl font-semibold">그리움 퀘스트</Link>
-        <nav aria-label="주 메뉴" className="flex flex-wrap gap-4">
-          <Link to="/">퀘스트 지도</Link>
-          <Link to="/quests/new">그리움 등록</Link>
-          <Link to="/me/memories">내 그리움·안부</Link>
-          <Link to="/me/history">수행 기록</Link>
-          <Link to="/login">로그인</Link>
-        </nav>
-      </header>
-      <main><Outlet /></main>
+    <div className="wire-stage">
+      <div className={`wire-phone ${scoped ? "" : "wire-other"}`}>
+        <div className="wire-status" aria-hidden="true">
+          <b>12:34</b>
+          <span>
+            <Signal size={15} />
+            <Wifi size={15} />
+            <BatteryFull size={22} />
+          </span>
+        </div>
+        <Outlet />
+      </div>
+      <p className="wire-demo-label">와이어프레임 미리보기 · 예시 데이터</p>
     </div>
-  )
+  );
 }

@@ -1,3 +1,4 @@
+//위치 조회 버튼
 import { LocateFixed, LoaderCircle } from 'lucide-react'
 import { Button } from '@/shared/components/ui/button'
 

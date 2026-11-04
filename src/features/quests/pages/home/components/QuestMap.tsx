@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import type { UserPosition } from '@/features/quests/hooks/useGeolocation'
 
 // 카카오 SDK의 좌표 객체가 제공하는 기능.
 // 실제 좌표 객체는 SDK가 만들고, 여기서는 TypeScript 타입만 정의합니다.
@@ -11,6 +12,11 @@ type KakaoLatLng = {
 // relayout은 지도 영역의 크기가 바뀌었을 때 다시 계산하는 기능
 type KakaoMap = {
   relayout(): void
+  panTo(position: KakaoLatLng): void // 전달받은 좌표로 지도 중심을 이동합니다.
+}
+
+type QuestMapProps = {
+  position: UserPosition | null // 홈에서 조회한 현재 위치
 }
 
 // TypeScript에 window.kakao가 존재할 수 있다는 것을 알려줍니다.
@@ -42,10 +48,25 @@ declare global {
   }
 }
 
-export default function QuestMap() {
+export default function QuestMap({ position }: QuestMapProps) {
   // 아래 JSX의 div 요소에 접근하기 위한 ref입니다.
   // 첫 렌더링 전에는 실제 div가 없으므로 초기값은 null입니다.
   const containerRef = useRef<HTMLDivElement>(null)
+  const mapRef = useRef<KakaoMap | null>(null) // 생성한 지도를 보관해 다시 사용합니다.
+  const latestPositionRef = useRef<UserPosition | null>(position)
+
+  // 위치 조회가 성공하면 기존 지도의 중심만 이동합니다.
+  useEffect(() => {
+    // SDK 로딩보다 위치 조회가 먼저 끝나도 최신 좌표를 기억합니다.
+    latestPositionRef.current = position
+
+    const map = mapRef.current
+    const maps = window.kakao?.maps
+
+    if (!position || !map || !maps) return
+
+    map.panTo(new maps.LatLng(position.lat, position.lng))
+  }, [position])
 
   // React가 div를 화면에 연결한 다음 지도 생성 작업을 실행합니다.
   useEffect(() => {
@@ -74,12 +95,15 @@ export default function QuestMap() {
       // 기다리는 동안 컴포넌트가 사라졌다면 지도를 생성하지 않습니다.
       if (cancelled) return
 
-      // container div 안에 지도를 생성합니다.
-      new maps.Map(container, {
-        // 처음 표시할 중심 좌표입니다.
-        // 현재 GPS가 아니라 코드에 지정한 예시 위치입니다.
-        // 순서는 반드시 위도 → 경도입니다.
-        center: new maps.LatLng(35.8714, 128.6014),
+      // 이미 조회된 위치가 있으면 그곳에서 시작하고, 없으면 기본 지도 좌표를 사용합니다.
+      const initialPosition = latestPositionRef.current ?? {
+        lat: 35.8714,
+        lng: 128.6014,
+      }
+
+      // 지도 객체를 저장해 이후 위치 조회 시 새로 만들지 않고 이동시킵니다.
+      mapRef.current = new maps.Map(container, {
+        center: new maps.LatLng(initialPosition.lat, initialPosition.lng),
 
         // 숫자가 작을수록 확대되고, 클수록 넓은 지역이 보입니다.
         level: 3,
@@ -90,6 +114,7 @@ export default function QuestMap() {
     return () => {
       // 뒤늦게 실행되는 load 콜백의 지도 생성을 막습니다.
       cancelled = true
+      mapRef.current = null // 화면을 떠날 때 이전 지도 참조를 해제합니다.
 
       // SDK가 div 안에 추가한 지도 DOM을 비웁니다.
       container.replaceChildren()

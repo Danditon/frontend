@@ -14,7 +14,7 @@ export default function QuestMapPage() {
       </h1>
 
       {/* 지도 영역을 담당하는 컴포넌트 */}
-      <QuestMap />
+      <QuestMap position={position} />
 
       {/* 위치 권한 거절·시간 초과 등은 사용자에게 안내합니다. */}
       {error && (
@@ -26,7 +26,7 @@ export default function QuestMapPage() {
         </p>
       )}
 
-      {/* 개발 중에만 좌표를 표시합니다. 지도 이동·마커 연결 전 조회 결과를 확인하는 용도입니다. */}
+      {/* 개발 중에만 조회한 좌표를 표시합니다. 내 위치 마커는 다음 단계에서 연결합니다. */}
       {import.meta.env.DEV && position && (
         <output
           aria-live="polite"

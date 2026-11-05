@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router";
 import { Heart, LogOut } from "lucide-react";
 import { Back, Bottom, Profile } from "@/shared/components/WireUI";
+import { RemotePhoto } from "@/shared/components/RemotePhoto";
+import type { MyPageData } from "@/features/memories/types";
 import { readHistory } from "@/shared/lib/demo";
 const items = [
   {
@@ -20,18 +22,29 @@ const items = [
     message: "",
   },
 ];
-export default function MyPage() {
+// The router uses previews until the backend publishes response DTOs.
+// Supply mapped API data through this boundary without changing the UI.
+export default function MyPage({ data }: { data?: MyPageData } = {}) {
   const { pathname } = useLocation();
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
   const [liked, setLiked] = useState(false);
   const [error, setError] = useState("");
-  const index = Math.max(0, Math.min(1, Number(params.get("message")) || 0));
+  const memories = data?.memories ?? items.map((item, i) => ({
+    id: String(i), title: item.title, sub: item.sub, photoUrl: null,
+    greetings: item.message ? [{ id: String(i), greeting: item.message, photoUrl: null, senderName: '동네 주민 수현', createdAt: '' }] : [],
+  }));
+  const selected = memories.find(item => item.id === params.get('quest')) ?? memories[0];
+  const greetings = selected?.greetings ?? [];
+  const requested = Number(params.get('message'));
+  const index = Number.isFinite(requested) ? Math.max(0, Math.min(greetings.length - 1, Math.trunc(requested))) : 0;
+  const greeting = greetings[index];
   const message = params.has("message") || params.get("tab") === "messages";
   const history = pathname === "/me/history";
   const logout = pathname === "/me/logout";
   const entries = readHistory();
-  const recordCount = 2 + entries.length;
+  const records = data?.records ?? entries.map(entry => ({ id: entry.id, title: entry.title, photoUrl: null }));
+  const recordCount = records.length;
   function signOut() {
     try {
       localStorage.removeItem("accessToken");
@@ -63,8 +76,8 @@ export default function MyPage() {
         <header className="flex items-center gap-[10px] mb-[15px] [&_>_div]:flex-1 [&_small]:text-[10px] [&_small]:block [&_strong]:text-[15px] [&_strong]:block [&_strong]:tracking-[-0.5px]">
           <Back />
           <div>
-            <small>도착한 안부 {index + 1}/2</small>
-            <strong>{items[0].title}</strong>
+            <small>도착한 안부 {greeting ? index + 1 : 0}/{greetings.length}</small>
+            <strong>{selected?.title ?? "도착한 안부"}</strong>
           </div>
           <Link
             className="h-[54px] w-[54px] rounded-full bg-[#c9eaf5] inline-flex items-center justify-center shrink-0 [&_svg]:[stroke-width:1.25]"
@@ -75,20 +88,18 @@ export default function MyPage() {
           </Link>
         </header>
         <article className="message-envelope rounded-[24px] bg-[#fff] flex-1 relative overflow-hidden [padding:20px_14px] flex flex-col items-center min-h-[650px] [&_>_small]:text-[10px] [&_>_small]:z-[1]">
-          <div
-            className="postcard-photo w-full h-[210px] rounded-[23px] shrink-0" aria-label="도착한 안부 사진"
-            role="img"
-          />
+          <RemotePhoto className="postcard-photo" photoUrl={greeting?.photoUrl} alt="도착한 안부 사진" />
           <p className="text-[20px] leading-[1.3] whitespace-pre-line text-center [margin:22px_0_10px] z-[1]">
-            {items[index].message}
+            {greeting?.greeting ?? "아직 도착한 안부가 없어요."}
           </p>
-          <small>From. 동네 주민 수현 | 11월 3일</small>
+          <small>{greeting ? `From. ${greeting.senderName}${greeting.createdAt ? ` | ${greeting.createdAt.slice(0, 10)}` : ""}` : ""}</small>
           <div className="absolute [inset:38%_0_0] bg-[#c9eaf5] [clip-path:polygon(0_0,_50%_37%,_100%_0,_100%_100%,_0_100%)]" />
           <div className="relative mt-auto z-[1] text-center pt-[90px] [&_:is(a,button)]:h-[66px] [&_:is(a,button)]:w-[66px] [&_:is(a,button)]:bg-[#242624] [&_.liked]:bg-[#999] [&_p]:text-[11px] [&_p]:[margin:12px_0_34px]">
             <button
               className={`h-[54px] w-[54px] rounded-full bg-[#c9eaf5] inline-flex items-center justify-center shrink-0 [&_svg]:[stroke-width:1.25] ${liked ? "liked" : ""}`}
               aria-label="안부 좋아요"
               aria-pressed={liked}
+              disabled={!greeting}
               onClick={() => setLiked(!liked)}
             >
               <Heart fill={liked ? "currentColor" : "none"} />
@@ -101,8 +112,9 @@ export default function MyPage() {
           </div>
           <button
             className="relative z-[1] bg-[#242624] h-[64px] rounded-[35px] w-full text-[15px]"
+            disabled={greetings.length < 2}
             onClick={() => {
-              setParams({ message: String((index + 1) % 2) });
+              setParams({ quest: selected.id, message: String((index + 1) % greetings.length) });
               setLiked(false);
             }}
           >
@@ -117,9 +129,9 @@ export default function MyPage() {
       <div className="grid [grid-template-columns:1fr_1fr] gap-[6px] mb-[16px] [&_>_a]:h-[115px] [&_>_a]:rounded-[23px] [&_>_a]:bg-[#c9eaf5] [&_>_a]:flex [&_>_a]:flex-col [&_>_a]:[padding:25px_14px_13px] [&_>_a]:relative [&_>_a]:justify-end [&_>_a.selected]:bg-[#242624] [&_strong]:font-normal [&_strong]:text-[45px] [&_strong]:leading-[1.05] [&_small]:text-[12px] [&_small]:mt-[4px]">
         <Link to="/me/memories" className={!history ? "selected" : ""}>
           <span className="text-[10px] absolute right-[12px] top-[14px] rounded-[15px] [padding:4px_7px] bg-[#dedede]">
-            새 안부 1
+            도착한 안부
           </span>
-          <strong>3</strong>
+          <strong>{memories.length}</strong>
           <small>내 그리움</small>
         </Link>
         <Link to="/me/history" className={history ? "selected" : ""}>
@@ -138,14 +150,10 @@ export default function MyPage() {
             <small>미션 다녀온 곳 {recordCount}</small>
           </div>
           <div className="grid [grid-template-columns:repeat(3,_1fr)] gap-[6px] [&_article_>_div]:bg-[#c9eaf5] [&_article_>_div]:h-[85px] [&_article_>_p]:text-[10px] [&_article_>_p]:leading-[1.3] [&_article_>_p]:text-center [&_article_>_p]:[padding:7px_0] [&_>_a]:h-[85px] [&_>_a]:[border:1px_dotted_#111] [&_>_a]:grid [&_>_a]:place-items-center [&_>_a]:text-[10px]">
-            {[
-              "자취방 앞 가로등 골목",
-              "주말마다 가던 동네 목욕탕",
-              ...entries.map((x) => x.title),
-            ].map((title, i) => (
-              <article key={i}>
-                <div className="record-photo" />
-                <p>{title}</p>
+            {records.map(record => (
+              <article key={record.id}>
+                <RemotePhoto className="record-photo" photoUrl={record.photoUrl} alt={record.title} />
+                <p>{record.title}</p>
               </article>
             ))}
             <Link to="/">다음 퀘스트 찾기</Link>
@@ -153,22 +161,23 @@ export default function MyPage() {
         </>
       ) : (
         <div className="flex flex-col gap-[8px] [&_>_button]:rounded-[23px] [&_>_button]:h-[113px] [&_>_button]:bg-[#c9eaf5] [&_>_button]:text-left [&_>_button]:[padding:21px_14px] [&_>_button]:relative [&_strong]:text-[15px] [&_strong]:font-medium [&_strong]:block [&_strong]:max-w-[76%] [&_strong]:tracking-[-0.5px] [&_small]:text-[10px] [&_small]:text-[#666] [&_small]:block [&_small]:mt-[2px] [&_button_>_span]:inline-block [&_button_>_span]:bg-[#bbb] [&_button_>_span]:rounded-[20px] [&_button_>_span]:text-[9px] [&_button_>_span]:[padding:4px_10px] [&_button_>_span]:mt-[11px] [&_i]:absolute [&_i]:right-[21px] [&_i]:top-[13px] [&_i]:w-[60px] [&_i]:h-[79px] [&_i]:bg-[#fff] [&_i]:[transform:rotate(10deg)] [&_button:nth-child(2)_i]:[transform:rotate(-10deg)]">
-          {items.map((x, i) => (
+          {memories.map((x) => (
             <button
-              key={x.title}
+              key={x.id}
               onClick={() => {
-                if (x.message) {
-                  setParams({ message: String(i) });
+                if (x.greetings.length) {
+                  setParams({ quest: x.id, message: "0" });
                   setLiked(false);
                 } else setError("아직 도착한 안부가 없어요.");
               }}
             >
               <strong>{x.title}</strong>
               <small>{x.sub}</small>
-              {i === 0 && <span>새 안부 도착</span>}
-              <i className="memory-thumbnail" />
+              {x.greetings.length > 0 && <span>안부 {x.greetings.length}통 도착</span>}
+              <i className="memory-thumbnail"><RemotePhoto photoUrl={x.photoUrl} alt={x.title} /></i>
             </button>
           ))}
+          {memories.length === 0 && <p role="status">등록한 그리움이 없어요.</p>}
           {error && (
             <p className="text-[12px] p-[12px]" role="status">
               {error}

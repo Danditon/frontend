@@ -229,3 +229,13 @@
  .verify-sheet{min-height:48dvh;}
  .verify-success>div{margin-top:36dvh;min-height:64dvh;}
 }
+
+/* User photos come exclusively from photoUrl, never the design screenshot. */
+.remote-photo,.memory-thumbnail {background-image:none;}
+.remote-photo {overflow:hidden;background-color:#eceeed;display:grid;place-items:center;}
+.remote-photo img {display:block;width:100%;height:100%;object-fit:cover;}
+.remote-photo>span {padding:10px;text-align:center;font-size:11px;color:#66716e;font-style:normal;}
+.memory-thumbnail .remote-photo {width:100%;height:100%;}
+.memory-thumbnail .remote-photo>span {font-size:8px;padding:4px;}
+.message-envelope>.postcard-photo {position:relative;z-index:1;}
+.message-envelope button:disabled {opacity:.5;cursor:default;}

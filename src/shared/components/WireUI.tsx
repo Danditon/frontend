@@ -1,6 +1,7 @@
 import { Link } from "react-router";
-import { ChevronLeft, ChevronsRight, LogOut, Footprints, MailPlus } from "lucide-react";
+import { ChevronLeft, ChevronsRight, LogOut, MailPlus } from "lucide-react";
 import { GoHomeFill } from "react-icons/go";
+import { PiSealCheck } from "react-icons/pi";
 import type { ReactNode } from "react";
 export function Back({ to = "/me/memories" }: { to?: string }) {
   return (
@@ -36,7 +37,7 @@ export function Bottom() {
       className="absolute bottom-[26px] left-[15px] right-[15px] h-[65px] rounded-[36px] bg-[#242624] text-white flex justify-between items-center [padding:0_37px] text-[14px] max-[500px]:[bottom:max(26px,_env(safe-area-inset-bottom))]"
       aria-label="주 메뉴"
     >
-      <Link className="nav-item" to="/quests/demo/verify"><Footprints size={22} />수행 인증</Link>
+      <Link className="nav-item" to="/quests/demo/verify"><PiSealCheck size={32} aria-hidden="true" />수행 인증</Link>
       <Link
         to="/"
         className="absolute left-[50%] top-[-36px] [transform:translateX(-50%)] h-[73px] w-[73px] bg-white text-[#242624] rounded-full grid place-items-center text-[18px]"

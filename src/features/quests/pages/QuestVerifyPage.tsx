@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 import { ChevronsLeftRight, Plus, X } from "lucide-react";
 import { Back, SlideButton } from "@/shared/components/WireUI";
+import { SwipeSheet } from "@/shared/components/SwipeSheet";
 import { saveHistory } from "@/shared/lib/demo";
 type Step = "capture" | "compare" | "checking" | "success" | "failure";
 export default function QuestVerifyPage() {
@@ -104,7 +105,7 @@ export default function QuestVerifyPage() {
   if (step === "checking")
     return (
       <section
-        className="min-h-[790px] flex-1 bg-[#eee] relative [&::before]:content-[''] [&::before]:absolute [&::before]:top-[-54px] [&::before]:left-0 [&::before]:right-0 [&::before]:h-[54px] [&::before]:bg-[#eee] [&::before]:z-0 max-[500px]:[min-height:calc(100dvh_-_54px)]"
+        className="verify-page verify-checking min-h-[790px] flex-1 bg-[#def2f6] relative [&::before]:content-[''] [&::before]:absolute [&::before]:top-[-54px] [&::before]:left-0 [&::before]:right-0 [&::before]:h-[54px] [&::before]:bg-[#def2f6] [&::before]:z-0 max-[500px]:[min-height:calc(100dvh_-_54px)]"
         aria-live="polite"
       >
         <motion.div
@@ -112,8 +113,8 @@ export default function QuestVerifyPage() {
           animate={{ y: reduceMotion ? 0 : [0, -200, 0] }}
           transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
         />
-        <div className="absolute bottom-[27px] left-[15px] right-[15px] bg-[#c4c4c4] rounded-[28px] p-[20px] [&_small]:text-[15px] [&_h1]:text-[28px] [&_h1]:leading-[1.2] [&_h1]:mt-[12px] [&_h1]:font-normal [&_h1]:tracking-[-1px]">
-          <small>AI 검증중 · 데모</small>
+        <div className="checking-card absolute bottom-[27px] left-[15px] right-[15px] bg-[#c9eaf5] rounded-[28px] p-[20px] [&_small]:text-[15px] [&_h1]:text-[28px] [&_h1]:leading-[1.2] [&_h1]:mt-[12px] [&_h1]:font-normal [&_h1]:tracking-[-1px]">
+          <small>AI 검증 중</small>
           <h1>
             같은 자리인지
             <br />
@@ -124,29 +125,32 @@ export default function QuestVerifyPage() {
     );
   if (step === "success")
     return (
-      <section className="[&::before]:content-[''] [&::before]:absolute [&::before]:top-[-54px] [&::before]:left-0 [&::before]:right-0 [&::before]:h-[54px] [&::before]:bg-[#eee] [&::before]:z-0 bg-[#eee] min-h-[790px] flex-1 relative max-[500px]:[min-height:calc(100dvh_-_54px)]">
+      <section className={`verify-page verify-${step} ${general ? "verify-general" : ""} [&::before]:content-[''] [&::before]:absolute [&::before]:top-[-54px] [&::before]:left-0 [&::before]:right-0 [&::before]:h-[54px] [&::before]:bg-[#def2f6] [&::before]:z-0 bg-[#def2f6] min-h-[790px] flex-1 relative max-[500px]:[min-height:calc(100dvh_-_54px)]`}>
         <Link
-          className="h-[54px] w-[54px] rounded-full bg-[#d9d9d9] inline-flex items-center justify-center shrink-0 [&_svg]:[stroke-width:1.25] absolute right-[15px] top-[12px]"
+          className="h-[54px] w-[54px] rounded-full bg-[#ededed] inline-flex items-center justify-center shrink-0 [&_svg]:[stroke-width:1.25] absolute right-[15px] top-[12px]"
           to="/me/history"
           aria-label="닫기"
         >
           <X />
         </Link>
-        <div className="mt-[265px] bg-[#c4c4c4] [border-radius:45px_45px_0_0] [padding:27px_25px] min-h-[525px] flex flex-col [&_>_p]:text-[20px] [&_>_p_small]:text-[10px] [&_>_p_small]:text-[#666] [&_>_p_small]:ml-[10px] [&_>_small]:text-[16px] [&_>_small]:mt-[4px] [&_h1]:text-[23px] [&_h1]:leading-[1.3] [&_h1]:font-normal [&_h1]:mt-[28px] [&_h1]:tracking-[-1px] max-[500px]:mt-[30dvh] max-[500px]:[min-height:calc(70dvh_-_54px)]">
+        {photo && <img className="verify-result-background" src={photo} alt="인증한 장소" />}
+        <SwipeSheet key="success" label="인증 성공 결과" collapsed={0.64} className="success-swipe-sheet">
+        <div className="success-sheet-content">
+
           <p>
-            인증 성공 <small>예시 결과</small>
+            인증 성공 <small className="sr-only">예시 결과</small>
           </p>
           <div className="text-[112px] leading-[1.15] tracking-[-6px] font-normal [&_span]:text-[36px] [&_span]:tracking-[0]">
-            84<span>%</span>
+            {general ? "인증 완료" : <>84<span>%</span></>}
           </div>
-          <small>그때 사진과의 유사도</small>
+          <small>{general ? "퀘스트 수행을 완료했어요" : "그때 사진과의 유사도"}</small>
           <h1>
             판교에 있는 사람에게
             <br />
             안부가 전해졌어요
           </h1>
-          <div className="mt-auto pt-[45px] flex flex-col text-center gap-[17px] text-[14px] [&_>_a:first-of-type]:bg-[#a6a6a6] [&_>_a:first-of-type]:rounded-[35px] [&_>_a:first-of-type]:p-[20px] [&_>_button]:text-[10px] [&_>_button]:text-[#555]">
-            <button onClick={record} disabled={saved}>
+          <div className="mt-auto pt-[45px] flex flex-col text-center gap-[17px] text-[14px] [&_>_a:first-of-type]:bg-[#242624] [&_>_a:first-of-type]:rounded-[35px] [&_>_a:first-of-type]:p-[20px] [&_>_button]:text-[10px] [&_>_button]:text-[#555]">
+            <button className="save-demo-record" onClick={record} disabled={saved}>
               {saved ? "데모 기록 저장 완료" : "데모 기록 저장하기"}
             </button>
             <Link to="/me/memories?message=0">다른 수행자의 안부 보기</Link>
@@ -154,36 +158,38 @@ export default function QuestVerifyPage() {
           </div>
           {error && <p role="alert">{error}</p>}
         </div>
+        </SwipeSheet>
       </section>
     );
   if (step === "failure")
     return (
-      <section className="[&::before]:content-[''] [&::before]:absolute [&::before]:top-[-54px] [&::before]:left-0 [&::before]:right-0 [&::before]:h-[54px] [&::before]:bg-[#eee] [&::before]:z-0 bg-[#eee] min-h-[790px] flex-1 relative [padding:68px_15px_25px] flex flex-col [&_>_p_small]:text-[10px] [&_>_p_small]:text-[#666] [&_>_p_small]:ml-[10px] [&_>_p]:text-[17px] [&_>_p]:mb-[16px] [&_>_h1]:text-[40px] [&_>_h1]:leading-[1.15] [&_>_h1]:font-semibold [&_>_h1]:tracking-[-2px] [&_>_h1]:[margin:0_10px_32px] max-[500px]:[min-height:calc(100dvh_-_54px)]">
+      <section className={`verify-page verify-${step} ${general ? "verify-general" : ""} [&::before]:content-[''] [&::before]:absolute [&::before]:top-[-54px] [&::before]:left-0 [&::before]:right-0 [&::before]:h-[54px] [&::before]:bg-[#def2f6] [&::before]:z-0 bg-[#def2f6] min-h-[790px] flex-1 relative [padding:68px_15px_25px] flex flex-col [&_>_p_small]:text-[10px] [&_>_p_small]:text-[#666] [&_>_p_small]:ml-[10px] [&_>_p]:text-[17px] [&_>_p]:mb-[16px] [&_>_h1]:text-[40px] [&_>_h1]:leading-[1.15] [&_>_h1]:font-semibold [&_>_h1]:tracking-[-2px] [&_>_h1]:[margin:0_10px_32px] max-[500px]:[min-height:calc(100dvh_-_54px)]`}>
         <Link
-          className="h-[54px] w-[54px] rounded-full bg-[#d9d9d9] inline-flex items-center justify-center shrink-0 [&_svg]:[stroke-width:1.25] absolute right-[15px] top-[12px]"
+          className="h-[54px] w-[54px] rounded-full bg-[#ededed] inline-flex items-center justify-center shrink-0 [&_svg]:[stroke-width:1.25] absolute right-[15px] top-[12px]"
           to="/me/memories"
           aria-label="닫기"
         >
           <X />
         </Link>
         <p>
-          인증 실패 <small>예시 결과</small>
+          인증 실패 <small className="sr-only">예시 결과</small>
         </p>
         <h1>
           조금
           <br />
           달라 보여요
         </h1>
-        <div className="flex gap-[10px] h-[250px] [&_>_div]:relative [&_>_div]:flex-1 [&_>_div]:bg-[#bfbfbf] [&_>_div]:rounded-[23px] [&_>_div]:overflow-hidden [&_>_div:nth-child(2)]:bg-[#d9d9d9] [&_img]:w-full [&_img]:h-full [&_img]:object-cover [&_span]:absolute [&_span]:left-[13px] [&_span]:top-[16px] [&_span]:bg-[#aaa] [&_span]:rounded-[20px] [&_span]:[padding:4px_10px] [&_span]:text-[12px] [&_span]:z-[1]">
+        <div className="flex gap-[10px] h-[250px] [&_>_div]:relative [&_>_div]:flex-1 [&_>_div]:bg-[#def2f6] [&_>_div]:rounded-[23px] [&_>_div]:overflow-hidden [&_>_div:nth-child(2)]:bg-[#ededed] [&_img]:w-full [&_img]:h-full [&_img]:object-cover [&_span]:absolute [&_span]:left-[13px] [&_span]:top-[16px] [&_span]:bg-[#aaa] [&_span]:rounded-[20px] [&_span]:[padding:4px_10px] [&_span]:text-[12px] [&_span]:z-[1]">
           <div>
             <span>과거</span>
+            <div className="past-photo" />
           </div>
           <div>
             <span>지금</span>
-            {photo && <img src={photo} alt="선택한 사진" />}
+            {photo ? <img src={photo} alt="선택한 사진" /> : <div className="past-photo current-photo" />}
           </div>
         </div>
-        <div className="flex items-center gap-[20px] bg-[#d9d9d9] rounded-[24px] [padding:22px_20px] mt-[12px] [&_strong]:text-[46px] [&_strong]:font-normal [&_strong]:tracking-[-2px] [&_strong]:whitespace-nowrap [&_strong_small]:text-[12px] [&_strong_small]:tracking-[0] [&_p]:text-[12px] [&_p]:leading-[1.5]">
+        <div className="flex items-center gap-[20px] bg-[#ededed] rounded-[24px] [padding:22px_20px] mt-[12px] [&_strong]:text-[46px] [&_strong]:font-normal [&_strong]:tracking-[-2px] [&_strong]:whitespace-nowrap [&_strong_small]:text-[12px] [&_strong_small]:tracking-[0] [&_p]:text-[12px] [&_p]:leading-[1.5]">
           <strong>
             41<small>%</small>
           </strong>
@@ -208,13 +214,13 @@ export default function QuestVerifyPage() {
       </section>
     );
   return (
-    <section className="min-h-[790px] flex-1 flex flex-col relative max-[500px]:[min-height:calc(100dvh_-_54px)]">
+    <section className={`verify-page verify-${step} ${general ? "verify-general" : ""} min-h-[790px] flex-1 flex flex-col relative max-[500px]:[min-height:calc(100dvh_-_54px)]`}>
       <div
-        className={`h-[388px] relative shrink-0 overflow-hidden max-[500px]:h-[44dvh] max-[500px]:min-h-[325px] ${step === "compare" ? "comparing" : ""}`}
+        className={`verify-photo h-[430px] relative shrink-0 overflow-hidden max-[500px]:h-[48dvh] max-[500px]:min-h-[325px] ${step === "compare" ? "comparing" : ""}`}
       >
         <div className="flex justify-between absolute top-[12px] left-[15px] right-[15px] z-[4]">
-          <Back />
-          <span className="bg-[#d9d9d9] flex items-center gap-[5px] [padding:0_15px] h-[54px] rounded-[30px] text-[12px] [&_i]:w-[12px] [&_i]:h-[12px] [&_i]:rounded-full [&_i]:bg-[#a6a6a6]">
+          <Back to="/" />
+          <span className="bg-[#ededed] flex items-center gap-[5px] [padding:0_15px] h-[54px] rounded-[30px] text-[12px] [&_i]:w-[12px] [&_i]:h-[12px] [&_i]:rounded-full [&_i]:bg-[#242624]">
             <i />
             퀘스트 위치까지 32m
           </span>
@@ -250,7 +256,7 @@ export default function QuestVerifyPage() {
               </h1>
             </div>
             <button
-              className="absolute bottom-[18px] left-[50%] [transform:translateX(-50%)] h-[54px] rounded-[30px] bg-[#d9d9d9] flex items-center gap-[22px] whitespace-nowrap [padding:5px_24px_5px_6px] text-[12px] [&_>_span]:w-[43px] [&_>_span]:h-[43px] [&_>_span]:bg-[#eee] [&_>_span]:rounded-full [&_>_span]:grid [&_>_span]:place-items-center [&_>_span]:text-[#777] [&_svg]:[stroke-width:1]"
+              className="absolute bottom-[18px] left-[50%] [transform:translateX(-50%)] h-[54px] rounded-[30px] bg-[#ededed] flex items-center gap-[22px] whitespace-nowrap [padding:5px_24px_5px_6px] text-[12px] [&_>_span]:w-[43px] [&_>_span]:h-[43px] [&_>_span]:bg-[#def2f6] [&_>_span]:rounded-full [&_>_span]:grid [&_>_span]:place-items-center [&_>_span]:text-[#777] [&_svg]:[stroke-width:1]"
               onClick={pick}
             >
               <span>
@@ -262,7 +268,7 @@ export default function QuestVerifyPage() {
         ) : (
           <>
             <div
-              className="absolute [inset:0_auto_0_0] bg-[#808080]"
+              className="compare-past absolute [inset:0_auto_0_0] bg-transparent"
               style={{ width: `${mix}%` }}
             />
             <div
@@ -282,7 +288,7 @@ export default function QuestVerifyPage() {
               onChange={(e) => setMix(Number(e.target.value))}
               aria-label="과거와 지금 사진 비교"
             />
-            <div className="absolute bottom-[16px] left-[16px] right-[16px] flex items-center justify-between text-[11px] [&_>_span]:bg-[#ddd] [&_>_span]:rounded-[20px] [&_>_span]:[padding:5px_13px] [&_>_button]:bg-[#d9d9d9] [&_>_button]:rounded-[30px] [&_>_button]:p-[20px]">
+            <div className="absolute bottom-[16px] left-[16px] right-[16px] flex items-center justify-between text-[11px] [&_>_span]:bg-[#ddd] [&_>_span]:rounded-[20px] [&_>_span]:[padding:5px_13px] [&_>_button]:bg-[#ededed] [&_>_button]:rounded-[30px] [&_>_button]:p-[20px]">
               <span>과거</span>
               <button onClick={pick}>다시 고르기</button>
               <span>지금</span>
@@ -290,7 +296,8 @@ export default function QuestVerifyPage() {
           </>
         )}
       </div>
-      <div className="bg-[#b3b3b3] [border-radius:46px_46px_0_0] flex-1 min-h-[402px] [padding:27px_20px_24px] flex flex-col [&_h1]:text-[22px] [&_h1]:font-bold [&_h1]:tracking-[-1px] [&_h1]:leading-[1.3] [&_h1]:mt-[3px] [&_>_p]:text-[11px] [&_>_p]:mt-[7px] [&_textarea]:block [&_textarea]:resize-y [&_textarea]:min-h-[90px] [&_textarea]:max-h-[160px] [&_textarea]:w-full [&_textarea]:bg-[#d9d9d9] [&_textarea]:rounded-[24px] [&_textarea]:[padding:22px_10px] [&_textarea]:text-[12px] [&_textarea]:mt-[26px] [&_textarea]:border-0 [&_textarea::placeholder]:text-[#777] max-[500px]:[min-height:calc(56dvh_-_54px)]">
+      <SwipeSheet key="capture" label="퀘스트 인증 입력" collapsed={0.50} className="capture-swipe-sheet">
+      <div className="verify-sheet bg-[#fff] [border-radius:46px_46px_0_0] flex-1 min-h-[402px] [padding:27px_20px_24px] flex flex-col [&_h1]:text-[22px] [&_h1]:font-bold [&_h1]:tracking-[-1px] [&_h1]:leading-[1.3] [&_h1]:mt-[3px] [&_>_p]:text-[11px] [&_>_p]:mt-[7px] [&_textarea]:block [&_textarea]:resize-y [&_textarea]:min-h-[90px] [&_textarea]:max-h-[160px] [&_textarea]:w-full [&_textarea]:bg-[#ededed] [&_textarea]:rounded-[24px] [&_textarea]:[padding:22px_10px] [&_textarea]:text-[12px] [&_textarea]:mt-[26px] [&_textarea]:border-0 [&_textarea::placeholder]:text-[#777] max-[500px]:[min-height:calc(52dvh_-_54px)]">
         <div className="flex justify-between text-[10px]">
           <span>{general ? "일반" : "이미지"} 퀘스트 | 난이도 2</span>
           <span>판교에서 온 그리움</span>
@@ -316,8 +323,7 @@ export default function QuestVerifyPage() {
           </SlideButton>
         </div>
       </div>
-      {fileInput}
-      <details className="absolute top-[100%] left-0 w-full p-[14px] text-[#ddd] text-[11px] bg-[#444] z-[1] [&_label]:inline-flex [&_label]:gap-[5px] [&_label]:p-[10px] [&_p]:text-[10px] max-[500px]:text-[#555] max-[500px]:bg-[#eee]">
+      <details className="absolute top-[100%] left-0 w-full p-[14px] text-[#ddd] text-[11px] bg-[#444] z-[1] [&_label]:inline-flex [&_label]:gap-[5px] [&_label]:p-[10px] [&_p]:text-[10px] max-[500px]:text-[#555] max-[500px]:bg-[#def2f6]">
         <summary>미리보기 설정</summary>
         <label>
           <input
@@ -347,6 +353,9 @@ export default function QuestVerifyPage() {
         </label>
         <p>실제 AI 판정과 위치 검증은 서버 연동 전입니다.</p>
       </details>
+      </SwipeSheet>
+      {fileInput}
+
     </section>
   );
 }

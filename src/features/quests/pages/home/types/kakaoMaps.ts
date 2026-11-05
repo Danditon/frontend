@@ -53,10 +53,25 @@ declare global {
           size: KakaoSize,
         ) => KakaoMarkerImage
 
+        // 마커 클릭 이벤트의 등록과 정리에 사용합니다.
+        event: {
+          addListener(
+            target: KakaoMarker,
+            eventName: 'click',
+            handler: () => void,
+          ): void
+          removeListener(
+            target: KakaoMarker,
+            eventName: 'click',
+            handler: () => void,
+          ): void
+        }
+
         Marker: new (options: {
           map: KakaoMap
           position: KakaoLatLng
           title?: string
+          clickable?: boolean // 마커 클릭의 지도 전파 차단
           image?: KakaoMarkerImage // 생략하면 기본 마커 사용
         }) => KakaoMarker
       }

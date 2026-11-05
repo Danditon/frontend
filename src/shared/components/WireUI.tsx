@@ -34,17 +34,17 @@ export function Profile() {
 export function Bottom() {
   return (
     <nav
-      className="absolute bottom-[26px] left-[15px] right-[15px] h-[65px] rounded-[36px] bg-[#242624] text-white flex justify-between items-center [padding:0_37px] text-[14px] max-[500px]:[bottom:max(26px,_env(safe-area-inset-bottom))]"
+      className="absolute bottom-[26px] left-[15px] right-[15px] h-[65px] rounded-[36px] bg-[#242624] text-white grid grid-cols-3 place-items-center px-4 text-[14px] max-[500px]:[bottom:max(26px,_env(safe-area-inset-bottom))]"
       aria-label="주 메뉴"
     >
-      <Link className="nav-item" to="/quests/demo/verify"><PiSealCheck size={32} aria-hidden="true" />수행 인증</Link>
+      <Link className="nav-item" to="/quests/demo/verify"><span className="nav-icon"><PiSealCheck size={32} aria-hidden="true" /></span><span>수행 인증</span></Link>
       <Link
         to="/"
-        className="absolute left-[50%] top-[-36px] [transform:translateX(-50%)] h-[73px] w-[73px] bg-white text-[#242624] rounded-full grid place-items-center text-[18px]"
+        className="relative -translate-y-8 h-[73px] w-[73px] bg-white text-[#242624] rounded-full grid place-items-center text-[18px]"
       >
         <GoHomeFill size={27} aria-hidden="true" /><span className="sr-only">홈</span>
       </Link>
-      <Link className="nav-item" to="/quests/new"><MailPlus size={22} />그리움 등록</Link>
+      <Link className="nav-item" to="/quests/new"><span className="nav-icon"><MailPlus size={22} aria-hidden="true" /></span><span>그리움 등록</span></Link>
     </nav>
   );
 }

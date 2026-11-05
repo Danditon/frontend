@@ -11,11 +11,13 @@ type MarkerImageSdk = Pick<
 const colors = {
   GENERAL: {
     background: '#FDE68A',
+    selectedBackground: '#FACC15', // 선택한 일반 퀘스트는 선명한 노랑
     border: '#A16207',
     star: '#854D0E',
   },
   IMAGE: {
     background: '#DDD6FE',
+    selectedBackground: '#C4B5FD', // 선택한 이미지 퀘스트는 조금 진한 보라
     border: '#7C3AED',
     star: '#5B21B6',
   },
@@ -25,6 +27,7 @@ export function createQuestMarkerImage(
   maps: MarkerImageSdk,
   questType: NearbyQuest['questType'],
   difficulty: NearbyQuest['difficulty'],
+  isSelected = false, // Drawer에서 보고 있는 퀘스트인지 여부
 ): KakaoMarkerImage {
   const color = colors[questType]
 
@@ -42,9 +45,9 @@ export function createQuestMarkerImage(
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="56" height="64" viewBox="0 0 56 64">
     <path
       d="M28 62C23 54 4 39 4 26a24 24 0 1 1 48 0c0 13-19 28-24 36Z"
-      fill="${color.background}"
+      fill="${isSelected ? color.selectedBackground : color.background}"
       stroke="${color.border}"
-      stroke-width="2"
+      stroke-width="${isSelected ? 3.5 : 2}"
     />
     ${stars}
   </svg>`

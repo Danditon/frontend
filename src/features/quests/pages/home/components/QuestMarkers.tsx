@@ -59,7 +59,11 @@ export default function QuestMarkers({ map, quests }: QuestMarkersProps) {
     for (const quest of quests) {
       // 퀘스트의 위도·경도를 카카오 좌표 객체로 변환합니다.
       const position = new maps.LatLng(quest.lat, quest.lng)
-      const image = markerImages[quest.questType][quest.difficulty]
+      const isSelected = quest.questId === selectedQuestId
+      // Drawer에서 보고 있는 마커만 색상과 테두리를 강조합니다.
+      const image = isSelected
+        ? createQuestMarkerImage(maps, quest.questType, quest.difficulty, true)
+        : markerImages[quest.questType][quest.difficulty]
       const existingMarker = markersRef.current.get(quest.questId)
 
       if (existingMarker) {
@@ -79,8 +83,11 @@ export default function QuestMarkers({ map, quests }: QuestMarkersProps) {
         })
         markersRef.current.set(quest.questId, marker)
       }
+
+      // 선택한 마커를 맨 앞에 놓고, 선택이 풀리면 기본 순서로 복원합니다.
+      markersRef.current.get(quest.questId)?.setZIndex(isSelected ? 10 : 0)
     }
-  }, [map, quests])
+  }, [map, quests, selectedQuestId])
 
   // 앞선 Effect에서 생성한 마커에 클릭 이벤트를 연결합니다.
   useEffect(() => {

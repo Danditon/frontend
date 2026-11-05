@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router";
 import { Heart, LogOut } from "lucide-react";
-import { Back, Bottom, Profile } from "@/shared/components/WireUI";
+import { Back, Profile } from "@/shared/components/WireUI";
 import { RemotePhoto } from "@/shared/components/RemotePhoto";
 import type { MyPageData } from "@/features/memories/types";
 import { readHistory } from "@/shared/lib/demo";
@@ -181,7 +181,6 @@ export default function MyPage({ data }: { data?: MyPageData } = {}) {
           )}
         </div>
       )}
-      <Bottom />
     </section>
   );
 }

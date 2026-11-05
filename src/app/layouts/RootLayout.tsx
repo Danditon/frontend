@@ -1,5 +1,6 @@
 import { Outlet, useLocation } from "react-router";
 import { BatteryFull, Signal, Wifi } from "lucide-react";
+import { Bottom } from "@/shared/components/WireUI";
 export function RootLayout() {
   const { pathname } = useLocation();
   const scoped = pathname.startsWith("/me") || pathname.endsWith("/verify");
@@ -19,7 +20,12 @@ export function RootLayout() {
             <BatteryFull size={22} />
           </span>
         </div>
-        <Outlet />
+        <main className="app-content" data-home={pathname === "/"}>
+          <Outlet />
+        </main>
+        <div className="app-navigation">
+          <Bottom />
+        </div>
       </div>
       <p className="text-[#ccc] text-[11px] p-[14px] max-[500px]:hidden">
         그리움 퀘스트 · UI 미리보기

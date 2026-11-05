@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 import { ChevronsLeftRight, Plus, X } from "lucide-react";
 import { Back, SlideButton } from "@/shared/components/WireUI";
+import { SwipeSheet } from "@/shared/components/SwipeSheet";
 import { saveHistory } from "@/shared/lib/demo";
 type Step = "capture" | "compare" | "checking" | "success" | "failure";
 export default function QuestVerifyPage() {
@@ -132,14 +133,17 @@ export default function QuestVerifyPage() {
         >
           <X />
         </Link>
-        <div className="mt-[265px] bg-[#c9eaf5] [border-radius:45px_45px_0_0] [padding:27px_25px] min-h-[525px] flex flex-col [&_>_p]:text-[20px] [&_>_p_small]:text-[10px] [&_>_p_small]:text-[#666] [&_>_p_small]:ml-[10px] [&_>_small]:text-[16px] [&_>_small]:mt-[4px] [&_h1]:text-[23px] [&_h1]:leading-[1.3] [&_h1]:font-normal [&_h1]:mt-[28px] [&_h1]:tracking-[-1px] max-[500px]:mt-[30dvh] max-[500px]:[min-height:calc(70dvh_-_54px)]">
+        {photo && <img className="verify-result-background" src={photo} alt="인증한 장소" />}
+        <SwipeSheet key="success" label="인증 성공 결과" collapsed={0.64} className="success-swipe-sheet">
+        <div className="success-sheet-content">
+
           <p>
             인증 성공 <small className="sr-only">예시 결과</small>
           </p>
           <div className="text-[112px] leading-[1.15] tracking-[-6px] font-normal [&_span]:text-[36px] [&_span]:tracking-[0]">
-            84<span>%</span>
+            {general ? "인증 완료" : <>84<span>%</span></>}
           </div>
-          <small>그때 사진과의 유사도</small>
+          <small>{general ? "퀘스트 수행을 완료했어요" : "그때 사진과의 유사도"}</small>
           <h1>
             판교에 있는 사람에게
             <br />
@@ -154,6 +158,7 @@ export default function QuestVerifyPage() {
           </div>
           {error && <p role="alert">{error}</p>}
         </div>
+        </SwipeSheet>
       </section>
     );
   if (step === "failure")
@@ -291,6 +296,7 @@ export default function QuestVerifyPage() {
           </>
         )}
       </div>
+      <SwipeSheet key="capture" label="퀘스트 인증 입력" collapsed={0.50} className="capture-swipe-sheet">
       <div className="verify-sheet bg-[#fff] [border-radius:46px_46px_0_0] flex-1 min-h-[402px] [padding:27px_20px_24px] flex flex-col [&_h1]:text-[22px] [&_h1]:font-bold [&_h1]:tracking-[-1px] [&_h1]:leading-[1.3] [&_h1]:mt-[3px] [&_>_p]:text-[11px] [&_>_p]:mt-[7px] [&_textarea]:block [&_textarea]:resize-y [&_textarea]:min-h-[90px] [&_textarea]:max-h-[160px] [&_textarea]:w-full [&_textarea]:bg-[#ededed] [&_textarea]:rounded-[24px] [&_textarea]:[padding:22px_10px] [&_textarea]:text-[12px] [&_textarea]:mt-[26px] [&_textarea]:border-0 [&_textarea::placeholder]:text-[#777] max-[500px]:[min-height:calc(52dvh_-_54px)]">
         <div className="flex justify-between text-[10px]">
           <span>{general ? "일반" : "이미지"} 퀘스트 | 난이도 2</span>
@@ -317,7 +323,6 @@ export default function QuestVerifyPage() {
           </SlideButton>
         </div>
       </div>
-      {fileInput}
       <details className="absolute top-[100%] left-0 w-full p-[14px] text-[#ddd] text-[11px] bg-[#444] z-[1] [&_label]:inline-flex [&_label]:gap-[5px] [&_label]:p-[10px] [&_p]:text-[10px] max-[500px]:text-[#555] max-[500px]:bg-[#def2f6]">
         <summary>미리보기 설정</summary>
         <label>
@@ -348,6 +353,9 @@ export default function QuestVerifyPage() {
         </label>
         <p>실제 AI 판정과 위치 검증은 서버 연동 전입니다.</p>
       </details>
+      </SwipeSheet>
+      {fileInput}
+
     </section>
   );
 }

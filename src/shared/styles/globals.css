@@ -185,7 +185,6 @@
 .verify-page button:disabled {background:#ededed;color:#666;}
 .verify-page details {position:relative;top:auto;background:#f4f4f4;color:#555;}
 @media(max-width:500px){
- .designed-screen>.preview-status{display:none;}
  .designed-screen{min-height:100dvh;padding-top:env(safe-area-inset-top);}
  .memory-page,.verify-page{min-height:calc(100dvh - env(safe-area-inset-top));}
  .verify-page{padding-bottom:env(safe-area-inset-bottom);}
@@ -275,6 +274,8 @@
 .app-navigation {position:relative;isolation:isolate;flex:none;height:124px;background:inherit;z-index:30;}
 .app-content[data-home="true"] {overflow:hidden;}
 .app-content[data-home="true"]>div {position:absolute;inset:0;width:100%;height:100%;}
+.app-content[data-home="true"] + .app-navigation {position:absolute;inset:auto 0 0;background:transparent;pointer-events:none;}
+.app-content[data-home="true"] + .app-navigation>nav {pointer-events:auto;}
 .app-content>.memory-page {min-height:100%;padding-bottom:24px;}
 .app-content>.verify-page {min-height:100%;}
 .app-content>.verify-page:has(>.swipe-sheet) {height:100%;min-height:0;}

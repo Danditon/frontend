@@ -1,5 +1,4 @@
 import { Outlet, useLocation } from "react-router";
-import { BatteryFull, Signal, Wifi } from "lucide-react";
 import { Bottom } from "@/shared/components/WireUI";
 export function RootLayout() {
   const { pathname } = useLocation();
@@ -9,17 +8,6 @@ export function RootLayout() {
       <div
         className={`app-phone ${scoped ? "designed-screen" : ""} w-[390px] min-h-[844px] bg-[#fff] relative flex flex-col [box-shadow:0_0_0_1px_#777] max-[500px]:w-full max-[500px]:min-h-[100dvh] max-[500px]:shadow-none ${scoped ? "" : "pb-[30px] [&_>_h1]:p-[20px]"}`}
       >
-        <div
-          className="preview-status h-[54px] shrink-0 [padding:20px_36px_10px] flex justify-between items-center text-[14px] relative z-[2] [&_>_span]:flex [&_>_span]:gap-[3px] [&_>_span]:items-center"
-          aria-hidden="true"
-        >
-          <b>12:34</b>
-          <span>
-            <Signal size={15} />
-            <Wifi size={15} />
-            <BatteryFull size={22} />
-          </span>
-        </div>
         <main className="app-content" data-home={pathname === "/"}>
           <Outlet />
         </main>

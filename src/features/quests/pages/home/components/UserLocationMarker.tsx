@@ -1,4 +1,4 @@
-// 조회된 현재 위치를 카카오 지도에 표시하고, 마커의 생성·갱신·제거를 관리하는 컴포넌트입니다.
+// 사용자 조회된 현재 위치를 카카오 지도에 표시하고, 마커의 생성·갱신·제거를 관리하는 컴포넌트입니다.
 import { useEffect, useRef } from 'react'
 import type { UserPosition } from '@/features/quests/hooks/useGeolocation'
 import type { KakaoMap, KakaoMarker } from '../types/kakaoMaps'

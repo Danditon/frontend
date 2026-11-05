@@ -6,12 +6,35 @@ export type KakaoLatLng = {
   getLng(): number // 경도 반환
 }
 
+export type KakaoSize = {
+  width: number
+  height: number
+}
+
+// 이미지 객체는 생성 후 마커 옵션에 전달하는 용도로만 사용합니다.
+export type KakaoMarkerImage = object
+
+export type KakaoPoint = {
+  x: number
+  y: number
+}
+
+// 지도 좌표와 지도 왼쪽 위 기준의 화면 좌표를 변환합니다.
+export type KakaoMapProjection = {
+  containerPointFromCoords(position: KakaoLatLng): KakaoPoint
+  coordsFromContainerPoint(point: KakaoPoint): KakaoLatLng
+}
+
 export type KakaoMap = {
+  getCenter(): KakaoLatLng // 현재 지도 중심 좌표
+  getProjection(): KakaoMapProjection // 화면·지도 좌표 변환 객체
   relayout(): void // 지도 영역 크기가 바뀌었을 때 다시 계산
   panTo(position: KakaoLatLng): void // 전달받은 좌표로 지도 중심 이동
 }
 
 export type KakaoMarker = {
+  setZIndex(zIndex: number): void // 선택한 마커를 다른 마커보다 앞에 표시
+  setImage(image: KakaoMarkerImage): void // 종류·난이도 이미지 갱신
   setPosition(position: KakaoLatLng): void // 기존 마커의 좌표 변경
   setMap(map: KakaoMap | null): void // 지도에 연결하거나 null로 제거
 }
@@ -37,10 +60,35 @@ declare global {
           },
         ) => KakaoMap
 
+        Point: new (x: number, y: number) => KakaoPoint
+
+        Size: new (width: number, height: number) => KakaoSize
+
+        MarkerImage: new (
+          source: string,
+          size: KakaoSize,
+        ) => KakaoMarkerImage
+
+        // 마커 클릭 이벤트의 등록과 정리에 사용합니다.
+        event: {
+          addListener(
+            target: KakaoMarker,
+            eventName: 'click',
+            handler: () => void,
+          ): void
+          removeListener(
+            target: KakaoMarker,
+            eventName: 'click',
+            handler: () => void,
+          ): void
+        }
+
         Marker: new (options: {
           map: KakaoMap
           position: KakaoLatLng
           title?: string
+          clickable?: boolean // 마커 클릭의 지도 전파 차단
+          image?: KakaoMarkerImage // 생략하면 기본 마커 사용
         }) => KakaoMarker
       }
     }

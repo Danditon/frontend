@@ -1,4 +1,5 @@
 import QuestMap from './components/QuestMap.tsx'
+import { mockNearbyQuests } from './mocks/nearbyQuests'
 import CurrentLocationButton from './components/CurrentLocationButton'
 import { useGeolocation } from '@/features/quests/hooks/useGeolocation'
 
@@ -14,7 +15,7 @@ export default function QuestMapPage() {
       </h1>
 
       {/* 지도 영역을 담당하는 컴포넌트 */}
-      <QuestMap position={position} />
+      <QuestMap position={position} quests={mockNearbyQuests} />
 
       {/* 위치 권한 거절·시간 초과 등은 사용자에게 안내합니다. */}
       {error && (

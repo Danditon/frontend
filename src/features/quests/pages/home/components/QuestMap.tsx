@@ -1,14 +1,17 @@
 // 카카오 지도를 생성하고 현재 위치로 중심을 이동시키며, 내 위치 마커 컴포넌트를 연결합니다.
 import { useEffect, useRef, useState } from 'react'
 import type { UserPosition } from '@/features/quests/hooks/useGeolocation'
+import type { NearbyQuest } from '@/features/quests/types/quest'
 import type { KakaoMap } from '../types/kakaoMaps'
 import UserLocationMarker from './UserLocationMarker'
+import QuestMarkers from './QuestMarkers'
 
 type QuestMapProps = {
+  quests: NearbyQuest[] // 지도에 표시할 퀘스트 배열
   position: UserPosition | null // 홈에서 조회한 현재 위치
 }
 
-export default function QuestMap({ position }: QuestMapProps) {
+export default function QuestMap({ position, quests }: QuestMapProps) {
   // 아래 JSX의 div 요소에 접근하기 위한 ref입니다.
   // 첫 렌더링 전에는 실제 div가 없으므로 초기값은 null입니다.
   const containerRef = useRef<HTMLDivElement>(null)
@@ -92,6 +95,8 @@ export default function QuestMap({ position }: QuestMapProps) {
     >
       {/* 지도와 최신 좌표를 전달하면 마커 컴포넌트가 표시·갱신을 담당합니다. */}
       <UserLocationMarker map={map} position={position} />
+      {/* 퀘스트 배열의 좌표별로 마커를 표시합니다. */}
+      <QuestMarkers map={map} quests={quests} />
     </div>
   )
 }

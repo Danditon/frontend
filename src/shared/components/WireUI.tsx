@@ -1,7 +1,5 @@
 import { Link } from "react-router";
-import { ChevronLeft, ChevronsRight, LogOut, MailPlus } from "lucide-react";
-import { GoHomeFill } from "react-icons/go";
-import { PiSealCheck } from "react-icons/pi";
+import { ChevronLeft, ChevronsRight, LogOut, MailPlus, House, BadgeCheck } from "lucide-react";
 import type { ReactNode } from "react";
 export function Back({ to = "/me/memories" }: { to?: string }) {
   return (
@@ -37,12 +35,12 @@ export function Bottom() {
       className="absolute bottom-[26px] left-[15px] right-[15px] h-[65px] rounded-[36px] bg-[#242624] text-white grid grid-cols-3 place-items-center px-4 text-[14px] max-[500px]:[bottom:max(26px,_env(safe-area-inset-bottom))]"
       aria-label="주 메뉴"
     >
-      <Link className="nav-item" to="/quests/demo/verify"><span className="nav-icon"><PiSealCheck size={32} aria-hidden="true" /></span><span>수행 인증</span></Link>
+      <Link className="nav-item" to="/quests/demo/verify"><span className="nav-icon"><BadgeCheck size={32} aria-hidden="true" /></span><span>수행 인증</span></Link>
       <Link
         to="/"
         className="relative -translate-y-8 h-[73px] w-[73px] bg-white text-[#242624] rounded-full grid place-items-center text-[18px]"
       >
-        <GoHomeFill size={27} aria-hidden="true" /><span className="sr-only">홈</span>
+        <House size={27} fill="currentColor" aria-hidden="true" /><span className="sr-only">홈</span>
       </Link>
       <Link className="nav-item" to="/quests/new"><span className="nav-icon"><MailPlus size={22} aria-hidden="true" /></span><span>그리움 등록</span></Link>
     </nav>

@@ -1,4 +1,10 @@
+// 홈 지도와 개수 카드·목록·상세 Drawer의 선택 상태를 연결하는 화면입니다.
+import { useCallback, useState } from 'react'
+import type { NearbyQuest } from '@/features/quests/types/quest'
 import QuestMap from './components/QuestMap.tsx'
+import NearbyQuestCountCard from './components/NearbyQuestCountCard'
+import QuestListDrawer from './components/QuestListDrawer'
+import QuestDetailDrawer from './components/QuestDetailDrawer'
 import { mockNearbyQuests } from './mocks/nearbyQuests'
 import CurrentLocationButton from './components/CurrentLocationButton'
 import { useGeolocation } from '@/features/quests/hooks/useGeolocation'
@@ -6,6 +12,30 @@ import { useGeolocation } from '@/features/quests/hooks/useGeolocation'
 export default function QuestMapPage() {
   // 홈에서 위치 조회 상태를 관리하고, 버튼과 결과 표시에 연결합니다.
   const { position, isLocating, error, requestLocation } = useGeolocation()
+  const [visibleQuests, setVisibleQuests] = useState<NearbyQuest[] | null>(null)
+  const [isListOpen, setIsListOpen] = useState(false)
+  const [listSnapshot, setListSnapshot] = useState<NearbyQuest[]>([])
+  const [selectedQuestId, setSelectedQuestId] = useState<number | null>(null)
+  const [drawerTop, setDrawerTop] = useState<number | null>(null)
+
+  // 마커와 목록 행이 같은 상세 Drawer를 사용합니다.
+  const handleQuestSelect = useCallback((questId: number) => {
+    setIsListOpen(false)
+    setSelectedQuestId(questId)
+
+    // TODO: 선택한 ID로 GET /quests/{questId} 상세 API를 요청할 위치입니다.
+    // 현재는 mock 목록으로 UI와 선택 동작만 확인합니다.
+  }, [])
+
+  const handleOpenList = () => {
+    if (visibleQuests === null) return
+
+    setSelectedQuestId(null)
+    setDrawerTop(null)
+    // 열린 목록은 지도를 옮겨도 행이 바뀌지 않게 현재 배열을 저장합니다.
+    setListSnapshot([...visibleQuests])
+    setIsListOpen(true)
+  }
   return (
 
   <div className="fixed inset-0 z-10 h-dvh w-full overflow-hidden bg-neutral-100">
@@ -15,7 +45,14 @@ export default function QuestMapPage() {
       </h1>
 
       {/* 지도 영역을 담당하는 컴포넌트 */}
-      <QuestMap position={position} quests={mockNearbyQuests} />
+      <QuestMap
+        position={position}
+        quests={mockNearbyQuests}
+        selectedQuestId={selectedQuestId}
+        drawerTop={drawerTop}
+        onQuestSelect={handleQuestSelect}
+        onVisibleQuestsChange={setVisibleQuests}
+      />
 
       {/* 위치 권한 거절·시간 초과 등은 사용자에게 안내합니다. */}
       {error && (
@@ -44,21 +81,44 @@ export default function QuestMapPage() {
         {/* 지역명·벨·MY 컴포넌트 */}
       </div>
 
-      {/* 지도 위 현위치 버튼 */}
-      <div className="absolute bottom-40 right-4 z-10">
-        <CurrentLocationButton
-          isLocating={isLocating}
-          onClick={() => {
-            // 조회 결과는 훅의 position과 error로 받으므로 반환값은 여기서 사용하지 않습니다.
-            void requestLocation()
-          }}
-        />
-      </div>
+      {/* Drawer가 닫혀 있을 때 개수 카드와 현위치 버튼을 보여줍니다. */}
+      {!isListOpen && selectedQuestId === null && (
+        <div className="pointer-events-none absolute inset-x-4 bottom-[calc(7rem+env(safe-area-inset-bottom,0px))] z-20">
+          {/* 카드 높이가 달라져도 현위치 버튼이 겹치지 않게 행 위에 배치합니다. */}
+          <div className="mb-3 flex justify-end">
+            <div className="pointer-events-auto">
+              <CurrentLocationButton
+                isLocating={isLocating}
+                onClick={() => {
+                  void requestLocation()
+                }}
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)] gap-3">
+            <div aria-hidden="true">{/* 추후 선택한 퀘스트 카드를 배치할 영역 */}</div>
+            <NearbyQuestCountCard
+              count={visibleQuests?.length ?? null}
+              onClick={handleOpenList}
+            />
+          </div>
+        </div>
+      )}
 
-      {/* 지도 위 하단 UI */}
-      <div className="absolute inset-x-0 bottom-0 z-10 p-4">
-        {/* 퀘스트 카드·하단 메뉴 컴포넌트 */}
-      </div>
+      <QuestListDrawer
+        open={isListOpen}
+        quests={listSnapshot}
+        onClose={() => setIsListOpen(false)}
+        onSelect={handleQuestSelect}
+      />
+      <QuestDetailDrawer
+        questId={selectedQuestId}
+        onPositionChange={setDrawerTop}
+        onClose={() => {
+          setSelectedQuestId(null)
+          setDrawerTop(null)
+        }}
+      />
     </section>
   </div>
   )

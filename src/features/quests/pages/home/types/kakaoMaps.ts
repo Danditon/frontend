@@ -25,7 +25,12 @@ export type KakaoMapProjection = {
   coordsFromContainerPoint(point: KakaoPoint): KakaoLatLng
 }
 
+export type KakaoBounds = {
+  contain(position: KakaoLatLng): boolean // 퀘스트 좌표가 현재 지도 범위 안인지 확인
+}
+
 export type KakaoMap = {
+  getBounds(): KakaoBounds // 현재 지도 영역
   getCenter(): KakaoLatLng // 현재 지도 중심 좌표
   getProjection(): KakaoMapProjection // 화면·지도 좌표 변환 객체
   relayout(): void // 지도 영역 크기가 바뀌었을 때 다시 계산
@@ -72,8 +77,18 @@ declare global {
         // 마커 클릭 이벤트의 등록과 정리에 사용합니다.
         event: {
           addListener(
+            target: KakaoMap,
+            eventName: 'idle',
+            handler: () => void,
+          ): void
+          addListener(
             target: KakaoMarker,
             eventName: 'click',
+            handler: () => void,
+          ): void
+          removeListener(
+            target: KakaoMap,
+            eventName: 'idle',
             handler: () => void,
           ): void
           removeListener(

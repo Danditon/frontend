@@ -1,51 +1,32 @@
-import { useEffect, useRef } from 'react'
+// 카카오 지도를 생성하고 현재 위치로 중심을 이동시키며, 내 위치 마커 컴포넌트를 연결합니다.
+import { useEffect, useRef, useState } from 'react'
+import type { UserPosition } from '@/features/quests/hooks/useGeolocation'
+import type { KakaoMap } from '../types/kakaoMaps'
+import UserLocationMarker from './UserLocationMarker'
 
-// 카카오 SDK의 좌표 객체가 제공하는 기능.
-// 실제 좌표 객체는 SDK가 만들고, 여기서는 TypeScript 타입만 정의합니다.
-type KakaoLatLng = {
-  getLat(): number // 위도 반환
-  getLng(): number // 경도 반환
+type QuestMapProps = {
+  position: UserPosition | null // 홈에서 조회한 현재 위치
 }
 
-// 지도 객체의 타입.
-// relayout은 지도 영역의 크기가 바뀌었을 때 다시 계산하는 기능
-type KakaoMap = {
-  relayout(): void
-}
-
-// TypeScript에 window.kakao가 존재할 수 있다는 것을 알려줍니다.
-// SDK를 불러오는 코드가 아니라, 타입을 설명하는 선언입니다.
-declare global {
-  interface Window {
-    // SDK 로딩에 실패하면 없을 수 있으므로 ?를 붙입니다.
-    kakao?: {
-      maps: {
-        // SDK가 준비되면 전달한 함수를 실행합니다.
-        load(callback: () => void): void
-
-        // new maps.LatLng(위도, 경도)로 좌표 객체를 만듭니다.
-        LatLng: new (
-          latitude: number,
-          longitude: number,
-        ) => KakaoLatLng
-
-        // new maps.Map(HTML 요소, 설정)으로 지도 객체를 만듭니다.
-        Map: new (
-          container: HTMLElement,
-          options: {
-            center: KakaoLatLng // 처음 보여줄 지도 중심
-            level: number      // 확대 수준
-          },
-        ) => KakaoMap
-      }
-    }
-  }
-}
-
-export default function QuestMap() {
+export default function QuestMap({ position }: QuestMapProps) {
   // 아래 JSX의 div 요소에 접근하기 위한 ref입니다.
   // 첫 렌더링 전에는 실제 div가 없으므로 초기값은 null입니다.
   const containerRef = useRef<HTMLDivElement>(null)
+  // 지도 생성 완료를 React에 알려 마커 컴포넌트에도 지도 객체를 전달합니다.
+  const [map, setMap] = useState<KakaoMap | null>(null)
+  const latestPositionRef = useRef<UserPosition | null>(position)
+
+  // 위치 조회가 성공하면 기존 지도의 중심만 이동합니다.
+  useEffect(() => {
+    // SDK 로딩보다 위치 조회가 먼저 끝나도 최신 좌표를 기억합니다.
+    latestPositionRef.current = position
+
+    const maps = window.kakao?.maps
+
+    if (!position || !map || !maps) return
+
+    map.panTo(new maps.LatLng(position.lat, position.lng))
+  }, [map, position])
 
   // React가 div를 화면에 연결한 다음 지도 생성 작업을 실행합니다.
   useEffect(() => {
@@ -74,16 +55,20 @@ export default function QuestMap() {
       // 기다리는 동안 컴포넌트가 사라졌다면 지도를 생성하지 않습니다.
       if (cancelled) return
 
-      // container div 안에 지도를 생성합니다.
-      new maps.Map(container, {
-        // 처음 표시할 중심 좌표입니다.
-        // 현재 GPS가 아니라 코드에 지정한 예시 위치입니다.
-        // 순서는 반드시 위도 → 경도입니다.
-        center: new maps.LatLng(35.8714, 128.6014),
+      // 이미 조회된 위치가 있으면 그곳에서 시작하고, 없으면 기본 지도 좌표를 사용합니다.
+      const initialPosition = latestPositionRef.current ?? {
+        lat: 35.8714,
+        lng: 128.6014,
+      }
+
+      // 지도 객체를 저장해 이후 위치 조회 시 새로 만들지 않고 이동시킵니다.
+      const createdMap = new maps.Map(container, {
+        center: new maps.LatLng(initialPosition.lat, initialPosition.lng),
 
         // 숫자가 작을수록 확대되고, 클수록 넓은 지역이 보입니다.
         level: 3,
       })
+      setMap(createdMap)
     })
 
     // 화면을 떠나거나 Effect가 다시 실행되기 전에 호출됩니다.
@@ -104,6 +89,9 @@ export default function QuestMap() {
       // 지도는 실제 높이가 있어야 보입니다.
       // 부모 화면 영역의 너비와 높이를 모두 채웁니다.
       className="absolute inset-0 z-0 h-full w-full"
-    />
+    >
+      {/* 지도와 최신 좌표를 전달하면 마커 컴포넌트가 표시·갱신을 담당합니다. */}
+      <UserLocationMarker map={map} position={position} />
+    </div>
   )
 }

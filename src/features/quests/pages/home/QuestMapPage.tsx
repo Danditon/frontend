@@ -1,17 +1,24 @@
-// 홈 지도와 개수 카드·목록·상세 Drawer의 선택 상태를 연결하는 화면입니다.
+// 홈 지도와 수행 중 카드·개수 카드·목록·상세 Drawer의 선택 상태를 연결하는 화면입니다.
 import { useCallback, useState } from 'react'
 import type { NearbyQuest } from '@/features/quests/types/quest'
 import QuestMap from './components/QuestMap.tsx'
 import NearbyQuestCountCard from './components/NearbyQuestCountCard'
 import QuestListDrawer from './components/QuestListDrawer'
 import QuestDetailDrawer from './components/QuestDetailDrawer'
+import ActiveQuestCard from './components/ActiveQuestCard'
 import { mockNearbyQuests } from './mocks/nearbyQuests'
 import CurrentLocationButton from './components/CurrentLocationButton'
 import { useGeolocation } from '@/features/quests/hooks/useGeolocation'
+import { useActiveQuest } from '@/features/quests/hooks/useActiveQuest'
+import { useQuestDetail } from '@/features/quests/hooks/useQuestDetail'
 
 export default function QuestMapPage() {
   // 홈에서 위치 조회 상태를 관리하고, 버튼과 결과 표시에 연결합니다.
   const { position, isLocating, error, requestLocation } = useGeolocation()
+  // Drawer에서 수행 시작한 ID로 카드에 표시할 상세 mock을 조회합니다.
+  const { activeQuestId } = useActiveQuest()
+  const activeQuestQuery = useQuestDetail(activeQuestId)
+  const activeQuest = activeQuestQuery.data
   const [visibleQuests, setVisibleQuests] = useState<NearbyQuest[] | null>(null)
   const [isListOpen, setIsListOpen] = useState(false)
   const [listSnapshot, setListSnapshot] = useState<NearbyQuest[]>([])
@@ -23,8 +30,7 @@ export default function QuestMapPage() {
     setIsListOpen(false)
     setSelectedQuestId(questId)
 
-    // TODO: 선택한 ID로 GET /quests/{questId} 상세 API를 요청할 위치입니다.
-    // 현재는 mock 목록으로 UI와 선택 동작만 확인합니다.
+    // 선택한 ID의 상세 조회는 QuestDetailDrawer의 useQuestDetail에서 처리합니다.
   }, [])
 
   const handleOpenList = () => {
@@ -81,7 +87,7 @@ export default function QuestMapPage() {
         {/* 지역명·벨·MY 컴포넌트 */}
       </div>
 
-      {/* Drawer가 닫혀 있을 때 개수 카드와 현위치 버튼을 보여줍니다. */}
+      {/* Drawer가 닫혀 있을 때 수행 중 카드·개수 카드·현위치 버튼을 보여줍니다. */}
       {!isListOpen && selectedQuestId === null && (
         <div className="pointer-events-none absolute inset-x-4 bottom-[calc(7rem+env(safe-area-inset-bottom,0px))] z-20">
           {/* 카드 높이가 달라져도 현위치 버튼이 겹치지 않게 행 위에 배치합니다. */}
@@ -96,7 +102,22 @@ export default function QuestMapPage() {
             </div>
           </div>
           <div className="grid grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)] gap-3">
-            <div aria-hidden="true">{/* 추후 선택한 퀘스트 카드를 배치할 영역 */}</div>
+            {/* 오른쪽 개수 카드와 같은 행의 높이를 사용하고, 수행 중일 때만 표시합니다. */}
+            <div className="min-w-0">
+              {activeQuest && (
+                <ActiveQuestCard quest={activeQuest} />
+              )}
+              {activeQuestId !== null && activeQuestQuery.isPending && (
+                <p role="status" className="rounded-3xl bg-white/80 p-4 text-sm">
+                  수행 중인 퀘스트를 불러오는 중이에요.
+                </p>
+              )}
+              {activeQuestQuery.isError && (
+                <p role="alert" className="rounded-3xl bg-white/80 p-4 text-sm">
+                  {activeQuestQuery.error.message}
+                </p>
+              )}
+            </div>
             <NearbyQuestCountCard
               count={visibleQuests?.length ?? null}
               onClick={handleOpenList}

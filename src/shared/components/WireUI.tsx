@@ -1,5 +1,6 @@
 import { Link } from "react-router";
-import { ChevronLeft, ChevronsRight, LogOut, House, Footprints, MailPlus } from "lucide-react";
+import { ChevronLeft, ChevronsRight, LogOut, Footprints, MailPlus } from "lucide-react";
+import { GoHomeFill } from "react-icons/go";
 import type { ReactNode } from "react";
 export function Back({ to = "/me/memories" }: { to?: string }) {
   return (
@@ -40,7 +41,7 @@ export function Bottom() {
         to="/"
         className="absolute left-[50%] top-[-36px] [transform:translateX(-50%)] h-[73px] w-[73px] bg-white text-[#242624] rounded-full grid place-items-center text-[18px]"
       >
-        <House size={27} fill="currentColor" /><span className="sr-only">홈</span>
+        <GoHomeFill size={27} aria-hidden="true" /><span className="sr-only">홈</span>
       </Link>
       <Link className="nav-item" to="/quests/new"><MailPlus size={22} />그리움 등록</Link>
     </nav>

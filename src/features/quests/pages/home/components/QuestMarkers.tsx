@@ -16,6 +16,11 @@ export default function QuestMarkers({ map, quests }: QuestMarkersProps) {
   const markersRef = useRef(new Map<number, KakaoMarker>())
   // 선택한 ID가 있으면 Drawer를 열고, null이면 닫습니다.
   const [selectedQuestId, setSelectedQuestId] = useState<number | null>(null)
+  // Drawer 위치를 알기 전에는 지도 이동을 기다립니다.
+  const [drawerTop, setDrawerTop] = useState<number | null>(null)
+  const selectedQuest = quests.find((quest) => quest.questId === selectedQuestId)
+  const selectedLat = selectedQuest?.lat
+  const selectedLng = selectedQuest?.lng
 
   // 마커 클릭을 이 컴포넌트에서 처리해 부모로 함수를 전달하지 않습니다.
   const handleMarkerClick = useCallback((questId: number) => {
@@ -89,6 +94,40 @@ export default function QuestMarkers({ map, quests }: QuestMarkersProps) {
     }
   }, [map, quests, selectedQuestId])
 
+  // 선택한 마커를 Drawer 위로 보이는 지도 영역의 중앙에 배치합니다.
+  useEffect(() => {
+    const maps = window.kakao?.maps
+    if (
+      !map ||
+      !maps ||
+      selectedQuestId === null ||
+      selectedLat === undefined ||
+      selectedLng === undefined ||
+      drawerTop === null
+    ) {
+      return
+    }
+
+    const projection = map.getProjection()
+    const centerPoint = projection.containerPointFromCoords(map.getCenter())
+    const mapHeight = centerPoint.y * 2
+    if (mapHeight <= 0) return
+
+    // 현재 지도는 화면 맨 위부터 채워져 있으므로 Drawer top이 보이는 높이입니다.
+    const visibleHeight = Math.max(0, Math.min(mapHeight, drawerTop))
+    const offsetY = centerPoint.y - visibleHeight / 2
+    const questPosition = new maps.LatLng(selectedLat, selectedLng)
+    const questPoint = projection.containerPointFromCoords(questPosition)
+
+    // 지도 중심을 아래로 보정하면 마커는 화면에서 위로 올라옵니다.
+    const adjustedCenter = projection.coordsFromContainerPoint(
+      new maps.Point(questPoint.x, questPoint.y + offsetY),
+    )
+
+    // 확대 수준과 GPS 좌표는 그대로 두고, 기존 지도의 중심만 이동합니다.
+    map.panTo(adjustedCenter)
+  }, [map, selectedQuestId, selectedLat, selectedLng, drawerTop])
+
   // 앞선 Effect에서 생성한 마커에 클릭 이벤트를 연결합니다.
   useEffect(() => {
     const maps = window.kakao?.maps
@@ -135,7 +174,12 @@ export default function QuestMarkers({ map, quests }: QuestMarkersProps) {
   return (
     <QuestDetailDrawer
       questId={selectedQuestId}
-      onClose={() => setSelectedQuestId(null)}
+      onPositionChange={setDrawerTop}
+      onClose={() => {
+        setSelectedQuestId(null)
+        // 다음 열림에는 새로 측정한 Drawer 위치를 사용합니다.
+        setDrawerTop(null)
+      }}
     />
   )
 }

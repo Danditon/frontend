@@ -1,5 +1,5 @@
 // 마커에서 선택한 퀘스트의 Drawer를 열고, 지도를 조작할 수 있게 유지하는 컴포넌트입니다.
-import { useState, type CSSProperties } from 'react'
+import { useCallback, useRef, useState, type CSSProperties } from 'react'
 import { X } from 'lucide-react'
 import { Button } from '@/shared/components/ui/button'
 import {
@@ -12,6 +12,7 @@ import {
 } from '@/shared/components/ui/drawer'
 
 type QuestDetailDrawerProps = {
+  onPositionChange: (top: number) => void // 보이는 지도 높이를 계산하도록 Drawer 상단 위치를 전달합니다.
   questId: number | null // null이면 닫히고, ID가 있으면 해당 퀘스트로 열립니다.
   onClose: () => void // 닫힐 때 부모의 선택 상태를 해제합니다.
 }
@@ -19,10 +20,20 @@ type QuestDetailDrawerProps = {
 export default function QuestDetailDrawer({
   questId,
   onClose,
+  onPositionChange,
 }: QuestDetailDrawerProps) {
   // 기본 40%, 확장 85% 중 현재 높이를 관리합니다.
   const [snapPoint, setSnapPoint] = useState(0.4)
   const isExpanded = snapPoint === 0.85
+  const drawerRef = useRef<HTMLDivElement>(null)
+
+  // 접힌 상태의 DOM 높이 대신, 실제 화면에 보이는 상단 위치를 측정합니다.
+  const reportPosition = useCallback(() => {
+    const drawer = drawerRef.current
+    if (questId === null || !drawer) return
+
+    onPositionChange(drawer.getBoundingClientRect().top)
+  }, [questId, onPositionChange])
 
   return (
     <Drawer
@@ -32,7 +43,12 @@ export default function QuestDetailDrawer({
       }}
       // 닫기 애니메이션 완료 후 다음에 열 높이를 초기화합니다.
       onOpenChangeComplete={(open) => {
-        if (!open) setSnapPoint(0.4)
+        if (open) {
+          // 열기 애니메이션 완료 후 선택한 마커의 위치를 보정합니다.
+          reportPosition()
+        } else {
+          setSnapPoint(0.4)
+        }
       }}
       // 드래그 시 두 높이 사이를 이동하도록 공용 Drawer에 맡깁니다.
       snapPoints={[0.4, 0.85]}
@@ -47,6 +63,15 @@ export default function QuestDetailDrawer({
       showSwipeHandle
     >
       <DrawerContent
+        ref={drawerRef}
+        onTransitionEnd={(event) => {
+          // 자식 요소의 애니메이션은 제외합니다.
+          if (event.target !== event.currentTarget) return
+          if (event.propertyName !== 'transform') return
+
+          // 기본·확장 높이 전환이 끝난 뒤 보이는 영역을 갱신합니다.
+          reportPosition()
+        }}
         // 하단은 공용 Drawer의 bottom: 0을 사용해 향후 navbar를 덮습니다.
         // 고정 높이 대신 확장 시 최대 높이만 제한하고, 이동은 snapPoints로 처리합니다.
         style={

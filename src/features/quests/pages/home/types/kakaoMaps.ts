@@ -14,7 +14,20 @@ export type KakaoSize = {
 // 이미지 객체는 생성 후 마커 옵션에 전달하는 용도로만 사용합니다.
 export type KakaoMarkerImage = object
 
+export type KakaoPoint = {
+  x: number
+  y: number
+}
+
+// 지도 좌표와 지도 왼쪽 위 기준의 화면 좌표를 변환합니다.
+export type KakaoMapProjection = {
+  containerPointFromCoords(position: KakaoLatLng): KakaoPoint
+  coordsFromContainerPoint(point: KakaoPoint): KakaoLatLng
+}
+
 export type KakaoMap = {
+  getCenter(): KakaoLatLng // 현재 지도 중심 좌표
+  getProjection(): KakaoMapProjection // 화면·지도 좌표 변환 객체
   relayout(): void // 지도 영역 크기가 바뀌었을 때 다시 계산
   panTo(position: KakaoLatLng): void // 전달받은 좌표로 지도 중심 이동
 }
@@ -46,6 +59,8 @@ declare global {
             level: number
           },
         ) => KakaoMap
+
+        Point: new (x: number, y: number) => KakaoPoint
 
         Size: new (width: number, height: number) => KakaoSize
 

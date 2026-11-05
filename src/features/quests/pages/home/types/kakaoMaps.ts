@@ -6,6 +6,14 @@ export type KakaoLatLng = {
   getLng(): number // 경도 반환
 }
 
+export type KakaoSize = {
+  width: number
+  height: number
+}
+
+// 이미지 객체는 생성 후 마커 옵션에 전달하는 용도로만 사용합니다.
+export type KakaoMarkerImage = object
+
 export type KakaoMap = {
   relayout(): void // 지도 영역 크기가 바뀌었을 때 다시 계산
   panTo(position: KakaoLatLng): void // 전달받은 좌표로 지도 중심 이동
@@ -37,10 +45,18 @@ declare global {
           },
         ) => KakaoMap
 
+        Size: new (width: number, height: number) => KakaoSize
+
+        MarkerImage: new (
+          source: string,
+          size: KakaoSize,
+        ) => KakaoMarkerImage
+
         Marker: new (options: {
           map: KakaoMap
           position: KakaoLatLng
           title?: string
+          image?: KakaoMarkerImage // 생략하면 기본 마커 사용
         }) => KakaoMarker
       }
     }

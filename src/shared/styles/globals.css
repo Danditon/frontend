@@ -151,8 +151,6 @@
 .memory-thumbnail {display:block;box-shadow:0 4px 9px #0002;border:3px solid white;}
 .postcard-photo {width:100%;height:210px;border-radius:24px;background-color:#ddd;}
 .record-photo {background-image:none;background-size:610.34% 364.03%;background-position:52.87% 23.65%;border-radius:10px;}
-.memory-page div[aria-label='미션 기록 예시 지도'] {background:#edf7f5 url('/memory-map.svg') center/cover;}
-.memory-page .map-stamp {border:2px dashed #907a48;border-radius:50%;background:#f2e6bd;color:#77623d;display:grid;place-content:center;text-align:center;font-size:13px;font-weight:bold;line-height:1.2;}
 .nav-item {display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10px;}
 .verify-photo,.verify-checking,.verify-success,.past-photo {background-image:none;background-size:610.34% 364.03%;background-position:52.87% 23.65%;}
 .verify-photo {background-color:#def2f6;}
@@ -238,4 +236,8 @@
 .memory-thumbnail .remote-photo {width:100%;height:100%;}
 .memory-thumbnail .remote-photo>span {font-size:8px;padding:4px;}
 .message-envelope>.postcard-photo {position:relative;z-index:1;}
+.history-map {position:relative;height:280px;border-radius:24px;overflow:hidden;margin-bottom:18px;background:#eef5f3;}
+.history-map>small {position:absolute;bottom:15px;left:15px;background:#242624;color:white;border-radius:20px;padding:5px 10px;font-size:10px;z-index:2;}
 .message-envelope button:disabled {opacity:.5;cursor:default;}
+
+.history-map-placeholder {height:100%;background:#eef5f3;}

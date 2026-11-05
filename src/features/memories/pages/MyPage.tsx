@@ -141,12 +141,8 @@ export default function MyPage({ data }: { data?: MyPageData } = {}) {
       </div>
       {history ? (
         <>
-          <div
-            className="h-[215px] rounded-[24px] bg-[#c9eaf5] relative mb-[15px] [&_>_span]:absolute [&_>_span]:top-[60px] [&_>_span]:left-[65px] [&_>_span]:w-[69px] [&_>_span]:h-[51px] [&_>_span]:[transform:rotate(-14deg)] [&_>_span]:bg-[#b5b5b5] [&_>_span:nth-child(2)]:top-[120px] [&_>_span:nth-child(2)]:left-[auto] [&_>_span:nth-child(2)]:right-[40px] [&_>_span:nth-child(2)]:[transform:rotate(7deg)] [&_small]:absolute [&_small]:bottom-[18px] [&_small]:left-[18px] [&_small]:bg-[#c9eaf5] [&_small]:rounded-[20px] [&_small]:[padding:4px_6px] [&_small]:text-[10px]"
-            aria-label="미션 기록 예시 지도"
-          >
-            <span className="map-stamp">대구<br />골목</span>
-            <span className="map-stamp">추억<br />도착</span>
+          <div className="history-map">
+            <div className="history-map-placeholder" aria-label="기록 지도 영역" />
             <small>미션 다녀온 곳 {recordCount}</small>
           </div>
           <div className="grid [grid-template-columns:repeat(3,_1fr)] gap-[6px] [&_article_>_div]:bg-[#c9eaf5] [&_article_>_div]:h-[85px] [&_article_>_p]:text-[10px] [&_article_>_p]:leading-[1.3] [&_article_>_p]:text-center [&_article_>_p]:[padding:7px_0] [&_>_a]:h-[85px] [&_>_a]:[border:1px_dotted_#111] [&_>_a]:grid [&_>_a]:place-items-center [&_>_a]:text-[10px]">

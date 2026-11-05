@@ -20,6 +20,7 @@ export type KakaoMap = {
 }
 
 export type KakaoMarker = {
+  setImage(image: KakaoMarkerImage): void // 종류·난이도 이미지 갱신
   setPosition(position: KakaoLatLng): void // 기존 마커의 좌표 변경
   setMap(map: KakaoMap | null): void // 지도에 연결하거나 null로 제거
 }

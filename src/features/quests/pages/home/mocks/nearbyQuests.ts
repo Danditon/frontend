@@ -29,7 +29,7 @@ export const mockNearbyQuests: NearbyQuest[] = [
     questId: 3,
     questTitle: '놀이터 안부 확인하기',
     questType: 'GENERAL',
-    difficulty: 1,
+    difficulty: 3,
     placeName: '임시 놀이터',
     lat: 35.8894,
     lng: 128.6014,

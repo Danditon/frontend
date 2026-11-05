@@ -2,6 +2,7 @@
 import { useEffect, useRef } from 'react'
 import type { NearbyQuest } from '@/features/quests/types/quest'
 import type { KakaoMap, KakaoMarker } from '../types/kakaoMaps'
+import { createQuestMarkerImage } from '../utils/createQuestMarkerImage'
 
 type QuestMarkersProps = {
   map: KakaoMap | null // 기존에 생성한 카카오 지도
@@ -19,15 +20,19 @@ export default function QuestMarkers({ map, quests }: QuestMarkersProps) {
     // 지도와 SDK가 준비된 뒤 마커를 표시합니다.
     if (!map || !maps) return
 
-    // 내 위치 마커와 구분하도록 퀘스트는 노란색 SVG 핀을 사용합니다.
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="40" viewBox="0 0 32 40">
-      <path d="M16 39C13 35 3 25 3 16a13 13 0 1 1 26 0c0 9-10 19-13 23Z" fill="#FACC15" stroke="#A16207" stroke-width="2"/>
-      <circle cx="16" cy="16" r="5" fill="white"/>
-    </svg>`
-    const questMarkerImage = new maps.MarkerImage(
-      `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
-      new maps.Size(32, 40),
-    )
+    // 종류 2개 × 난이도 3개의 이미지를 만들어 같은 조합의 퀘스트가 함께 사용합니다.
+    const markerImages = {
+      GENERAL: {
+        1: createQuestMarkerImage(maps, 'GENERAL', 1),
+        2: createQuestMarkerImage(maps, 'GENERAL', 2),
+        3: createQuestMarkerImage(maps, 'GENERAL', 3),
+      },
+      IMAGE: {
+        1: createQuestMarkerImage(maps, 'IMAGE', 1),
+        2: createQuestMarkerImage(maps, 'IMAGE', 2),
+        3: createQuestMarkerImage(maps, 'IMAGE', 3),
+      },
+    }
 
     const currentIds = new Set(quests.map((quest) => quest.questId))
 
@@ -42,15 +47,18 @@ export default function QuestMarkers({ map, quests }: QuestMarkersProps) {
     for (const quest of quests) {
       // 퀘스트의 위도·경도를 카카오 좌표 객체로 변환합니다.
       const position = new maps.LatLng(quest.lat, quest.lng)
+      const image = markerImages[quest.questType][quest.difficulty]
       const existingMarker = markersRef.current.get(quest.questId)
 
       if (existingMarker) {
         // 이미 있는 마커는 새로 만들지 않고 위치만 갱신합니다.
         existingMarker.setPosition(position)
+        // 종류나 난이도가 변하면 기존 마커의 이미지도 갱신합니다.
+        existingMarker.setImage(image)
         existingMarker.setMap(map)
       } else {
         // 처음 받은 퀘스트는 마커를 생성하고 보관합니다.
-        const marker = new maps.Marker({ map, position, image: questMarkerImage })
+        const marker = new maps.Marker({ map, position, image })
         markersRef.current.set(quest.questId, marker)
       }
     }

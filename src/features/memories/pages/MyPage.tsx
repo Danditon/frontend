@@ -44,9 +44,9 @@ export default function MyPage() {
   }
   if (logout)
     return (
-      <section className="min-h-[790px] flex-1 relative [padding:12px_15px] max-[500px]:[min-height:calc(100dvh_-_54px)]">
+      <section className="memory-page min-h-[790px] flex-1 relative [padding:12px_15px] max-[500px]:[min-height:calc(100dvh_-_54px)]">
         <Back />
-        <div className="absolute left-[15px] right-[15px] bottom-[26px] bg-[#c6c6c6] rounded-[29px] [padding:37px_22px_20px] [&_h1]:text-[23px] [&_h1]:font-normal [&_h1]:tracking-[-1px] [&_p]:text-[11px] [&_p]:[margin:5px_0_18px] [&_>_div]:flex [&_>_div]:gap-[16px] [&_>_div_>_*]:bg-[#ddd] [&_>_div_>_*]:rounded-[30px] [&_>_div_>_*]:h-[50px] [&_>_div_>_*]:flex-1 [&_>_div_>_*]:grid [&_>_div_>_*]:place-items-center [&_>_div_>_*]:text-[14px] [&_>_div_>_button]:bg-[#eee]">
+        <div className="absolute left-[15px] right-[15px] bottom-[26px] bg-[#242624] rounded-[29px] [padding:37px_22px_20px] [&_h1]:text-[23px] [&_h1]:font-normal [&_h1]:tracking-[-1px] [&_p]:text-[11px] [&_p]:[margin:5px_0_18px] [&_>_div]:flex [&_>_div]:gap-[16px] [&_>_div_>_*]:bg-[#ddd] [&_>_div_>_*]:rounded-[30px] [&_>_div_>_*]:h-[50px] [&_>_div_>_*]:flex-1 [&_>_div_>_*]:grid [&_>_div_>_*]:place-items-center [&_>_div_>_*]:text-[14px] [&_>_div_>_button]:bg-[#fff]">
           <h1>로그아웃할까요?</h1>
           <p>다시 로그인하면 내 그리움과 기록을 그대로 볼 수 있어요.</p>
           {error && <p role="alert">{error}</p>}
@@ -59,7 +59,7 @@ export default function MyPage() {
     );
   if (message)
     return (
-      <section className="[padding:12px_15px_15px] min-h-[790px] flex-1 flex flex-col max-[500px]:[min-height:calc(100dvh_-_54px)]">
+      <section className="memory-page [padding:12px_15px_15px] min-h-[790px] flex-1 flex flex-col max-[500px]:[min-height:calc(100dvh_-_54px)]">
         <header className="flex items-center gap-[10px] mb-[15px] [&_>_div]:flex-1 [&_small]:text-[10px] [&_small]:block [&_strong]:text-[15px] [&_strong]:block [&_strong]:tracking-[-0.5px]">
           <Back />
           <div>
@@ -67,27 +67,26 @@ export default function MyPage() {
             <strong>{items[0].title}</strong>
           </div>
           <Link
-            className="h-[54px] w-[54px] rounded-full bg-[#d9d9d9] inline-flex items-center justify-center shrink-0 [&_svg]:[stroke-width:1.25]"
+            className="h-[54px] w-[54px] rounded-full bg-[#c9eaf5] inline-flex items-center justify-center shrink-0 [&_svg]:[stroke-width:1.25]"
             to="/me/logout"
             aria-label="로그아웃"
           >
             <LogOut size={21} />
           </Link>
         </header>
-        <article className="rounded-[24px] bg-[#eee] flex-1 relative overflow-hidden [padding:20px_14px] flex flex-col items-center min-h-[650px] [&_>_small]:text-[10px] [&_>_small]:z-[1]">
+        <article className="message-envelope rounded-[24px] bg-[#fff] flex-1 relative overflow-hidden [padding:20px_14px] flex flex-col items-center min-h-[650px] [&_>_small]:text-[10px] [&_>_small]:z-[1]">
           <div
-            className="w-full h-[210px] bg-[#d9d9d9] rounded-[23px] shrink-0"
-            aria-label="도착한 안부 사진 자리"
+            className="postcard-photo w-full h-[210px] rounded-[23px] shrink-0" aria-label="도착한 안부 사진"
             role="img"
           />
           <p className="text-[20px] leading-[1.3] whitespace-pre-line text-center [margin:22px_0_10px] z-[1]">
             {items[index].message}
           </p>
           <small>From. 동네 주민 수현 | 11월 3일</small>
-          <div className="absolute [inset:38%_0_0] bg-[#d9d9d9] [clip-path:polygon(0_0,_50%_37%,_100%_0,_100%_100%,_0_100%)]" />
-          <div className="relative mt-auto z-[1] text-center pt-[90px] [&_:is(a,button)]:h-[66px] [&_:is(a,button)]:w-[66px] [&_:is(a,button)]:bg-[#b3b3b3] [&_.liked]:bg-[#999] [&_p]:text-[11px] [&_p]:[margin:12px_0_34px]">
+          <div className="absolute [inset:38%_0_0] bg-[#c9eaf5] [clip-path:polygon(0_0,_50%_37%,_100%_0,_100%_100%,_0_100%)]" />
+          <div className="relative mt-auto z-[1] text-center pt-[90px] [&_:is(a,button)]:h-[66px] [&_:is(a,button)]:w-[66px] [&_:is(a,button)]:bg-[#242624] [&_.liked]:bg-[#999] [&_p]:text-[11px] [&_p]:[margin:12px_0_34px]">
             <button
-              className={`h-[54px] w-[54px] rounded-full bg-[#d9d9d9] inline-flex items-center justify-center shrink-0 [&_svg]:[stroke-width:1.25] ${liked ? "liked" : ""}`}
+              className={`h-[54px] w-[54px] rounded-full bg-[#c9eaf5] inline-flex items-center justify-center shrink-0 [&_svg]:[stroke-width:1.25] ${liked ? "liked" : ""}`}
               aria-label="안부 좋아요"
               aria-pressed={liked}
               onClick={() => setLiked(!liked)}
@@ -101,7 +100,7 @@ export default function MyPage() {
             </p>
           </div>
           <button
-            className="relative z-[1] bg-[#a6a6a6] h-[64px] rounded-[35px] w-full text-[15px]"
+            className="relative z-[1] bg-[#242624] h-[64px] rounded-[35px] w-full text-[15px]"
             onClick={() => {
               setParams({ message: String((index + 1) % 2) });
               setLiked(false);
@@ -113,9 +112,9 @@ export default function MyPage() {
       </section>
     );
   return (
-    <section className="[padding:12px_15px_100px] min-h-[790px] relative flex-1 max-[500px]:[min-height:calc(100dvh_-_54px)]">
+    <section className="memory-page [padding:12px_15px_100px] min-h-[790px] relative flex-1 max-[500px]:[min-height:calc(100dvh_-_54px)]">
       <Profile />
-      <div className="grid [grid-template-columns:1fr_1fr] gap-[6px] mb-[16px] [&_>_a]:h-[115px] [&_>_a]:rounded-[23px] [&_>_a]:bg-[#d9d9d9] [&_>_a]:flex [&_>_a]:flex-col [&_>_a]:[padding:25px_14px_13px] [&_>_a]:relative [&_>_a]:justify-end [&_>_a.selected]:bg-[#a6a6a6] [&_strong]:font-normal [&_strong]:text-[45px] [&_strong]:leading-[1.05] [&_small]:text-[12px] [&_small]:mt-[4px]">
+      <div className="grid [grid-template-columns:1fr_1fr] gap-[6px] mb-[16px] [&_>_a]:h-[115px] [&_>_a]:rounded-[23px] [&_>_a]:bg-[#c9eaf5] [&_>_a]:flex [&_>_a]:flex-col [&_>_a]:[padding:25px_14px_13px] [&_>_a]:relative [&_>_a]:justify-end [&_>_a.selected]:bg-[#242624] [&_strong]:font-normal [&_strong]:text-[45px] [&_strong]:leading-[1.05] [&_small]:text-[12px] [&_small]:mt-[4px]">
         <Link to="/me/memories" className={!history ? "selected" : ""}>
           <span className="text-[10px] absolute right-[12px] top-[14px] rounded-[15px] [padding:4px_7px] bg-[#dedede]">
             새 안부 1
@@ -131,21 +130,21 @@ export default function MyPage() {
       {history ? (
         <>
           <div
-            className="h-[215px] rounded-[24px] bg-[#d9d9d9] relative mb-[15px] [&_>_span]:absolute [&_>_span]:top-[60px] [&_>_span]:left-[65px] [&_>_span]:w-[69px] [&_>_span]:h-[51px] [&_>_span]:[transform:rotate(-14deg)] [&_>_span]:bg-[#b5b5b5] [&_>_span:nth-child(2)]:top-[120px] [&_>_span:nth-child(2)]:left-[auto] [&_>_span:nth-child(2)]:right-[40px] [&_>_span:nth-child(2)]:[transform:rotate(7deg)] [&_small]:absolute [&_small]:bottom-[18px] [&_small]:left-[18px] [&_small]:bg-[#bfbfbf] [&_small]:rounded-[20px] [&_small]:[padding:4px_6px] [&_small]:text-[10px]"
-            aria-label="미션 기록 지도 자리"
+            className="h-[215px] rounded-[24px] bg-[#c9eaf5] relative mb-[15px] [&_>_span]:absolute [&_>_span]:top-[60px] [&_>_span]:left-[65px] [&_>_span]:w-[69px] [&_>_span]:h-[51px] [&_>_span]:[transform:rotate(-14deg)] [&_>_span]:bg-[#b5b5b5] [&_>_span:nth-child(2)]:top-[120px] [&_>_span:nth-child(2)]:left-[auto] [&_>_span:nth-child(2)]:right-[40px] [&_>_span:nth-child(2)]:[transform:rotate(7deg)] [&_small]:absolute [&_small]:bottom-[18px] [&_small]:left-[18px] [&_small]:bg-[#c9eaf5] [&_small]:rounded-[20px] [&_small]:[padding:4px_6px] [&_small]:text-[10px]"
+            aria-label="미션 기록 예시 지도"
           >
-            <span />
-            <span />
+            <span className="map-stamp">대구<br />골목</span>
+            <span className="map-stamp">추억<br />도착</span>
             <small>미션 다녀온 곳 {recordCount}</small>
           </div>
-          <div className="grid [grid-template-columns:repeat(3,_1fr)] gap-[6px] [&_article_>_div]:bg-[#d9d9d9] [&_article_>_div]:h-[85px] [&_article_>_p]:text-[10px] [&_article_>_p]:leading-[1.3] [&_article_>_p]:text-center [&_article_>_p]:[padding:7px_0] [&_>_a]:h-[85px] [&_>_a]:[border:1px_dotted_#111] [&_>_a]:grid [&_>_a]:place-items-center [&_>_a]:text-[10px]">
+          <div className="grid [grid-template-columns:repeat(3,_1fr)] gap-[6px] [&_article_>_div]:bg-[#c9eaf5] [&_article_>_div]:h-[85px] [&_article_>_p]:text-[10px] [&_article_>_p]:leading-[1.3] [&_article_>_p]:text-center [&_article_>_p]:[padding:7px_0] [&_>_a]:h-[85px] [&_>_a]:[border:1px_dotted_#111] [&_>_a]:grid [&_>_a]:place-items-center [&_>_a]:text-[10px]">
             {[
               "자취방 앞 가로등 골목",
               "주말마다 가던 동네 목욕탕",
               ...entries.map((x) => x.title),
             ].map((title, i) => (
               <article key={i}>
-                <div />
+                <div className="record-photo" />
                 <p>{title}</p>
               </article>
             ))}
@@ -153,7 +152,7 @@ export default function MyPage() {
           </div>
         </>
       ) : (
-        <div className="flex flex-col gap-[8px] [&_>_button]:rounded-[23px] [&_>_button]:h-[113px] [&_>_button]:bg-[#d9d9d9] [&_>_button]:text-left [&_>_button]:[padding:21px_14px] [&_>_button]:relative [&_strong]:text-[15px] [&_strong]:font-medium [&_strong]:block [&_strong]:max-w-[76%] [&_strong]:tracking-[-0.5px] [&_small]:text-[10px] [&_small]:text-[#666] [&_small]:block [&_small]:mt-[2px] [&_button_>_span]:inline-block [&_button_>_span]:bg-[#bbb] [&_button_>_span]:rounded-[20px] [&_button_>_span]:text-[9px] [&_button_>_span]:[padding:4px_10px] [&_button_>_span]:mt-[11px] [&_i]:absolute [&_i]:right-[21px] [&_i]:top-[13px] [&_i]:w-[60px] [&_i]:h-[79px] [&_i]:bg-[#eee] [&_i]:[transform:rotate(10deg)] [&_button:nth-child(2)_i]:[transform:rotate(-10deg)]">
+        <div className="flex flex-col gap-[8px] [&_>_button]:rounded-[23px] [&_>_button]:h-[113px] [&_>_button]:bg-[#c9eaf5] [&_>_button]:text-left [&_>_button]:[padding:21px_14px] [&_>_button]:relative [&_strong]:text-[15px] [&_strong]:font-medium [&_strong]:block [&_strong]:max-w-[76%] [&_strong]:tracking-[-0.5px] [&_small]:text-[10px] [&_small]:text-[#666] [&_small]:block [&_small]:mt-[2px] [&_button_>_span]:inline-block [&_button_>_span]:bg-[#bbb] [&_button_>_span]:rounded-[20px] [&_button_>_span]:text-[9px] [&_button_>_span]:[padding:4px_10px] [&_button_>_span]:mt-[11px] [&_i]:absolute [&_i]:right-[21px] [&_i]:top-[13px] [&_i]:w-[60px] [&_i]:h-[79px] [&_i]:bg-[#fff] [&_i]:[transform:rotate(10deg)] [&_button:nth-child(2)_i]:[transform:rotate(-10deg)]">
           {items.map((x, i) => (
             <button
               key={x.title}
@@ -167,7 +166,7 @@ export default function MyPage() {
               <strong>{x.title}</strong>
               <small>{x.sub}</small>
               {i === 0 && <span>새 안부 도착</span>}
-              <i />
+              <i className="memory-thumbnail" />
             </button>
           ))}
           {error && (

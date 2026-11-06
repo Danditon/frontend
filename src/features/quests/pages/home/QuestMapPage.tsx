@@ -6,6 +6,7 @@ import NearbyQuestCountCard from './components/NearbyQuestCountCard'
 import QuestListDrawer from './components/QuestListDrawer'
 import QuestDetailDrawer from './components/QuestDetailDrawer'
 import ActiveQuestCard from './components/ActiveQuestCard'
+import LocationPromptCard from './components/LocationPromptCard'
 import { mockNearbyQuests } from './mocks/nearbyQuests'
 import CurrentLocationButton from './components/CurrentLocationButton'
 import { useGeolocation } from '@/features/quests/hooks/useGeolocation'
@@ -103,16 +104,17 @@ export default function QuestMapPage() {
           </div>
           <div className="grid grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)] gap-3">
             {/* 현재 위치를 확인한 뒤 가까운 퀘스트를 표시하고, 카드 선택도 마커 선택과 연결합니다. */}
-            <div className="min-w-0">
+            <div className="relative aspect-[51/35] min-w-0">
               {!position && (
-                <p role="status" className="rounded-3xl bg-white/80 p-4 text-sm">
-                  {isLocating
-                    ? '현재 위치를 확인하는 중이에요.'
-                    : '가까운 퀘스트를 보려면 현위치 버튼을 눌러주세요.'}
-                </p>
+                <LocationPromptCard
+                  isLocating={isLocating}
+                  onRequestLocation={() => {
+                    void requestLocation()
+                  }}
+                />
               )}
               {position && !nearestQuest && (
-                <p role="status" className="rounded-3xl bg-white/80 p-4 text-sm">
+                <p role="status" className="grid h-full place-items-center rounded-3xl bg-[#EDF4F5]/95 p-3 text-sm">
                   주변에 등록된 퀘스트가 없어요.
                 </p>
               )}
@@ -123,12 +125,12 @@ export default function QuestMapPage() {
                 />
               )}
               {nearestQuest !== null && nearestQuestQuery.isPending && (
-                <p role="status" className="rounded-3xl bg-white/80 p-4 text-sm">
+                <p role="status" className="grid h-full place-items-center rounded-3xl bg-[#EDF4F5]/95 p-3 text-sm">
                   가까운 퀘스트를 불러오는 중이에요.
                 </p>
               )}
               {nearestQuestQuery.isError && (
-                <p role="alert" className="rounded-3xl bg-white/80 p-4 text-sm">
+                <p role="alert" className="grid h-full place-items-center rounded-3xl bg-[#EDF4F5]/95 p-3 text-sm">
                   {nearestQuestQuery.error.message}
                 </p>
               )}

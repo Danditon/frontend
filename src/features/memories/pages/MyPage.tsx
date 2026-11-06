@@ -266,13 +266,39 @@ export default function MyPage({ data }: { data?: MyPageData } = {}) {
               내 기록 전체 보기
             </Link>
           )}
-          <header className="my-4 flex items-center justify-between gap-3">
-            <h2 className="text-sm font-semibold">
-              내가 수행한 퀘스트 · 최신순
-            </h2>
+          <div
+            aria-label="내 수행 퀘스트 사진"
+            className="grid grid-cols-3 gap-2"
+          >
+            {visibleRecords.map((record) => (
+              <Link
+                key={record.id}
+                className="min-w-0 text-center text-[#242624]"
+                to={`/me/memories?${new URLSearchParams({ source: "records", record: record.id, quest: record.questId ?? record.id, message: "0", returnOthers: showOthers ? "1" : "0" })}`}
+              >
+                <RemotePhoto
+                  className="aspect-square w-full rounded-none!"
+                  photoUrl={record.photoUrl}
+                  alt={record.title}
+                />
+                <h3 className="pt-2 text-[10px] font-normal leading-snug">
+                  {record.title}
+                </h3>
+                <span className="sr-only">나와 다른 수행자의 안부 보기</span>
+              </Link>
+            ))}
+            <Link
+              className="grid aspect-square place-items-center border border-dotted border-neutral-400 p-2 text-center text-[10px]"
+              to="/"
+            >
+              다음 퀘스트 찾기
+            </Link>
+          </div>
+          <header className="mt-4 mb-2 flex items-center justify-between gap-3">
+            <h2 className="text-[11px] font-medium">수행 기록 · 최신순</h2>
             <button
               aria-expanded={showOthers}
-              aria-controls="my-performance-list"
+              aria-controls="other-performance-list"
               className="rounded-full bg-[#242624] px-3 py-2 text-xs text-white"
               onClick={() =>
                 setParams((previous) => {
@@ -286,102 +312,68 @@ export default function MyPage({ data }: { data?: MyPageData } = {}) {
               {showOthers ? "다른 수행자 기록 숨기기" : "다른 수행자 기록 보기"}
             </button>
           </header>
-          <p className="mb-3 text-xs text-neutral-500">
+          <p className="sr-only">
             {showOthers
               ? "내가 수행한 퀘스트의 다른 수행 기록도 함께 보여요."
               : "내가 수행한 퀘스트만 보여요. 안부를 열면 다른 수행자의 글도 함께 볼 수 있어요."}
           </p>
-          <div id="my-performance-list" className="flex flex-col gap-3">
-            {visibleRecords.map((record) => {
-              const peerRecords = relatedOtherRecords.filter(
-                (item) =>
-                  (item.questId ?? item.id) === (record.questId ?? record.id),
-              );
-              return (
-                <article
-                  key={record.id}
-                  className="rounded-2xl border border-[#c9eaf5] bg-white p-3 text-[#242624]"
-                >
-                  <Link
-                    className="flex gap-3"
-                    to={`/me/memories?${new URLSearchParams({ source: "records", record: record.id, quest: record.questId ?? record.id, message: "0", returnOthers: showOthers ? "1" : "0" })}`}
+          {showOthers && (
+            <div
+              id="other-performance-list"
+              className="mt-3 flex flex-col gap-3"
+            >
+              {visibleRecords.map((record) => {
+                const peers = relatedOtherRecords.filter(
+                  (item) =>
+                    (item.questId ?? item.id) === (record.questId ?? record.id),
+                );
+                return (
+                  <section
+                    key={record.id}
+                    aria-label={`${record.title} 다른 수행자 기록`}
+                    className="rounded-xl bg-white p-3 text-[#242624]"
                   >
-                    <RemotePhoto
-                      className="record-photo h-20 w-20 shrink-0"
-                      photoUrl={record.photoUrl}
-                      alt={record.title}
-                    />
-                    <div className="min-w-0">
-                      <span className="text-[10px] text-neutral-500">
-                        내 수행 기록
-                      </span>
-                      <h3 className="mt-1 text-sm font-semibold">
-                        {record.title}
-                      </h3>
-                      <time
-                        className="block py-1 text-[10px] text-neutral-500"
-                        dateTime={record.createdAt}
-                      >
-                        {record.createdAt?.slice(0, 10) ?? "등록일 정보 없음"}
-                      </time>
-                      <span className="text-xs underline">
-                        나와 다른 수행자의 안부 보기
-                      </span>
-                    </div>
-                  </Link>
-                  {showOthers && (
-                    <section
-                      aria-label={`${record.title} 다른 수행자 기록`}
-                      className="mt-3 border-t pt-3"
-                    >
-                      <h4 className="mb-2 text-xs font-semibold">
-                        같은 퀘스트의 다른 수행 기록 {peerRecords.length}건
-                      </h4>
-                      {peerRecords.length ? (
-                        <ul className="flex flex-col gap-2">
-                          {peerRecords.map((peer) => (
-                            <li key={peer.id}>
-                              <Link
-                                className="block rounded-xl bg-[#edf4f6] p-3 text-xs"
-                                to={`/me/memories?${new URLSearchParams({ source: "records", record: record.id, quest: record.questId ?? record.id, message: "0", returnOthers: "1" })}`}
+                    <h3 className="mb-2 text-xs font-semibold">
+                      {record.title} · 다른 수행 기록 {peers.length}건
+                    </h3>
+                    {peers.length ? (
+                      <ul className="flex flex-col gap-2">
+                        {peers.map((peer) => (
+                          <li key={peer.id}>
+                            <Link
+                              className="block rounded-lg bg-[#edf4f6] p-3 text-xs"
+                              to={`/me/memories?${new URLSearchParams({ source: "records", record: record.id, quest: record.questId ?? record.id, message: "0", returnOthers: "1" })}`}
+                            >
+                              <span>
+                                {peer.performerName ?? "다른 수행자"} ·{" "}
+                                {peer.title}
+                              </span>
+                              <time
+                                className="mt-1 block text-[10px] text-neutral-500"
+                                dateTime={peer.createdAt}
                               >
-                                <span className="block">
-                                  {peer.performerName ?? "다른 수행자"} ·{" "}
-                                  {peer.title}
-                                </span>
-                                <time
-                                  className="mt-1 block text-[10px] text-neutral-500"
-                                  dateTime={peer.createdAt}
-                                >
-                                  {peer.createdAt?.slice(0, 10) ??
-                                    "등록일 정보 없음"}
-                                </time>
-                              </Link>
-                            </li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <p className="text-xs text-neutral-500">
-                          이 퀘스트를 수행한 다른 사람의 기록이 아직 없어요.
-                        </p>
-                      )}
-                    </section>
-                  )}
-                </article>
-              );
-            })}
-          </div>
+                                {peer.createdAt?.slice(0, 10) ??
+                                  "등록일 정보 없음"}
+                              </time>
+                            </Link>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-xs text-neutral-500">
+                        다른 수행자의 기록이 아직 없어요.
+                      </p>
+                    )}
+                  </section>
+                );
+              })}
+            </div>
+          )}
           {visibleRecords.length === 0 && (
             <p role="status" className="py-5 text-sm">
               아직 수행한 기록이 없어요.
             </p>
           )}
-          <Link
-            className="mt-4 block rounded-full border border-dotted border-neutral-400 p-3 text-center text-xs"
-            to="/"
-          >
-            다음 퀘스트 찾기
-          </Link>
         </>
       ) : (
         <div className="flex flex-col gap-[8px] [&_>_button]:rounded-[23px] [&_>_button]:h-[113px] [&_>_button]:bg-[#c9eaf5] [&_>_button]:text-left [&_>_button]:[padding:21px_14px] [&_>_button]:relative [&_strong]:text-[15px] [&_strong]:font-medium [&_strong]:block [&_strong]:max-w-[76%] [&_strong]:tracking-[-0.5px] [&_small]:text-[10px] [&_small]:text-[#666] [&_small]:block [&_small]:mt-[2px] [&_button_>_span]:inline-block [&_button_>_span]:bg-[#bbb] [&_button_>_span]:rounded-[20px] [&_button_>_span]:text-[9px] [&_button_>_span]:[padding:4px_10px] [&_button_>_span]:mt-[11px] [&_i]:absolute [&_i]:right-[21px] [&_i]:top-[13px] [&_i]:w-[60px] [&_i]:h-[79px] [&_i]:bg-[#fff] [&_i]:[transform:rotate(10deg)] [&_button:nth-child(2)_i]:[transform:rotate(-10deg)]">

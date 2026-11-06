@@ -46,6 +46,11 @@ export type KakaoMarker = {
   setMap(map: KakaoMap | null): void // 지도에 연결하거나 null로 제거
 }
 
+export type KakaoCustomOverlay = {
+  setMap(map: KakaoMap | null): void
+  setZIndex(zIndex: number): void
+}
+
 // TypeScript에 브라우저의 window.kakao 형태를 알려줍니다.
 // SDK 로딩 실패 시 없을 수 있으므로 kakao에 ?를 붙입니다.
 declare global {
@@ -58,6 +63,8 @@ declare global {
           latitude: number,
           longitude: number,
         ) => KakaoLatLng
+
+        CustomOverlay: new (options: { map: KakaoMap; position: KakaoLatLng; content: HTMLElement; xAnchor?: number; yAnchor?: number; zIndex?: number }) => KakaoCustomOverlay
 
         LatLngBounds: new () => KakaoBounds
 

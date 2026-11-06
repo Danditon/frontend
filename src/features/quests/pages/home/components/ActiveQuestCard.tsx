@@ -1,19 +1,20 @@
-// 수행 중인 퀘스트의 요약을 표시하고 해당 상세 페이지로 이동하는 카드입니다.
-import { Link } from 'react-router'
+// 가장 가까운 퀘스트의 요약을 표시하고 선택한 ID를 홈의 상세 Drawer에 전달하는 카드입니다.
 import { ArrowUpRight } from 'lucide-react'
 import { RemotePhoto } from '@/shared/components/RemotePhoto'
 import type { QuestDetail } from '@/features/quests/types/quest'
 
 type Props = {
   quest: QuestDetail
+  onSelect: (questId: number) => void
 }
 
-export default function ActiveQuestCard({ quest }: Props) {
+export default function ActiveQuestCard({ quest, onSelect }: Props) {
   return (
-    <Link
-      to={`/quests/${quest.questId}`}
+    <button
+      type="button"
+      onClick={() => onSelect(quest.questId)}
       aria-label={`${quest.questTitle} 상세 보기`}
-      className="pointer-events-auto relative block h-full overflow-hidden rounded-3xl bg-[#69716B] text-white"
+      className="pointer-events-auto relative block h-full w-full overflow-hidden rounded-3xl bg-[#69716B] text-left text-white"
     >
       {/* 현재 mock 사진은 null입니다. URL이 생기면 같은 카드에 사진을 표시합니다. */}
       {quest.photoUrl && (
@@ -33,7 +34,7 @@ export default function ActiveQuestCard({ quest }: Props) {
         {' · '}난이도 {quest.difficulty}
       </span>
 
-      {/* 카드 전체가 링크이므로 화살표는 별도의 버튼으로 만들지 않습니다. */}
+      {/* 카드 전체가 버튼이므로 화살표는 별도의 버튼으로 만들지 않습니다. */}
       <span className="absolute right-3 top-3 grid size-7 place-items-center rounded-full bg-white text-[#242624]">
         <ArrowUpRight className="size-4" aria-hidden="true" />
       </span>
@@ -46,6 +47,6 @@ export default function ActiveQuestCard({ quest }: Props) {
           {quest.placeName}에서 온 그리움
         </p>
       </div>
-    </Link>
+    </button>
   )
 }

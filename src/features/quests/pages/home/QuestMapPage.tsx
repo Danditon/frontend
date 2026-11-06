@@ -1,4 +1,4 @@
-// 홈 지도와 수행 중 카드·개수 카드·목록·상세 Drawer의 선택 상태를 연결하는 화면입니다.
+// 홈 지도와 가까운 퀘스트 카드·개수 카드·목록·상세 Drawer의 선택 상태를 연결하는 화면입니다.
 import { useCallback, useState } from 'react'
 import type { NearbyQuest } from '@/features/quests/types/quest'
 import QuestMap from './components/QuestMap.tsx'
@@ -9,23 +9,23 @@ import ActiveQuestCard from './components/ActiveQuestCard'
 import { mockNearbyQuests } from './mocks/nearbyQuests'
 import CurrentLocationButton from './components/CurrentLocationButton'
 import { useGeolocation } from '@/features/quests/hooks/useGeolocation'
-import { useActiveQuest } from '@/features/quests/hooks/useActiveQuest'
 import { useQuestDetail } from '@/features/quests/hooks/useQuestDetail'
+import { getNearestQuest } from './utils/getNearestQuest'
 
 export default function QuestMapPage() {
   // 홈에서 위치 조회 상태를 관리하고, 버튼과 결과 표시에 연결합니다.
   const { position, isLocating, error, requestLocation } = useGeolocation()
-  // Drawer에서 수행 시작한 ID로 카드에 표시할 상세 mock을 조회합니다.
-  const { activeQuestId } = useActiveQuest()
-  const activeQuestQuery = useQuestDetail(activeQuestId)
-  const activeQuest = activeQuestQuery.data
+  // 지도 표시 범위가 아닌 사용자 좌표를 기준으로 전체 목록에서 가장 가까운 항목을 찾습니다.
+  const nearestQuest = getNearestQuest(mockNearbyQuests, position)
+  const nearestQuestQuery = useQuestDetail(nearestQuest?.questId ?? null)
+  const nearestQuestDetail = nearestQuestQuery.data
   const [visibleQuests, setVisibleQuests] = useState<NearbyQuest[] | null>(null)
   const [isListOpen, setIsListOpen] = useState(false)
   const [listSnapshot, setListSnapshot] = useState<NearbyQuest[]>([])
   const [selectedQuestId, setSelectedQuestId] = useState<number | null>(null)
   const [drawerTop, setDrawerTop] = useState<number | null>(null)
 
-  // 마커와 목록 행이 같은 상세 Drawer를 사용합니다.
+  // 마커·목록 행·가까운 퀘스트 카드가 같은 상세 Drawer를 사용합니다.
   const handleQuestSelect = useCallback((questId: number) => {
     setIsListOpen(false)
     setSelectedQuestId(questId)
@@ -87,7 +87,7 @@ export default function QuestMapPage() {
         {/* 지역명·벨·MY 컴포넌트 */}
       </div>
 
-      {/* Drawer가 닫혀 있을 때 수행 중 카드·개수 카드·현위치 버튼을 보여줍니다. */}
+      {/* Drawer가 닫혀 있을 때 가까운 퀘스트 카드·개수 카드·현위치 버튼을 보여줍니다. */}
       {!isListOpen && selectedQuestId === null && (
         <div className="pointer-events-none absolute inset-x-4 bottom-[calc(7rem+env(safe-area-inset-bottom,0px))] z-20">
           {/* 카드 높이가 달라져도 현위치 버튼이 겹치지 않게 행 위에 배치합니다. */}
@@ -102,19 +102,34 @@ export default function QuestMapPage() {
             </div>
           </div>
           <div className="grid grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)] gap-3">
-            {/* 오른쪽 개수 카드와 같은 행의 높이를 사용하고, 수행 중일 때만 표시합니다. */}
+            {/* 현재 위치를 확인한 뒤 가까운 퀘스트를 표시하고, 카드 선택도 마커 선택과 연결합니다. */}
             <div className="min-w-0">
-              {activeQuest && (
-                <ActiveQuestCard quest={activeQuest} />
-              )}
-              {activeQuestId !== null && activeQuestQuery.isPending && (
+              {!position && (
                 <p role="status" className="rounded-3xl bg-white/80 p-4 text-sm">
-                  수행 중인 퀘스트를 불러오는 중이에요.
+                  {isLocating
+                    ? '현재 위치를 확인하는 중이에요.'
+                    : '가까운 퀘스트를 보려면 현위치 버튼을 눌러주세요.'}
                 </p>
               )}
-              {activeQuestQuery.isError && (
+              {position && !nearestQuest && (
+                <p role="status" className="rounded-3xl bg-white/80 p-4 text-sm">
+                  주변에 등록된 퀘스트가 없어요.
+                </p>
+              )}
+              {nearestQuestDetail && (
+                <ActiveQuestCard
+                  quest={nearestQuestDetail}
+                  onSelect={handleQuestSelect}
+                />
+              )}
+              {nearestQuest !== null && nearestQuestQuery.isPending && (
+                <p role="status" className="rounded-3xl bg-white/80 p-4 text-sm">
+                  가까운 퀘스트를 불러오는 중이에요.
+                </p>
+              )}
+              {nearestQuestQuery.isError && (
                 <p role="alert" className="rounded-3xl bg-white/80 p-4 text-sm">
-                  {activeQuestQuery.error.message}
+                  {nearestQuestQuery.error.message}
                 </p>
               )}
             </div>

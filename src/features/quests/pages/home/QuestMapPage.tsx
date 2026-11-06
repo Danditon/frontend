@@ -8,6 +8,7 @@ import QuestListDrawer from './components/QuestListDrawer'
 import QuestDetailDrawer from './components/QuestDetailDrawer'
 import ActiveQuestCard from './components/ActiveQuestCard'
 import LocationPromptCard from './components/LocationPromptCard'
+import HomeHeader from './components/HomeHeader'
 import { mockNearbyQuests } from './mocks/nearbyQuests'
 import CurrentLocationButton from './components/CurrentLocationButton'
 import { useGeolocation } from '@/features/quests/hooks/useGeolocation'
@@ -149,8 +150,8 @@ export default function QuestMapPage() {
       )}
 
       {/* 지도 위 상단 UI */}
-      <div className="absolute inset-x-0 top-0 z-10 p-4">
-        {/* 지역명·벨·MY 컴포넌트 */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 px-4 pt-[calc(0.75rem+env(safe-area-inset-top,0px))]">
+        <HomeHeader />
       </div>
 
       {/* Drawer가 닫혀 있을 때 현재 상태의 카드·개수 카드·현위치 버튼을 보여줍니다. */}

@@ -2,17 +2,21 @@
 import { Bell, MapPin } from 'lucide-react'
 import { Button } from '@/shared/components/ui/button'
 
-export default function HomeHeader() {
+type Props = {
+  regionLabel: string // 위치·지역 조회 상태에 맞는 문구를 홈에서 전달합니다.
+}
+
+export default function HomeHeader({ regionLabel }: Props) {
   return (
     <header className="flex min-w-0 items-center justify-between gap-3 [font-family:Pretendard,system-ui,sans-serif]">
-      {/* 지역명 조회 연결 전에는 실제 지역으로 오해하지 않도록 안내 문구를 표시합니다. */}
+      {/* 지역명 조회는 훅이 담당하고, Header는 전달받은 문구만 표시합니다. */}
       <span className="inline-flex h-9 min-w-0 items-center gap-1.5 rounded-full border border-white/80 bg-white/90 px-3 text-[11px] font-semibold text-[#242624] shadow-sm backdrop-blur-sm">
         <MapPin
           className="size-3.5 shrink-0 fill-current [&_circle]:fill-white [&_circle]:stroke-white"
           strokeWidth={1.8}
           aria-hidden="true"
         />
-        <span className="truncate">위치 확인</span>
+        <span className="truncate" aria-live="polite">{regionLabel}</span>
       </span>
 
       <div className="flex shrink-0 items-center gap-1">

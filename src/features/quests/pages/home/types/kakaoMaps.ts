@@ -44,6 +44,24 @@ export type KakaoMarker = {
   setMap(map: KakaoMap | null): void // 지도에 연결하거나 null로 제거
 }
 
+// 상단 지역명 표시에 필요한 행정구역 필드만 선언합니다.
+export type KakaoRegion = {
+  region_type: 'H' | 'B'
+  region_1depth_name?: string
+  region_2depth_name?: string
+}
+
+export type KakaoGeocoder = {
+  coord2RegionCode(
+    longitude: number,
+    latitude: number,
+    callback: (
+      result: KakaoRegion[],
+      status: 'OK' | 'ZERO_RESULT' | 'ERROR',
+    ) => void,
+  ): void
+}
+
 // TypeScript에 브라우저의 window.kakao 형태를 알려줍니다.
 // SDK 로딩 실패 시 없을 수 있으므로 kakao에 ?를 붙입니다.
 declare global {
@@ -51,6 +69,14 @@ declare global {
     kakao?: {
       maps: {
         load(callback: () => void): void // SDK 준비가 끝나면 콜백 실행
+
+        // services 라이브러리는 maps.load 완료 후 사용합니다.
+        services?: {
+          Geocoder: new () => KakaoGeocoder
+          Status: {
+            OK: 'OK'
+          }
+        }
 
         LatLng: new (
           latitude: number,

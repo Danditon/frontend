@@ -78,3 +78,8 @@ export const previewCompletedRecords: RecordItem[] = [1, 2, 101].map(
   },
 );
 
+
+export function previewRecordLocation(questId: string) {
+  const quest = mockNearbyQuests.find(item => String(item.questId) === questId);
+  return quest ? { lat: quest.lat, lng: quest.lng, placeName: quest.placeName } : undefined;
+}

@@ -1,3 +1,4 @@
+import type { RecordLocation } from "../types/location.ts";
 export type Entry = {
   id: string;
   title: string;
@@ -5,6 +6,7 @@ export type Entry = {
   date: string;
   message: string;
   createdAt?: string;
+  location?: RecordLocation;
 };
 export function readHistory(): Entry[] {
   try {
@@ -26,7 +28,7 @@ export function readHistory(): Entry[] {
 }
 export function saveHistory(
   id: string,
-  details?: { title?: string; message?: string },
+  details?: { title?: string; message?: string; location?: RecordLocation },
 ) {
   const entries = readHistory();
   if (!entries.some((x) => x.id === id))
@@ -36,6 +38,7 @@ export function saveHistory(
       place: "직접 담은 오늘의 풍경",
       date: new Date().toLocaleDateString("ko-KR"),
       createdAt: new Date().toISOString(),
+      location: details?.location,
       message: details?.message ?? "",
     });
   localStorage.setItem("geurium.demo.history", JSON.stringify(entries));

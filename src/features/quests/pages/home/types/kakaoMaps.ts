@@ -26,10 +26,12 @@ export type KakaoMapProjection = {
 }
 
 export type KakaoBounds = {
+  extend(position: KakaoLatLng): void
   contain(position: KakaoLatLng): boolean // 퀘스트 좌표가 현재 지도 범위 안인지 확인
 }
 
 export type KakaoMap = {
+  setBounds(bounds: KakaoBounds, paddingTop?: number, paddingRight?: number, paddingBottom?: number, paddingLeft?: number): void
   getBounds(): KakaoBounds // 현재 지도 영역
   getCenter(): KakaoLatLng // 현재 지도 중심 좌표
   getProjection(): KakaoMapProjection // 화면·지도 좌표 변환 객체
@@ -56,6 +58,8 @@ declare global {
           latitude: number,
           longitude: number,
         ) => KakaoLatLng
+
+        LatLngBounds: new () => KakaoBounds
 
         Map: new (
           container: HTMLElement,

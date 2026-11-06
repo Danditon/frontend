@@ -60,7 +60,11 @@ export default function QuestVerifyPage() {
   function record() {
     try {
       const quest = mockNearbyQuests.find(item => String(item.questId) === questId);
-      saveHistory(questId, { title: quest?.questTitle, message: note });
+      saveHistory(questId, {
+        title: quest?.questTitle,
+        message: note,
+        location: quest ? { lat: quest.lat, lng: quest.lng, placeName: quest.placeName } : undefined,
+      });
       setSaved(true);
     } catch {
       setError("기록을 저장하지 못했어요. 다시 시도해 주세요.");

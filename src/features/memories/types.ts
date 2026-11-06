@@ -1,3 +1,4 @@
+import type { RecordLocation } from "@/shared/types/location";
 /** Frontend view model. Map API DTOs here once response schemas are finalized. */
 export type Greeting = {
   isMine?: boolean;
@@ -15,6 +16,7 @@ export type Memory = {
   greetings: Greeting[];
 };
 export type RecordItem = {
+  location?: RecordLocation;
   performerName?: string;
   questId?: string;
   createdAt?: string;

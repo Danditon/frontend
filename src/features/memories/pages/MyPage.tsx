@@ -1,3 +1,4 @@
+import { HistoryMap } from "@/features/history/components/HistoryMap";
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router";
 import { Heart, LogOut } from "lucide-react";
@@ -12,6 +13,7 @@ import {
 import {
   previewMemories,
   previewCompletedRecords,
+  previewRecordLocation,
 } from "@/features/memories/data/preview";
 import type { RecordItem } from "@/features/memories/types";
 import { readHistory } from "@/shared/lib/demo";
@@ -30,6 +32,7 @@ export default function MyPage({ data }: { data?: MyPageData } = {}) {
       readHistory().map((entry) => ({
         id: entry.id,
         questId: entry.id,
+        location: entry.location ?? previewRecordLocation(entry.id),
         title: entry.title,
         photoUrl: null,
         createdAt: entry.createdAt ?? entry.date,
@@ -257,7 +260,7 @@ export default function MyPage({ data }: { data?: MyPageData } = {}) {
       </div>
       {history ? (
         <>
-          <div className="history-map"><div className="history-map-placeholder" aria-label="기록 지도 영역"/><small>미션 다녀온 곳 {recordCount}</small></div>
+          <HistoryMap records={visibleRecords} source="records" />
           {historyQuestId && (
             <Link to="/me/history" className="block py-2 text-sm underline">
               내 기록 전체 보기

@@ -1,35 +1,31 @@
-// 퀘스트 마커를 관리하고, 클릭한 퀘스트의 상세 Drawer를 여는 컴포넌트입니다.
-import { useCallback, useEffect, useRef, useState } from 'react'
+// 공통 선택 상태로 퀘스트 마커의 표시·강조·위치 이동을 관리하는 컴포넌트입니다.
+import { useEffect, useRef } from 'react'
 import type { NearbyQuest } from '@/features/quests/types/quest'
 import type { KakaoMap, KakaoMarker } from '../types/kakaoMaps'
 import { createQuestMarkerImage } from '../utils/createQuestMarkerImage'
-import QuestDetailDrawer from './QuestDetailDrawer'
 
 type QuestMarkersProps = {
+  selectedQuestId: number | null // 마커와 목록이 공유하는 선택 ID
+  drawerTop: number | null
+  onQuestSelect: (questId: number) => void
   map: KakaoMap | null // 기존에 생성한 카카오 지도
   quests: NearbyQuest[] // 지도에 표시할 퀘스트 배열
 }
 
-export default function QuestMarkers({ map, quests }: QuestMarkersProps) {
+export default function QuestMarkers({
+  map,
+  quests,
+  selectedQuestId,
+  drawerTop,
+  onQuestSelect,
+}: QuestMarkersProps) {
   // questId를 기준으로 마커를 보관합니다.
   // 여기서 Map은 JavaScript의 자료구조이며 카카오 지도와는 별개입니다.
   const markersRef = useRef(new Map<number, KakaoMarker>())
-  // 선택한 ID가 있으면 Drawer를 열고, null이면 닫습니다.
-  const [selectedQuestId, setSelectedQuestId] = useState<number | null>(null)
-  // Drawer 위치를 알기 전에는 지도 이동을 기다립니다.
-  const [drawerTop, setDrawerTop] = useState<number | null>(null)
+  // 선택과 Drawer는 홈에서 공유하고, 마커는 전달받은 ID로 갱신합니다.
   const selectedQuest = quests.find((quest) => quest.questId === selectedQuestId)
   const selectedLat = selectedQuest?.lat
   const selectedLng = selectedQuest?.lng
-
-  // 마커 클릭을 이 컴포넌트에서 처리해 부모로 함수를 전달하지 않습니다.
-  const handleMarkerClick = useCallback((questId: number) => {
-    setSelectedQuestId(questId)
-
-    // TODO: 상세 API 연결 위치
-    // 클릭한 questId로 GET /quests/{questId}를 요청합니다.
-    // Axios 요청과 로딩·오류 처리는 다음 단계에서 연결합니다.
-  }, [])
 
   useEffect(() => {
     const maps = window.kakao?.maps
@@ -140,7 +136,7 @@ export default function QuestMarkers({ map, quests }: QuestMarkersProps) {
       if (!marker) continue
 
       const handleClick = () => {
-        handleMarkerClick(quest.questId)
+        onQuestSelect(quest.questId)
       }
 
       maps.event.addListener(marker, 'click', handleClick)
@@ -155,7 +151,7 @@ export default function QuestMarkers({ map, quests }: QuestMarkersProps) {
       // 목록 변경·화면 종료 시 이벤트 중복 등록을 막습니다.
       removeListeners.forEach((removeListener) => removeListener())
     }
-  }, [map, quests, handleMarkerClick])
+  }, [map, quests, onQuestSelect])
 
   useEffect(() => {
     const markers = markersRef.current
@@ -170,16 +166,6 @@ export default function QuestMarkers({ map, quests }: QuestMarkersProps) {
     }
   }, [])
 
-  // 마커는 SDK가 그리고, 상세 화면은 선택한 ID로 Drawer에 연결합니다.
-  return (
-    <QuestDetailDrawer
-      questId={selectedQuestId}
-      onPositionChange={setDrawerTop}
-      onClose={() => {
-        setSelectedQuestId(null)
-        // 다음 열림에는 새로 측정한 Drawer 위치를 사용합니다.
-        setDrawerTop(null)
-      }}
-    />
-  )
+  // 마커는 SDK가 그리고, 목록·상세 Drawer는 홈에서 렌더링합니다.
+  return null
 }

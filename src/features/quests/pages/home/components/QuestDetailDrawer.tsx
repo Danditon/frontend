@@ -1,7 +1,10 @@
-// 마커에서 선택한 퀘스트의 Drawer를 열고, 지도를 조작할 수 있게 유지하는 컴포넌트입니다.
+// 선택한 퀘스트의 상세 mock과 수행 시작 버튼을 표시하며 지도 조작을 유지하는 Drawer입니다.
 import { useCallback, useRef, useState, type CSSProperties } from 'react'
 import { X } from 'lucide-react'
 import { Button } from '@/shared/components/ui/button'
+import { RemotePhoto } from '@/shared/components/RemotePhoto'
+import { useQuestDetail } from '@/features/quests/hooks/useQuestDetail'
+import QuestStartButton from './QuestStartButton'
 import {
   Drawer,
   DrawerClose,
@@ -26,6 +29,9 @@ export default function QuestDetailDrawer({
   const [snapPoint, setSnapPoint] = useState(0.4)
   const isExpanded = snapPoint === 0.85
   const drawerRef = useRef<HTMLDivElement>(null)
+  // 마커·목록에서 선택한 ID로 같은 상세 mock을 조회합니다.
+  const detailQuery = useQuestDetail(questId)
+  const quest = detailQuery.data
 
   // 접힌 상태의 DOM 높이 대신, 실제 화면에 보이는 상단 위치를 측정합니다.
   const reportPosition = useCallback(() => {
@@ -82,9 +88,13 @@ export default function QuestDetailDrawer({
         className="data-[swipe-direction=down]:rounded-t-3xl pb-[env(safe-area-inset-bottom,0px)]"
       >
         <DrawerHeader className="relative pr-14 text-left">
-          <DrawerTitle>퀘스트 상세</DrawerTitle>
+          <DrawerTitle className="line-clamp-2">
+            {quest?.questTitle ?? '퀘스트 상세'}
+          </DrawerTitle>
           <DrawerDescription>
-            선택한 퀘스트를 확인하는 공간입니다.
+            {quest
+              ? `${quest.placeName}에서 온 그리움`
+              : '선택한 퀘스트를 확인하는 공간입니다.'}
           </DrawerDescription>
 
           <DrawerClose
@@ -111,32 +121,56 @@ export default function QuestDetailDrawer({
             isExpanded ? 'overflow-y-auto overscroll-contain' : 'overflow-hidden'
           }`}
         >
-          <p>선택한 퀘스트 ID: {questId}</p>
+          {detailQuery.isPending && questId !== null && (
+            <p role="status">상세 내용을 불러오는 중이에요.</p>
+          )}
 
-          {isExpanded ? (
+          {detailQuery.isError && (
+            <p role="alert">{detailQuery.error.message}</p>
+          )}
+
+          {quest && (
             <>
-              {/* 상세 API 연결 전이므로 필드별 표시 영역만 만듭니다. */}
-              <section className="mt-4">
-                <h3 className="font-semibold">등록 사진</h3>
-                {/* photoUrl: 사진이 있으면 표시합니다. */}
-              </section>
-              <section className="mt-4">
-                <h3 className="font-semibold">이곳에 남긴 그리움</h3>
-                {/* longingText: 그리운 이유 전체를 표시합니다. */}
-              </section>
-              <section className="mt-4">
-                <h3 className="font-semibold">전해줄 안부</h3>
-                {/* questDescription: 수행할 내용을 표시합니다. */}
-              </section>
-              <section className="mt-4">
-                <h3 className="font-semibold">위치</h3>
-                {/* placeName, address: 장소와 주소를 표시합니다. */}
-              </section>
+              <p className="text-sm text-neutral-500">
+                {quest.questType === 'GENERAL' ? '일반' : '이미지'}
+                {' · '}난이도 {quest.difficulty}
+              </p>
+
+              {/* 접힌 상태에서도 수행을 시작할 수 있게 상세 내용보다 먼저 배치합니다. */}
+              <div className="mt-3">
+                <QuestStartButton quest={quest} onStarted={onClose} />
+              </div>
+
+              {isExpanded ? (
+                <>
+                  <section className="mt-4">
+                    <h3 className="font-semibold">등록 사진</h3>
+                    <RemotePhoto
+                      photoUrl={quest.photoUrl}
+                      alt={`${quest.placeName} 등록 사진`}
+                      className="mt-2 grid aspect-video place-items-center overflow-hidden rounded-xl bg-neutral-100 text-neutral-500 [&>img]:h-full [&>img]:w-full [&>img]:object-cover"
+                    />
+                  </section>
+                  <section className="mt-4">
+                    <h3 className="font-semibold">이곳에 남긴 그리움</h3>
+                    <p className="whitespace-pre-wrap break-words">{quest.longingText}</p>
+                  </section>
+                  <section className="mt-4">
+                    <h3 className="font-semibold">전해줄 안부</h3>
+                    <p className="whitespace-pre-wrap break-words">{quest.questDescription}</p>
+                  </section>
+                  <section className="mt-4">
+                    <h3 className="font-semibold">위치</h3>
+                    <p>{quest.placeName}</p>
+                    <p className="break-words">{quest.address}</p>
+                  </section>
+                </>
+              ) : (
+                <p className="mt-3 text-sm text-muted-foreground">
+                  위로 올리면 상세 내용을 확인할 수 있어요.
+                </p>
+              )}
             </>
-          ) : (
-            <p className="mt-3 text-sm text-muted-foreground">
-              위로 올리면 상세 내용을 확인할 수 있어요.
-            </p>
           )}
         </div>
       </DrawerContent>

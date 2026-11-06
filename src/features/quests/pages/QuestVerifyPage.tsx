@@ -63,6 +63,8 @@ export default function QuestVerifyPage() {
       saveHistory(questId, {
         title: quest?.questTitle,
         message: note,
+        questType: quest?.questType,
+        difficulty: quest?.difficulty,
         location: quest ? { lat: quest.lat, lng: quest.lng, placeName: quest.placeName } : undefined,
       });
       setSaved(true);

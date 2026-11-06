@@ -1,18 +1,21 @@
-// 로그인 화면을 배치하고 인증 API·사용자 확인·홈 이동을 연결합니다.
-import { useEffect, useRef, useState } from 'react'
+// 공통 인증 상태를 사용해 로그인 화면과 세션 재확인·홈 이동을 연결합니다.
+import { useEffect, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router'
-import axios from 'axios'
-import { login, getMe } from '@/features/auth/api/auth'
+import { useAuth } from '@/features/auth/hooks/useAuth'
 import type { LoginRequest } from '@/features/auth/types/auth'
-import { getAuthErrorMessage } from '@/features/auth/utils/getAuthErrorMessage'
+import { getSafeReturnTo } from '@/features/auth/utils/getSafeReturnTo'
 import LoginHeader from './LoginHeader'
 import LoginForm from './LoginForm'
 
 export default function LoginScreen() {
   const navigate = useNavigate()
   const location = useLocation()
+  const returnTo = getSafeReturnTo(new URLSearchParams(location.search).get('returnTo'))
+  const signupHref = returnTo === '/'
+    ? '/signup'
+    : `/signup?${new URLSearchParams({ returnTo })}`
   const requestRef = useRef<AbortController | null>(null)
-  const [isRequesting, setIsRequesting] = useState(false)
+  const { signIn, retrySession, status, error: sessionError, isSigningIn } = useAuth()
   const registeredEmail = typeof location.state?.registeredEmail === 'string'
     ? location.state.registeredEmail
     : ''
@@ -27,31 +30,24 @@ export default function LoginScreen() {
 
     const controller = new AbortController()
     requestRef.current = controller
-    setIsRequesting(true)
-    let step: 'login' | 'session' | 'storage' = 'login'
-
     try {
-      const result = await login(values, controller.signal)
-      step = 'session'
-      const user = await getMe(result.accessToken, controller.signal)
+      await signIn(values, controller.signal)
       if (controller.signal.aborted) return
-      if (user.userId !== result.userId) {
-        throw new Error('로그인 응답과 사용자 정보가 일치하지 않아요.')
-      }
-
-      step = 'storage'
-      // shortcut: 현재는 토큰만 보관합니다. 세션 복원·경로 보호는 AuthProvider 단계에서 연결합니다.
-      sessionStorage.setItem('accessToken', result.accessToken)
-      navigate('/', { replace: true })
-    } catch (error) {
-      if (axios.isCancel(error)) throw error
-      // Axios 설정에 포함된 비밀번호나 내부 오류를 화면에 노출하지 않습니다.
-      throw new Error(getAuthErrorMessage(error, step), { cause: error })
+      navigate(returnTo, { replace: true })
     } finally {
-      if (requestRef.current === controller) {
-        requestRef.current = null
-        setIsRequesting(false)
-      }
+      if (requestRef.current === controller) requestRef.current = null
+    }
+  }
+
+  async function handleRetrySession() {
+    if (requestRef.current) return
+    const controller = new AbortController()
+    requestRef.current = controller
+    try {
+      const confirmed = await retrySession(controller.signal)
+      if (confirmed && !controller.signal.aborted) navigate(returnTo, { replace: true })
+    } finally {
+      if (requestRef.current === controller) requestRef.current = null
     }
   }
 
@@ -65,9 +61,28 @@ export default function LoginScreen() {
 
       {/* 작은 화면에서는 고정 배치 대신 페이지 스크롤로 폼에 접근합니다. */}
       <div className="mt-auto pt-24">
+        {status === 'checking' && (
+          <p role="status" className="mb-4 text-center text-sm text-[#66757B]">
+            로그인 정보를 확인하는 중이에요.
+          </p>
+        )}
+        {status === 'error' && sessionError && (
+          <div className="mb-4 rounded-2xl bg-[#F4F4F4] p-4 text-center text-sm text-[#66757B]">
+            <p role="alert">{sessionError}</p>
+            <button
+              type="button"
+              onClick={() => { void handleRetrySession() }}
+              disabled={isSigningIn}
+              className="mt-2 min-h-11 underline underline-offset-4 disabled:opacity-50"
+            >
+              로그인 정보 다시 확인
+            </button>
+          </div>
+        )}
         <LoginForm
           initialEmail={registeredEmail}
-          disabled={isRequesting}
+          signupHref={signupHref}
+          disabled={isSigningIn || status === 'checking'}
           onSubmit={handleLogin}
         />
       </div>

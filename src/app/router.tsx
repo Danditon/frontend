@@ -1,5 +1,6 @@
 import { createBrowserRouter } from "react-router";
 import { RootLayout } from "@/app/layouts/RootLayout";
+import RequireAuth from "@/features/auth/components/RequireAuth";
 import LoginPage from "@/features/auth/pages/login/LoginPage";
 import SignupPage from "@/features/auth/pages/signup/SignupPage";
 import QuestMapPage from "@/features/quests/pages/home/QuestMapPage";
@@ -15,17 +16,27 @@ export const router = createBrowserRouter([
   {
     element: <RootLayout />,
     children: [
-      { path: "/", Component: QuestMapPage },
       { path: "/login", Component: LoginPage },
       { path: "/signup", Component: SignupPage },
-      { path: "/quests/new", Component: QuestCreatePage },
-      { path: "/quests/:questId", Component: QuestDetailPage },
-      { path: "/quests/:questId/verify", Component: QuestVerifyPage },
-      { path: "/me", Component: MyPage },
-      { path: "/me/logout", Component: MyPage },
-      { path: "/me/memories", Component: MemoriesPage },
-      { path: "/me/history", Component: HistoryPage },
-      { path: "*", Component: NotFoundPage },
+    ],
+  },
+  {
+    element: <RequireAuth />,
+    children: [
+      {
+        element: <RootLayout />,
+        children: [
+          { path: "/", Component: QuestMapPage },
+          { path: "/quests/new", Component: QuestCreatePage },
+          { path: "/quests/:questId", Component: QuestDetailPage },
+          { path: "/quests/:questId/verify", Component: QuestVerifyPage },
+          { path: "/me", Component: MyPage },
+          { path: "/me/logout", Component: MyPage },
+          { path: "/me/memories", Component: MemoriesPage },
+          { path: "/me/history", Component: HistoryPage },
+          { path: "*", Component: NotFoundPage },
+        ],
+      },
     ],
   },
 ]);

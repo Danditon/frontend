@@ -7,7 +7,7 @@ type AuthAction = 'signup' | 'login' | 'session' | 'storage'
 
 export function getAuthErrorMessage(error: unknown, action: AuthAction): string {
   if (action === 'storage') {
-    return '로그인 정보를 보관하지 못했어요. 브라우저의 저장소 설정을 확인해주세요.'
+    return '로그인 정보에 접근하지 못했어요. 브라우저의 저장소 설정을 확인해주세요.'
   }
 
   if (error instanceof z.ZodError) {

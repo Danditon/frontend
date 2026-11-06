@@ -1,8 +1,9 @@
 // 회원가입 API와 화면 배치·기존 키프레임을 사용한 진입·복귀 동작을 연결합니다.
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router'
+import { useLocation, useNavigate } from 'react-router'
 import { signup } from '@/features/auth/api/auth'
 import type { SignupRequest } from '@/features/auth/types/auth'
+import { getSafeReturnTo } from '@/features/auth/utils/getSafeReturnTo'
 import SignupHeader from './SignupHeader'
 import SignupForm from './SignupForm'
 
@@ -17,6 +18,11 @@ function prefersReducedMotion() {
 
 export default function SignupScreen() {
   const navigate = useNavigate()
+  const location = useLocation()
+  const returnTo = getSafeReturnTo(new URLSearchParams(location.search).get('returnTo'))
+  const loginHref = returnTo === '/'
+    ? '/login'
+    : `/login?${new URLSearchParams({ returnTo })}`
   const navigationFinished = useRef(false)
   const requestRef = useRef<AbortController | null>(null)
   const registeredEmail = useRef<string | null>(null)
@@ -29,11 +35,11 @@ export default function SignupScreen() {
     if (navigationFinished.current) return
     navigationFinished.current = true
     // 직접 접속·가입 성공 모두 로그인으로 돌아가며 비밀번호는 이동 상태에 남기지 않습니다.
-    navigate('/login', {
+    navigate(loginHref, {
       replace: true,
       state: registeredEmail.current ? { registeredEmail: registeredEmail.current } : undefined,
     })
-  }, [navigate])
+  }, [navigate, loginHref])
 
   const finishMotion = useCallback(() => {
     if (phase === 'enter') {

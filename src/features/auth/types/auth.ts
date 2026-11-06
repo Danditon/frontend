@@ -36,3 +36,16 @@ export type ApiErrorResponse = {
   code: string
   message: string
 }
+
+// 인증된 상태에서만 사용자 정보가 존재하도록 상태를 구분합니다.
+export type AuthState =
+  | { status: 'checking'; user: null; error: null }
+  | { status: 'authenticated'; user: MeResponse; error: null }
+  | { status: 'anonymous'; user: null; error: null }
+  | { status: 'error'; user: null; error: string }
+
+export type AuthContextValue = AuthState & {
+  isSigningIn: boolean
+  signIn: (values: LoginRequest, signal?: AbortSignal) => Promise<void>
+  retrySession: (signal?: AbortSignal) => Promise<boolean>
+}

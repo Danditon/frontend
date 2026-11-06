@@ -11,11 +11,12 @@ import type { LoginRequest } from '@/features/auth/types/auth'
 
 type Props = {
   initialEmail: string
+  signupHref: string
   disabled: boolean
   onSubmit: (values: LoginRequest) => Promise<void>
 }
 
-export default function LoginForm({ initialEmail, disabled, onSubmit }: Props) {
+export default function LoginForm({ initialEmail, signupHref, disabled, onSubmit }: Props) {
   // 서버 오류 때문에 정상 입력값까지 무효가 되어 재시도가 막히지 않도록 분리합니다.
   const [message, setMessage] = useState('')
   const {
@@ -116,7 +117,7 @@ export default function LoginForm({ initialEmail, disabled, onSubmit }: Props) {
       <div className="mt-2 flex justify-center">
         {/* 약관 단계 없이 회원가입 입력 화면으로 이동합니다. */}
         <Link
-          to="/signup"
+          to={signupHref}
           aria-disabled={disabled || isSubmitting}
           tabIndex={disabled || isSubmitting ? -1 : undefined}
           onClick={(event) => {

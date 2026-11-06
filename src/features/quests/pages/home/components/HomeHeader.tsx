@@ -1,5 +1,6 @@
 // 홈 지도 위에 지역명 배지와 알림·MY 버튼을 표시하는 상단 UI입니다.
 import { Bell, MapPin } from 'lucide-react'
+import { Link } from 'react-router'
 import { Button } from '@/shared/components/ui/button'
 
 type Props = {
@@ -33,18 +34,16 @@ export default function HomeHeader({ regionLabel }: Props) {
           </span>
         </Button>
 
-        {/* MY 이동 링크는 다음 작업에서 연결합니다. */}
-        <Button
-          type="button"
-          size="icon"
-          disabled
-          aria-label="마이페이지, 준비 중"
-          className="pointer-events-auto size-11 rounded-full bg-transparent p-0 disabled:opacity-100"
+        {/* 기존 마이페이지로 이동하며 원형 디자인은 유지합니다. */}
+        <Link
+          to="/me"
+          aria-label="마이페이지"
+          className="pointer-events-auto grid size-11 place-items-center rounded-full"
         >
           <span className="grid size-9 shrink-0 place-items-center rounded-full bg-[#F5E6AC] text-[10px] font-bold text-[#242624] shadow-sm">
             MY
           </span>
-        </Button>
+        </Link>
       </div>
     </header>
   )

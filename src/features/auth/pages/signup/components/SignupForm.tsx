@@ -1,4 +1,5 @@
 // 회원가입 입력값 검증과 입력란별 오류를 표시하는 폼 컴포넌트입니다.
+import axios from 'axios'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -6,12 +7,21 @@ import { Input } from '@/shared/components/ui/input'
 import { Button } from '@/shared/components/ui/button'
 import { signupSchema } from '@/features/auth/schemas/signup'
 import type { SignupValues } from '@/features/auth/schemas/signup'
+import type { ApiErrorResponse, SignupRequest } from '@/features/auth/types/auth'
+import { getAuthErrorMessage } from '@/features/auth/utils/getAuthErrorMessage'
 
-export default function SignupForm() {
+type Props = {
+  onSubmit: (values: SignupRequest) => Promise<void>
+  disabled: boolean
+}
+
+export default function SignupForm({ onSubmit, disabled }: Props) {
+  // 서버 연결 오류는 입력값의 유효성과 분리해 같은 값으로 재시도할 수 있게 합니다.
   const [message, setMessage] = useState('')
   const {
     register,
     handleSubmit,
+    setError,
     formState: { errors, touchedFields, isSubmitted, isValid, isSubmitting },
   } = useForm<SignupValues>({
     resolver: zodResolver(signupSchema),
@@ -25,9 +35,32 @@ export default function SignupForm() {
     },
   })
 
-  const submit = handleSubmit(() => {
-    // shortcut: 입력 검증까지 제공합니다. 이후 단계에서 회원가입 API를 연결합니다.
-    setMessage('회원가입 기능은 아직 연결되지 않았어요.')
+  const submit = handleSubmit(async (values) => {
+    if (disabled) return
+    setMessage('')
+
+    try {
+      // 확인용 비밀번호는 제외하고 검증된 값만 화면의 요청 함수에 전달합니다.
+      await onSubmit({
+        email: values.email,
+        password: values.password,
+        nickname: values.nickname,
+      })
+    } catch (error) {
+      // 화면을 떠나 취소된 요청은 실패 안내를 표시하지 않습니다.
+      if (axios.isCancel(error)) return
+
+      const message = getAuthErrorMessage(error, 'signup')
+      if (
+        axios.isAxiosError<ApiErrorResponse>(error) &&
+        error.response?.status === 409 &&
+        error.response.data?.code === 'DUPLICATE_EMAIL'
+      ) {
+        setError('email', { type: 'server', message }, { shouldFocus: true })
+      } else {
+        setMessage(message)
+      }
+    }
   })
 
   // 다른 입력란의 검증 결과가 생겨도 사용하지 않은 입력란에는 오류를 표시하지 않습니다.
@@ -40,7 +73,7 @@ export default function SignupForm() {
 
   return (
     <form onSubmit={submit} noValidate className="w-full">
-      <div className="space-y-5">
+      <fieldset disabled={disabled || isSubmitting} className="space-y-5">
         <div className="space-y-2">
           <label htmlFor="signup-email" className="text-sm font-medium">
             이메일
@@ -142,20 +175,20 @@ export default function SignupForm() {
             </p>
           )}
         </div>
-      </div>
+      </fieldset>
 
       <Button
         type="submit"
-        disabled={!isValid || isSubmitting}
+        disabled={disabled || !isValid || isSubmitting}
         className="mt-7 h-14 w-full rounded-[22px] bg-[#D3E7F4] text-base font-medium text-[#242624] hover:bg-[#C7E0F0]"
       >
-        회원가입
+        {isSubmitting ? '가입하는 중…' : '회원가입'}
       </Button>
 
-      {/* 실제 가입 성공을 표시하지 않고 API 미연결 상태만 안내합니다. */}
+      {/* 성공은 화면 이동으로 처리하고, 서버 오류는 폼 아래에 표시합니다. */}
       <p
-        role="status"
-        className="mt-3 min-h-5 text-center text-xs leading-5 text-[#66757B]"
+        role={message ? 'alert' : 'status'}
+        className="mt-3 min-h-5 text-center text-xs leading-5 text-red-600"
       >
         {message}
       </p>

@@ -1,6 +1,8 @@
-// 회원가입 화면의 배치와 기존 키프레임을 사용한 진입·복귀 동작을 담당합니다.
+// 회원가입 API와 화면 배치·기존 키프레임을 사용한 진입·복귀 동작을 연결합니다.
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
+import { signup } from '@/features/auth/api/auth'
+import type { SignupRequest } from '@/features/auth/types/auth'
 import SignupHeader from './SignupHeader'
 import SignupForm from './SignupForm'
 
@@ -16,23 +18,31 @@ function prefersReducedMotion() {
 export default function SignupScreen() {
   const navigate = useNavigate()
   const navigationFinished = useRef(false)
+  const requestRef = useRef<AbortController | null>(null)
+  const registeredEmail = useRef<string | null>(null)
+  const [isRequesting, setIsRequesting] = useState(false)
   const [phase, setPhase] = useState<MotionPhase>(() =>
     prefersReducedMotion() ? 'idle' : 'enter',
   )
+
+  const navigateToLogin = useCallback(() => {
+    if (navigationFinished.current) return
+    navigationFinished.current = true
+    // 직접 접속·가입 성공 모두 로그인으로 돌아가며 비밀번호는 이동 상태에 남기지 않습니다.
+    navigate('/login', {
+      replace: true,
+      state: registeredEmail.current ? { registeredEmail: registeredEmail.current } : undefined,
+    })
+  }, [navigate])
 
   const finishMotion = useCallback(() => {
     if (phase === 'enter') {
       // 진입 애니메이션을 해제해야 같은 키프레임을 복귀 때 다시 실행할 수 있습니다.
       setPhase('idle')
-      return
+    } else if (phase === 'exit') {
+      navigateToLogin()
     }
-
-    if (phase === 'exit' && !navigationFinished.current) {
-      navigationFinished.current = true
-      // 직접 /signup에 접속한 경우에도 로그인 화면으로 돌아갑니다.
-      navigate('/login', { replace: true })
-    }
-  }, [phase, navigate])
+  }, [phase, navigateToLogin])
 
   useEffect(() => {
     if (phase === 'idle') return
@@ -43,12 +53,42 @@ export default function SignupScreen() {
     return () => window.clearTimeout(timer)
   }, [phase, finishMotion])
 
+  useEffect(() => () => {
+    requestRef.current?.abort()
+    requestRef.current = null
+  }, [])
+
+  async function handleSignup(values: SignupRequest) {
+    if (requestRef.current || phase !== 'idle') return
+
+    const controller = new AbortController()
+    requestRef.current = controller
+    setIsRequesting(true)
+
+    try {
+      await signup(values, controller.signal)
+      if (controller.signal.aborted) return
+
+      // 201과 응답 검사를 통과한 경우에만 복귀 애니메이션을 시작합니다.
+      registeredEmail.current = values.email
+      if (prefersReducedMotion()) {
+        navigateToLogin()
+      } else {
+        setPhase('exit')
+      }
+    } finally {
+      if (requestRef.current === controller) {
+        requestRef.current = null
+        setIsRequesting(false)
+      }
+    }
+  }
+
   function handleReturnToLogin() {
-    if (phase !== 'idle' || navigationFinished.current) return
+    if (phase !== 'idle' || navigationFinished.current || requestRef.current) return
 
     if (prefersReducedMotion()) {
-      navigationFinished.current = true
-      navigate('/login', { replace: true })
+      navigateToLogin()
       return
     }
 
@@ -73,12 +113,15 @@ export default function SignupScreen() {
       >
         <SignupHeader
           onBack={handleReturnToLogin}
-          disabled={phase !== 'idle'}
+          disabled={phase !== 'idle' || isRequesting}
         />
 
         {/* 입력 영역은 고정하지 않아 작은 화면과 키보드 환경에서 스크롤됩니다. */}
         <div className="my-auto py-10">
-          <SignupForm />
+          <SignupForm
+            onSubmit={handleSignup}
+            disabled={phase !== 'idle' || isRequesting}
+          />
         </div>
       </section>
     </div>

@@ -2,6 +2,8 @@ import { Outlet, useLocation } from "react-router";
 import { Bottom } from "@/shared/components/WireUI";
 export function RootLayout() {
   const { pathname } = useLocation();
+  // 로그인 화면에서는 내비게이션과 해당 영역의 여백을 함께 제외합니다.
+  const isLoginPage = pathname === "/login";
   const scoped = pathname.startsWith("/me") || pathname.endsWith("/verify");
   return (
     <div className="[&_button]:cursor-pointer [&_:is(button,a,input,textarea)]:[-webkit-tap-highlight-color:transparent] [&_:is(button,a,input,textarea):focus-visible]:outline-2 [&_:is(button,a,input,textarea):focus-visible]:outline-[#333] [&_:is(button,a,input,textarea):focus-visible]:outline-offset-[3px] min-h-[100dvh] bg-[#444] flex flex-col items-center justify-start p-[24px] text-[#080808] [font-family:Arial,Malgun_Gothic,sans-serif] max-[500px]:p-0 max-[500px]:bg-[#fff]">
@@ -15,9 +17,11 @@ export function RootLayout() {
         >
           <Outlet />
         </main>
-        <div className="app-navigation">
-          <Bottom />
-        </div>
+        {!isLoginPage && (
+          <div className="app-navigation">
+            <Bottom />
+          </div>
+        )}
       </div>
       <p className="text-[#ccc] text-[11px] p-[14px] max-[500px]:hidden">
         그리움 퀘스트 · UI 미리보기

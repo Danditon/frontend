@@ -1,6 +1,7 @@
 // 이메일·비밀번호 입력과 로그인 제출 UI를 담당하는 폼 컴포넌트입니다.
 import { useState } from 'react'
 import type { FormEventHandler } from 'react'
+import { Link } from 'react-router'
 import { Input } from '@/shared/components/ui/input'
 import { Button } from '@/shared/components/ui/button'
 
@@ -71,15 +72,13 @@ export default function LoginForm() {
       </p>
 
       <div className="mt-2 flex justify-center">
-        {/* 회원가입 UI를 만드는 단계에서 모드 전환 동작을 연결합니다. */}
-        <Button
-          type="button"
-          variant="link"
-          disabled
-          className="min-h-11 text-xs text-[#555D61]"
+        {/* 약관 단계 없이 회원가입 입력 화면으로 이동합니다. */}
+        <Link
+          to="/signup"
+          className="inline-flex min-h-11 items-center text-xs text-[#555D61]"
         >
           회원가입
-        </Button>
+        </Link>
       </div>
     </form>
   )

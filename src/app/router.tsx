@@ -1,6 +1,7 @@
 import { createBrowserRouter } from "react-router";
 import { RootLayout } from "@/app/layouts/RootLayout";
 import LoginPage from "@/features/auth/pages/login/LoginPage";
+import SignupPage from "@/features/auth/pages/signup/SignupPage";
 import QuestMapPage from "@/features/quests/pages/home/QuestMapPage";
 import QuestCreatePage from "@/features/quests/pages/QuestCreatePage";
 import QuestDetailPage from "@/features/quests/pages/QuestDetailPage";
@@ -16,6 +17,7 @@ export const router = createBrowserRouter([
     children: [
       { path: "/", Component: QuestMapPage },
       { path: "/login", Component: LoginPage },
+      { path: "/signup", Component: SignupPage },
       { path: "/quests/new", Component: QuestCreatePage },
       { path: "/quests/:questId", Component: QuestDetailPage },
       { path: "/quests/:questId/verify", Component: QuestVerifyPage },

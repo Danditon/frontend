@@ -304,3 +304,16 @@
 @media(prefers-reduced-motion:reduce){
  .app-content[data-mypage="true"] {animation:none;}
 }
+
+/* 마이페이지의 키프레임을 회원가입 진입·복귀에도 재사용합니다. */
+.signup-screen[data-motion="enter"] {
+ animation:mypage-enter 280ms cubic-bezier(0.22,0.61,0.36,1) both;
+}
+.signup-screen[data-motion="exit"] {
+ animation:mypage-enter 280ms cubic-bezier(0.22,0.61,0.36,1) reverse both;
+}
+
+@media(prefers-reduced-motion:reduce){
+ .signup-screen[data-motion="enter"],
+ .signup-screen[data-motion="exit"] {animation:none;}
+}

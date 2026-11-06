@@ -29,20 +29,21 @@ export function Profile() {
     </header>
   );
 }
+// 모든 화면에서 같은 크기와 간격으로 사용하는 공용 하단 navbar입니다.
 export function Bottom() {
   return (
     <nav
-      className="absolute bottom-[26px] left-[15px] right-[15px] h-[65px] rounded-[36px] bg-[#242624] text-white grid grid-cols-3 place-items-center px-4 text-[14px] max-[500px]:[bottom:max(26px,_env(safe-area-inset-bottom))]"
+      className="absolute bottom-[26px] left-[15px] right-[15px] h-[62px] rounded-[36px] bg-[#242624] text-white grid grid-cols-3 place-items-center px-4 text-[14px] max-[500px]:[bottom:max(26px,_env(safe-area-inset-bottom))]"
       aria-label="주 메뉴"
     >
-      <Link className="nav-item" to="/quests/demo/verify"><span className="nav-icon"><BadgeCheck size={32} aria-hidden="true" /></span><span>수행 인증</span></Link>
+      <Link className="nav-item" to="/quests/demo/verify"><span className="nav-icon"><BadgeCheck size={20} strokeWidth={1.6} aria-hidden="true" /></span><span>수행 인증</span></Link>
       <Link
         to="/"
-        className="relative -translate-y-8 h-[73px] w-[73px] bg-white text-[#242624] rounded-full grid place-items-center text-[18px]"
+        className="relative -translate-y-[22px] h-[60px] w-[60px] bg-white text-[#242624] rounded-full grid place-items-center text-[18px]"
       >
-        <House size={27} fill="currentColor" aria-hidden="true" /><span className="sr-only">홈</span>
+        <House size={25} fill="currentColor" aria-hidden="true" /><span className="sr-only">홈</span>
       </Link>
-      <Link className="nav-item" to="/quests/new"><span className="nav-icon"><MailPlus size={22} aria-hidden="true" /></span><span>그리움 등록</span></Link>
+      <Link className="nav-item" to="/quests/new"><span className="nav-icon"><MailPlus size={20} strokeWidth={1.6} aria-hidden="true" /></span><span>그리움 등록</span></Link>
     </nav>
   );
 }

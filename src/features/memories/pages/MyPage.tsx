@@ -25,6 +25,7 @@ export default function MyPage({ data }: { data?: MyPageData } = {}) {
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
   const messageTop = useRef<HTMLElement>(null);
+  const greetingBody = useRef<HTMLDivElement>(null);
   const historyPanel = useRef<HTMLDivElement>(null);
   const [liked, setLiked] = useState(false);
   const [error, setError] = useState("");
@@ -100,7 +101,10 @@ export default function MyPage({ data }: { data?: MyPageData } = {}) {
         ? `/me/history${params.get("returnOthers") === "1" ? "?showOthers=1" : ""}`
         : "/me/memories";
   useEffect(() => {
-    if (message) messageTop.current?.scrollIntoView({ block: "start" });
+    if (message) {
+      messageTop.current?.scrollIntoView({ block: "start" });
+      greetingBody.current?.scrollTo({ top: 0 });
+    }
   }, [message, selected?.id, index]);
   useEffect(() => {
     const panel = historyPanel.current;
@@ -172,10 +176,44 @@ export default function MyPage({ data }: { data?: MyPageData } = {}) {
             <LogOut size={21} />
           </Link>
         </header>
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-[15px] pb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div ref={greetingBody} className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-[15px] pb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+
+        <article className="message-envelope rounded-[24px] bg-[#fff] flex-1 relative overflow-hidden [padding:20px_14px] flex flex-col items-center min-h-[650px] [&_>_small]:text-[10px] [&_>_small]:z-[1]">
+          <RemotePhoto
+            className="postcard-photo"
+            photoUrl={greeting?.photoUrl}
+            alt="도착한 안부 사진"
+          />
+          <p className="text-[20px] leading-[1.3] whitespace-pre-line text-center [margin:22px_0_10px] z-[1]">
+            {greeting?.greeting ?? "아직 도착한 안부가 없어요."}
+          </p>
+          <small>
+            {greeting
+              ? `From. ${greeting.senderName}${greeting.createdAt ? ` | ${greeting.createdAt.slice(0, 10)}` : ""}`
+              : ""}
+          </small>
+          <div className="absolute [inset:38%_0_0] bg-[#c9eaf5] [clip-path:polygon(0_0,_50%_37%,_100%_0,_100%_100%,_0_100%)]" />
+          <div className="relative mt-auto z-[1] text-center pt-[90px] [&_:is(a,button)]:h-[66px] [&_:is(a,button)]:w-[66px] [&_:is(a,button)]:bg-[#242624] [&_.liked]:bg-[#999] [&_p]:text-[11px] [&_p]:[margin:12px_0_34px]">
+            <button
+              className={`h-[54px] w-[54px] rounded-full bg-[#c9eaf5] inline-flex items-center justify-center shrink-0 [&_svg]:[stroke-width:1.25] ${liked ? "liked" : ""}`}
+              aria-label="안부 좋아요"
+              aria-pressed={liked}
+              disabled={!greeting}
+              onClick={() => setLiked(!liked)}
+            >
+              <Heart fill={liked ? "currentColor" : "none"} />
+            </button>
+            <p>
+              {liked
+                ? "고마운 마음을 전했어요"
+                : "좋아요로 고마움을 전해보세요"}
+            </p>
+          </div>
+
+        </article>
         <section
           aria-label="수행 글 목록"
-          className="mb-4 rounded-2xl bg-white p-3 text-[#242624]"
+          className="mt-4 rounded-2xl bg-white p-3 text-[#242624]"
         >
           <h2 className="mb-2 text-sm font-semibold">
             {source === "records" || source === "completed"
@@ -218,39 +256,6 @@ export default function MyPage({ data }: { data?: MyPageData } = {}) {
             </p>
           )}
         </section>
-        <article className="message-envelope rounded-[24px] bg-[#fff] flex-1 relative overflow-hidden [padding:20px_14px] flex flex-col items-center min-h-[650px] [&_>_small]:text-[10px] [&_>_small]:z-[1]">
-          <RemotePhoto
-            className="postcard-photo"
-            photoUrl={greeting?.photoUrl}
-            alt="도착한 안부 사진"
-          />
-          <p className="text-[20px] leading-[1.3] whitespace-pre-line text-center [margin:22px_0_10px] z-[1]">
-            {greeting?.greeting ?? "아직 도착한 안부가 없어요."}
-          </p>
-          <small>
-            {greeting
-              ? `From. ${greeting.senderName}${greeting.createdAt ? ` | ${greeting.createdAt.slice(0, 10)}` : ""}`
-              : ""}
-          </small>
-          <div className="absolute [inset:38%_0_0] bg-[#c9eaf5] [clip-path:polygon(0_0,_50%_37%,_100%_0,_100%_100%,_0_100%)]" />
-          <div className="relative mt-auto z-[1] text-center pt-[90px] [&_:is(a,button)]:h-[66px] [&_:is(a,button)]:w-[66px] [&_:is(a,button)]:bg-[#242624] [&_.liked]:bg-[#999] [&_p]:text-[11px] [&_p]:[margin:12px_0_34px]">
-            <button
-              className={`h-[54px] w-[54px] rounded-full bg-[#c9eaf5] inline-flex items-center justify-center shrink-0 [&_svg]:[stroke-width:1.25] ${liked ? "liked" : ""}`}
-              aria-label="안부 좋아요"
-              aria-pressed={liked}
-              disabled={!greeting}
-              onClick={() => setLiked(!liked)}
-            >
-              <Heart fill={liked ? "currentColor" : "none"} />
-            </button>
-            <p>
-              {liked
-                ? "고마운 마음을 전했어요"
-                : "좋아요로 고마움을 전해보세요"}
-            </p>
-          </div>
-
-        </article>
         </div>
         <footer aria-label="안부 이동" className="shrink-0 px-[15px] pt-3 pb-[max(26px,env(safe-area-inset-bottom,0px))]">
           <button

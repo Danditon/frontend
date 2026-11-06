@@ -1,50 +1,106 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router";
 import { Heart, LogOut } from "lucide-react";
 import { Back, Profile } from "@/shared/components/WireUI";
 import { RemotePhoto } from "@/shared/components/RemotePhoto";
 import type { MyPageData } from "@/features/memories/types";
+import {
+  newestFirst,
+  recordMemory,
+  otherPerformances,
+} from "@/features/memories/lib/performances";
+import {
+  previewMemories,
+  previewCompletedRecords,
+} from "@/features/memories/data/preview";
+import type { RecordItem } from "@/features/memories/types";
 import { readHistory } from "@/shared/lib/demo";
-const items = [
-  {
-    title: "시험 끝나면 가던 떡볶이집",
-    sub: "안부 2통  |  일반 퀘스트",
-    message: "사장님 아직 그대로세요.\n떡볶이도 그대로예요.",
-  },
-  {
-    title: "해 질 무렵의 앞산 전망대",
-    sub: "안부 1통  |  이미지 퀘스트",
-    message: "해 질 무렵의 풍경은 여전히 아름다워요.",
-  },
-  {
-    title: "친구들과 탔던 수성못 오리배",
-    sub: "아직 안부를 기다리는 중",
-    message: "",
-  },
-];
 // The router uses previews until the backend publishes response DTOs.
 // Supply mapped API data through this boundary without changing the UI.
 export default function MyPage({ data }: { data?: MyPageData } = {}) {
   const { pathname } = useLocation();
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
+  const messageTop = useRef<HTMLElement>(null);
   const [liked, setLiked] = useState(false);
   const [error, setError] = useState("");
-  const memories = data?.memories ?? items.map((item, i) => ({
-    id: String(i), title: item.title, sub: item.sub, photoUrl: null,
-    greetings: item.message ? [{ id: String(i), greeting: item.message, photoUrl: null, senderName: '동네 주민 수현', createdAt: '' }] : [],
-  }));
-  const selected = memories.find(item => item.id === params.get('quest')) ?? memories[0];
-  const greetings = selected?.greetings ?? [];
-  const requested = Number(params.get('message'));
-  const index = Number.isFinite(requested) ? Math.max(0, Math.min(greetings.length - 1, Math.trunc(requested))) : 0;
+  const memories = data?.memories ?? previewMemories;
+  const records: RecordItem[] = newestFirst(
+    data?.records ??
+      readHistory().map((entry) => ({
+        id: entry.id,
+        questId: entry.id,
+        title: entry.title,
+        photoUrl: null,
+        createdAt: entry.createdAt ?? entry.date,
+        greetings: entry.message
+          ? [
+              {
+                id: `local-${entry.id}`,
+                greeting: entry.message,
+                photoUrl: null,
+                senderName: "나",
+                isMine: true,
+                createdAt: entry.createdAt ?? entry.date,
+              },
+            ]
+          : undefined,
+      })),
+  );
+  const completedRecords = newestFirst(
+    data?.completedRecords ?? (data ? [] : previewCompletedRecords),
+  );
+  const showOthers = params.get("showOthers") === "1";
+  const relatedOtherRecords = otherPerformances(records, completedRecords);
+  const historyQuestId =
+    pathname === "/me/history" ? params.get("quest") : null;
+  const visibleRecords = records.filter(
+    (item) => !historyQuestId || (item.questId ?? item.id) === historyQuestId,
+  );
+  const source = params.get("source");
+  const sourceRecords = source === "completed" ? completedRecords : records;
+  const requestedRecord = sourceRecords.find(
+    (item) =>
+      item.id === params.get("record") ||
+      (!params.has("record") &&
+        (item.questId ?? item.id) === params.get("quest")),
+  );
+  const selected =
+    source === "records" || source === "completed"
+      ? requestedRecord &&
+        recordMemory(requestedRecord, memories, [
+          ...records,
+          ...completedRecords,
+        ])
+      : params.has("quest")
+        ? memories.find((item) => item.id === params.get("quest"))
+        : memories[0];
+  const greetings = newestFirst(selected?.greetings ?? []);
+  const requested = Number(params.get("message"));
+  const index = Number.isFinite(requested)
+    ? Math.max(0, Math.min(greetings.length - 1, Math.trunc(requested)))
+    : 0;
   const greeting = greetings[index];
   const message = params.has("message") || params.get("tab") === "messages";
   const history = pathname === "/me/history";
   const logout = pathname === "/me/logout";
-  const entries = readHistory();
-  const records = data?.records ?? entries.map(entry => ({ id: entry.id, title: entry.title, photoUrl: null }));
   const recordCount = records.length;
+  const backTo =
+    source === "completed"
+      ? "/me/history?showOthers=1"
+      : source === "records"
+        ? `/me/history${params.get("returnOthers") === "1" ? "?showOthers=1" : ""}`
+        : "/me/memories";
+  useEffect(() => {
+    if (message) messageTop.current?.scrollIntoView({ block: "start" });
+  }, [message, selected?.id, index]);
+  function openGreeting(next: number) {
+    setParams((previous) => {
+      previous.set("message", String(next));
+      return previous;
+    });
+    setLiked(false);
+  }
   function signOut() {
     try {
       localStorage.removeItem("accessToken");
@@ -73,11 +129,19 @@ export default function MyPage({ data }: { data?: MyPageData } = {}) {
   if (message)
     return (
       <section className="memory-page [padding:12px_15px_15px] min-h-[790px] flex-1 flex flex-col max-[500px]:[min-height:calc(100dvh_-_54px)]">
-        <header className="flex items-center gap-[10px] mb-[15px] [&_>_div]:flex-1 [&_small]:text-[10px] [&_small]:block [&_strong]:text-[15px] [&_strong]:block [&_strong]:tracking-[-0.5px]">
-          <Back />
+        <header
+          ref={messageTop}
+          className="flex items-center gap-[10px] mb-[15px] [&_>_div]:flex-1 [&_small]:text-[10px] [&_small]:block [&_strong]:text-[15px] [&_strong]:block [&_strong]:tracking-[-0.5px]"
+        >
+          <Back to={backTo} />
           <div>
-            <small>도착한 안부 {greeting ? index + 1 : 0}/{greetings.length}</small>
-            <strong>{selected?.title ?? "도착한 안부"}</strong>
+            <small>
+              {source === "records" || source === "completed"
+                ? "수행한 퀘스트의 안부"
+                : "내 그리움에 도착한 안부"}{" "}
+              {greeting ? index + 1 : 0}/{greetings.length}
+            </small>
+            <strong>{selected?.title ?? "퀘스트를 찾을 수 없어요"}</strong>
           </div>
           <Link
             className="h-[54px] w-[54px] rounded-full bg-[#c9eaf5] inline-flex items-center justify-center shrink-0 [&_svg]:[stroke-width:1.25]"
@@ -87,12 +151,65 @@ export default function MyPage({ data }: { data?: MyPageData } = {}) {
             <LogOut size={21} />
           </Link>
         </header>
+        <section
+          aria-label="수행 글 목록"
+          className="mb-4 rounded-2xl bg-white p-3 text-[#242624]"
+        >
+          <h2 className="mb-2 text-sm font-semibold">
+            {source === "records" || source === "completed"
+              ? "나와 다른 수행자의 안부 · 최신순"
+              : "도착한 수행 안부 · 최신순"}
+          </h2>
+          {greetings.length ? (
+            <ol className="flex flex-col gap-2">
+              {greetings.map((item, position) => (
+                <li key={item.id}>
+                  <button
+                    className={`w-full rounded-xl p-3 text-left text-sm ${position === index ? "bg-[#c9eaf5]" : "bg-neutral-100"}`}
+                    aria-current={position === index ? "true" : undefined}
+                    onClick={() => openGreeting(position)}
+                  >
+                    <span className="block font-medium">
+                      {item.senderName}
+                      {item.isMine && (
+                        <span className="ml-2 rounded-full bg-white px-2 py-0.5 text-[10px]">
+                          내가 보낸 안부
+                        </span>
+                      )}
+                    </span>
+                    <span className="block truncate">{item.greeting}</span>
+                    <time
+                      className="text-xs text-neutral-500"
+                      dateTime={item.createdAt}
+                    >
+                      {item.createdAt
+                        ? item.createdAt.slice(0, 10)
+                        : "등록일 정보 없음"}
+                    </time>
+                  </button>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <p className="text-sm" role="status">
+              아직 등록된 수행 글이 없어요.
+            </p>
+          )}
+        </section>
         <article className="message-envelope rounded-[24px] bg-[#fff] flex-1 relative overflow-hidden [padding:20px_14px] flex flex-col items-center min-h-[650px] [&_>_small]:text-[10px] [&_>_small]:z-[1]">
-          <RemotePhoto className="postcard-photo" photoUrl={greeting?.photoUrl} alt="도착한 안부 사진" />
+          <RemotePhoto
+            className="postcard-photo"
+            photoUrl={greeting?.photoUrl}
+            alt="도착한 안부 사진"
+          />
           <p className="text-[20px] leading-[1.3] whitespace-pre-line text-center [margin:22px_0_10px] z-[1]">
             {greeting?.greeting ?? "아직 도착한 안부가 없어요."}
           </p>
-          <small>{greeting ? `From. ${greeting.senderName}${greeting.createdAt ? ` | ${greeting.createdAt.slice(0, 10)}` : ""}` : ""}</small>
+          <small>
+            {greeting
+              ? `From. ${greeting.senderName}${greeting.createdAt ? ` | ${greeting.createdAt.slice(0, 10)}` : ""}`
+              : ""}
+          </small>
           <div className="absolute [inset:38%_0_0] bg-[#c9eaf5] [clip-path:polygon(0_0,_50%_37%,_100%_0,_100%_100%,_0_100%)]" />
           <div className="relative mt-auto z-[1] text-center pt-[90px] [&_:is(a,button)]:h-[66px] [&_:is(a,button)]:w-[66px] [&_:is(a,button)]:bg-[#242624] [&_.liked]:bg-[#999] [&_p]:text-[11px] [&_p]:[margin:12px_0_34px]">
             <button
@@ -114,8 +231,7 @@ export default function MyPage({ data }: { data?: MyPageData } = {}) {
             className="relative z-[1] bg-[#242624] h-[64px] rounded-[35px] w-full text-[15px]"
             disabled={greetings.length < 2}
             onClick={() => {
-              setParams({ quest: selected.id, message: String((index + 1) % greetings.length) });
-              setLiked(false);
+              openGreeting((index + 1) % greetings.length);
             }}
           >
             다음 안부 보기
@@ -141,19 +257,128 @@ export default function MyPage({ data }: { data?: MyPageData } = {}) {
       </div>
       {history ? (
         <>
-          <div className="history-map">
-            <div className="history-map-placeholder" aria-label="기록 지도 영역" />
-            <small>미션 다녀온 곳 {recordCount}</small>
+          <div className="history-map"><div className="history-map-placeholder" aria-label="기록 지도 영역"/><small>미션 다녀온 곳 {recordCount}</small></div>
+          {historyQuestId && (
+            <Link to="/me/history" className="block py-2 text-sm underline">
+              내 기록 전체 보기
+            </Link>
+          )}
+          <header className="my-4 flex items-center justify-between gap-3">
+            <h2 className="text-sm font-semibold">
+              내가 수행한 퀘스트 · 최신순
+            </h2>
+            <button
+              aria-expanded={showOthers}
+              aria-controls="my-performance-list"
+              className="rounded-full bg-[#242624] px-3 py-2 text-xs text-white"
+              onClick={() =>
+                setParams((previous) => {
+                  if (showOthers) previous.delete("showOthers");
+                  else previous.set("showOthers", "1");
+                  previous.delete("scope");
+                  return previous;
+                })
+              }
+            >
+              {showOthers ? "다른 수행자 기록 숨기기" : "다른 수행자 기록 보기"}
+            </button>
+          </header>
+          <p className="mb-3 text-xs text-neutral-500">
+            {showOthers
+              ? "내가 수행한 퀘스트의 다른 수행 기록도 함께 보여요."
+              : "내가 수행한 퀘스트만 보여요. 안부를 열면 다른 수행자의 글도 함께 볼 수 있어요."}
+          </p>
+          <div id="my-performance-list" className="flex flex-col gap-3">
+            {visibleRecords.map((record) => {
+              const peerRecords = relatedOtherRecords.filter(
+                (item) =>
+                  (item.questId ?? item.id) === (record.questId ?? record.id),
+              );
+              return (
+                <article
+                  key={record.id}
+                  className="rounded-2xl border border-[#c9eaf5] bg-white p-3 text-[#242624]"
+                >
+                  <Link
+                    className="flex gap-3"
+                    to={`/me/memories?${new URLSearchParams({ source: "records", record: record.id, quest: record.questId ?? record.id, message: "0", returnOthers: showOthers ? "1" : "0" })}`}
+                  >
+                    <RemotePhoto
+                      className="record-photo h-20 w-20 shrink-0"
+                      photoUrl={record.photoUrl}
+                      alt={record.title}
+                    />
+                    <div className="min-w-0">
+                      <span className="text-[10px] text-neutral-500">
+                        내 수행 기록
+                      </span>
+                      <h3 className="mt-1 text-sm font-semibold">
+                        {record.title}
+                      </h3>
+                      <time
+                        className="block py-1 text-[10px] text-neutral-500"
+                        dateTime={record.createdAt}
+                      >
+                        {record.createdAt?.slice(0, 10) ?? "등록일 정보 없음"}
+                      </time>
+                      <span className="text-xs underline">
+                        나와 다른 수행자의 안부 보기
+                      </span>
+                    </div>
+                  </Link>
+                  {showOthers && (
+                    <section
+                      aria-label={`${record.title} 다른 수행자 기록`}
+                      className="mt-3 border-t pt-3"
+                    >
+                      <h4 className="mb-2 text-xs font-semibold">
+                        같은 퀘스트의 다른 수행 기록 {peerRecords.length}건
+                      </h4>
+                      {peerRecords.length ? (
+                        <ul className="flex flex-col gap-2">
+                          {peerRecords.map((peer) => (
+                            <li key={peer.id}>
+                              <Link
+                                className="block rounded-xl bg-[#edf4f6] p-3 text-xs"
+                                to={`/me/memories?${new URLSearchParams({ source: "records", record: record.id, quest: record.questId ?? record.id, message: "0", returnOthers: "1" })}`}
+                              >
+                                <span className="block">
+                                  {peer.performerName ?? "다른 수행자"} ·{" "}
+                                  {peer.title}
+                                </span>
+                                <time
+                                  className="mt-1 block text-[10px] text-neutral-500"
+                                  dateTime={peer.createdAt}
+                                >
+                                  {peer.createdAt?.slice(0, 10) ??
+                                    "등록일 정보 없음"}
+                                </time>
+                              </Link>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-xs text-neutral-500">
+                          이 퀘스트를 수행한 다른 사람의 기록이 아직 없어요.
+                        </p>
+                      )}
+                    </section>
+                  )}
+                </article>
+              );
+            })}
           </div>
-          <div className="grid [grid-template-columns:repeat(3,_1fr)] gap-[6px] [&_article_>_div]:bg-[#c9eaf5] [&_article_>_div]:h-[85px] [&_article_>_p]:text-[10px] [&_article_>_p]:leading-[1.3] [&_article_>_p]:text-center [&_article_>_p]:[padding:7px_0] [&_>_a]:h-[85px] [&_>_a]:[border:1px_dotted_#111] [&_>_a]:grid [&_>_a]:place-items-center [&_>_a]:text-[10px]">
-            {records.map(record => (
-              <article key={record.id}>
-                <RemotePhoto className="record-photo" photoUrl={record.photoUrl} alt={record.title} />
-                <p>{record.title}</p>
-              </article>
-            ))}
-            <Link to="/">다음 퀘스트 찾기</Link>
-          </div>
+          {visibleRecords.length === 0 && (
+            <p role="status" className="py-5 text-sm">
+              아직 수행한 기록이 없어요.
+            </p>
+          )}
+          <Link
+            className="mt-4 block rounded-full border border-dotted border-neutral-400 p-3 text-center text-xs"
+            to="/"
+          >
+            다음 퀘스트 찾기
+          </Link>
         </>
       ) : (
         <div className="flex flex-col gap-[8px] [&_>_button]:rounded-[23px] [&_>_button]:h-[113px] [&_>_button]:bg-[#c9eaf5] [&_>_button]:text-left [&_>_button]:[padding:21px_14px] [&_>_button]:relative [&_strong]:text-[15px] [&_strong]:font-medium [&_strong]:block [&_strong]:max-w-[76%] [&_strong]:tracking-[-0.5px] [&_small]:text-[10px] [&_small]:text-[#666] [&_small]:block [&_small]:mt-[2px] [&_button_>_span]:inline-block [&_button_>_span]:bg-[#bbb] [&_button_>_span]:rounded-[20px] [&_button_>_span]:text-[9px] [&_button_>_span]:[padding:4px_10px] [&_button_>_span]:mt-[11px] [&_i]:absolute [&_i]:right-[21px] [&_i]:top-[13px] [&_i]:w-[60px] [&_i]:h-[79px] [&_i]:bg-[#fff] [&_i]:[transform:rotate(10deg)] [&_button:nth-child(2)_i]:[transform:rotate(-10deg)]">
@@ -169,11 +394,17 @@ export default function MyPage({ data }: { data?: MyPageData } = {}) {
             >
               <strong>{x.title}</strong>
               <small>{x.sub}</small>
-              {x.greetings.length > 0 && <span>안부 {x.greetings.length}통 도착</span>}
-              <i className="memory-thumbnail"><RemotePhoto photoUrl={x.photoUrl} alt={x.title} /></i>
+              {x.greetings.length > 0 && (
+                <span>안부 {x.greetings.length}통 도착</span>
+              )}
+              <i className="memory-thumbnail">
+                <RemotePhoto photoUrl={x.photoUrl} alt={x.title} />
+              </i>
             </button>
           ))}
-          {memories.length === 0 && <p role="status">등록한 그리움이 없어요.</p>}
+          {memories.length === 0 && (
+            <p role="status">등록한 그리움이 없어요.</p>
+          )}
           {error && (
             <p className="text-[12px] p-[12px]" role="status">
               {error}

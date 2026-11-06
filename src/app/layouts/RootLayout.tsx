@@ -8,7 +8,11 @@ export function RootLayout() {
       <div
         className={`app-phone ${scoped ? "designed-screen" : ""} w-[390px] min-h-[844px] bg-[#fff] relative flex flex-col [box-shadow:0_0_0_1px_#777] max-[500px]:w-full max-[500px]:min-h-[100dvh] max-[500px]:shadow-none ${scoped ? "" : "pb-[30px] [&_>_h1]:p-[20px]"}`}
       >
-        <main className="app-content" data-home={pathname === "/"}>
+        <main
+          className="app-content"
+          data-home={pathname === "/"}
+          data-mypage={pathname === "/me"}
+        >
           <Outlet />
         </main>
         <div className="app-navigation">

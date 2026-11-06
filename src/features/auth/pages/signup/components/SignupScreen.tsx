@@ -80,15 +80,6 @@ export default function SignupScreen() {
         <div className="my-auto py-10">
           <SignupForm />
         </div>
-
-        <button
-          type="button"
-          onClick={handleReturnToLogin}
-          disabled={phase !== 'idle'}
-          className="min-h-11 text-sm text-[#66757B] disabled:opacity-50"
-        >
-          로그인으로 돌아가기
-        </button>
       </section>
     </div>
   )

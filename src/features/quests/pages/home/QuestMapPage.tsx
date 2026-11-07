@@ -267,6 +267,7 @@ export default function QuestMapPage() {
       />
       <QuestDetailDrawer
         questId={selectedQuestId}
+        position={position}
         onPositionChange={setDrawerTop}
         onClose={() => {
           setSelectedQuestId(null)

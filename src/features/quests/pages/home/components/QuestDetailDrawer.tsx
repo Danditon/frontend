@@ -4,9 +4,11 @@ import { X } from 'lucide-react'
 import { Button } from '@/shared/components/ui/button'
 import { RemotePhoto } from '@/shared/components/RemotePhoto'
 import { useQuestDetail } from '@/features/quests/hooks/useQuestDetail'
+import type { UserPosition } from '@/features/quests/hooks/useGeolocation'
 import QuestStartButton from './QuestStartButton'
 import QuestQueryErrorNotice from './QuestQueryErrorNotice'
 import { getQuestQueryError } from '../utils/getQuestQueryError'
+import { getDistanceMeters } from '../utils/getDistanceMeters'
 import {
   Drawer,
   DrawerClose,
@@ -19,11 +21,13 @@ import {
 type QuestDetailDrawerProps = {
   onPositionChange: (top: number) => void // 보이는 지도 높이를 계산하도록 Drawer 상단 위치를 전달합니다.
   questId: number | null // null이면 닫히고, ID가 있으면 해당 퀘스트로 열립니다.
+  position: UserPosition | null // 홈에서 확인한 GPS를 재사용하며 여기서 위치를 요청하지 않습니다.
   onClose: () => void // 닫힐 때 부모의 선택 상태를 해제합니다.
 }
 
 export default function QuestDetailDrawer({
   questId,
+  position,
   onClose,
   onPositionChange,
 }: QuestDetailDrawerProps) {
@@ -36,6 +40,13 @@ export default function QuestDetailDrawer({
   const detailError = detailQuery.isError ? getQuestQueryError(detailQuery.error, 'detail') : null
   // 통신 오류에는 기존 상세를 유지하지만, 401·403·404의 오래된 수행 버튼은 숨깁니다.
   const quest = detailError?.keepPreviousData === false ? undefined : detailQuery.data
+  // 목록 응답의 distance 대신 현재 선택한 상세 좌표와 홈의 마지막 GPS로 계산합니다.
+  const distanceMeters = position && quest ? getDistanceMeters(position, quest) : null
+  const distanceText = distanceMeters === null
+    ? '위치 확인 후 거리 표시'
+    : distanceMeters < 1000
+      ? `내 위치에서 약 ${Math.round(distanceMeters)}m`
+      : `내 위치에서 약 ${(distanceMeters / 1000).toFixed(1)}km`
 
   // 접힌 상태의 DOM 높이 대신, 실제 화면에 보이는 상단 위치를 측정합니다.
   const reportPosition = useCallback(() => {
@@ -143,6 +154,7 @@ export default function QuestDetailDrawer({
               <p className="text-sm text-neutral-500">
                 {quest.questType === 'GENERAL' ? '일반' : '이미지'}
                 {' · '}난이도 {quest.difficulty}
+                <span className="ml-3">{distanceText}</span>
               </p>
 
               {/* 접힌 상태에서도 수행을 시작할 수 있게 상세 내용보다 먼저 배치합니다. */}

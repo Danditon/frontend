@@ -35,6 +35,8 @@ const queryErrorUtils = loadSource('features/quests/pages/home/utils/getQuestQue
   zod: { z },
 })
 
+const distanceUtils = loadSource('features/quests/pages/home/utils/getDistanceMeters.ts')
+
 function findNode(tree, type) {
   if (!tree || typeof tree !== 'object') return null
   if (tree.type === type) return tree
@@ -125,7 +127,7 @@ function homeFixture() {
         }
       },
     },
-    './utils/getNearestQuest': loadSource('features/quests/pages/home/utils/getNearestQuest.ts'),
+    './utils/getNearestQuest': loadSource('features/quests/pages/home/utils/getNearestQuest.ts', { './getDistanceMeters': distanceUtils }),
     './utils/getQuestVerifyPath': loadSource('features/quests/pages/home/utils/getQuestVerifyPath.ts'),
     './utils/getQuestQueryError': queryErrorUtils,
   }, { queueMicrotask: (callback) => microtasks.push(callback) })
@@ -188,6 +190,18 @@ test('좌표·정확도 디버그 표시는 없애고 지도에 전달하는 위
   assert.doesNotMatch(textOf(tree), /위도:|경도:|정확도 범위:/)
   assert.equal(f.node('QuestMap').props.position, position)
   assert.equal(f.node('QuestMap').props.position.accuracy, 10)
+  assert.equal(f.node('QuestDetailDrawer').props.position, position)
+})
+
+test('공통 직선거리는 미터 단위이며 동일 좌표·대칭·날짜변경선·대척점에서 안정적으로 계산한다', () => {
+  const { getDistanceMeters } = distanceUtils
+  assert.equal(getDistanceMeters(position, position), 0)
+  const a = { lat: 0, lng: 0 }, b = { lat: 0, lng: 1 }
+  assert.ok(Math.abs(getDistanceMeters(a, b) - 111_195) < 1)
+  assert.equal(getDistanceMeters(a, b), getDistanceMeters(b, a))
+  assert.ok(getDistanceMeters({ lat: 0, lng: 179.9999 }, { lat: 0, lng: -179.9999 }) < 23)
+  const opposite = getDistanceMeters(a, { lat: 0, lng: 180 })
+  assert.ok(Number.isFinite(opposite) && opposite > 20_000_000 && opposite < 20_020_000)
 })
 
 test('위치 미확인·조회 중·실패·성공 0개를 구분하고 mock 마커로 대체하지 않는다', () => {
@@ -509,6 +523,7 @@ test('오류 안내는 조회 중 중복 클릭을 막고 401에서 로그인 �
 
 test('상세 Drawer는 재시도를 연결하고 일시적 오류의 기존 내용만 유지한다', () => {
   const retries = []
+  let viewerPosition = position
   const query = {
     data: quests[0], isError: true, isPending: false, isFetching: false,
     error: new axios.AxiosError('Network', 'ERR_NETWORK'),
@@ -523,10 +538,18 @@ test('상세 Drawer는 재시도를 연결하고 일시적 오류의 기존 내�
     './QuestStartButton': { __esModule: true, default: 'QuestStartButton' },
     './QuestQueryErrorNotice': { __esModule: true, default: 'QuestQueryErrorNotice' },
     '../utils/getQuestQueryError': queryErrorUtils,
+    '../utils/getDistanceMeters': distanceUtils,
     '@/shared/components/ui/drawer': Object.fromEntries(['Drawer', 'DrawerClose', 'DrawerContent', 'DrawerDescription', 'DrawerHeader', 'DrawerTitle'].map((name) => [name, name])),
   })
-  const render = () => Drawer({ questId: 701, onPositionChange() {}, onClose() {} })
+  const render = () => Drawer({ questId: 701, position: viewerPosition, onPositionChange() {}, onClose() {} })
   let tree = render()
+  assert.match(textOf(tree), /내 위치에서 약 0m/)
+  viewerPosition = { ...position, lat: position.lat - 0.001 }
+  assert.match(textOf(render()), /내 위치에서 약 111m/)
+  viewerPosition = { ...position, lng: position.lng - 0.1 }
+  assert.match(textOf(render()), /내 위치에서 약 [0-9.]+km/)
+  viewerPosition = null
+  assert.match(textOf(render()), /위치 확인 후 거리 표시/)
   assert.ok(findNode(tree, 'QuestStartButton'))
   const notice = findNode(tree, 'QuestQueryErrorNotice')
   assert.equal(notice.props.showingPreviousData, true)

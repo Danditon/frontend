@@ -117,9 +117,13 @@ export default function OnboardingScreen() {
                   </p>
                 </div>
 
-                {/* 그림은 정적으로 유지하고, 다음 화면의 이미지도 함께 준비합니다. */}
+                {/* 도착한 장면에만 active를 전달해 그림의 등장과 반복 동작을 시작합니다. */}
                 <div className="flex min-h-[160px] flex-1 items-center justify-center overflow-hidden">
-                  <OnboardingVisual visual={step.visual} />
+                  <OnboardingVisual
+                    visual={step.visual}
+                    active={index === currentIndex && !isTransitioning}
+                    reducedMotion={Boolean(reducedMotion)}
+                  />
                 </div>
               </div>
             ))}

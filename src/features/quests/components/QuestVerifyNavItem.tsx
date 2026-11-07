@@ -4,11 +4,14 @@ import { useNavigate } from 'react-router'
 import { useActiveQuest } from '../hooks/useActiveQuest'
 import { useQuestDetail } from '../hooks/useQuestDetail'
 import { getQuestVerifyPath } from '../pages/home/utils/getQuestVerifyPath'
+import { getQuestQueryError } from '../pages/home/utils/getQuestQueryError'
 
 export default function QuestVerifyNavItem() {
   const navigate = useNavigate()
   const { activeQuestId } = useActiveQuest()
   const query = useQuestDetail(activeQuestId)
+  const queryError = query.isError ? getQuestQueryError(query.error, 'detail') : null
+  const quest = queryError?.keepPreviousData === false ? undefined : query.data
   const isLoading = activeQuestId !== null && query.isPending
 
   function handleClick() {
@@ -18,15 +21,15 @@ export default function QuestVerifyNavItem() {
       return
     }
 
-    if (!query.data) {
+    if (!quest) {
       window.alert(
-        query.error?.message ?? '퀘스트 정보를 확인하는 중이에요.',
+        queryError?.message ?? '퀘스트 정보를 확인하는 중이에요.',
       )
       return
     }
 
     // 카드·Drawer와 같은 ID와 경로 규칙을 사용합니다. 수행 상태를 새로 지정하지 않습니다.
-    navigate(getQuestVerifyPath(query.data))
+    navigate(getQuestVerifyPath(quest))
   }
 
   return (

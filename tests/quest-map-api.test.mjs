@@ -4,11 +4,13 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import { runInNewContext } from 'node:vm'
 import { QueryClient, QueryObserver } from '@tanstack/react-query'
+import axios from 'axios'
 import ts from 'typescript'
+import { z } from 'zod'
 
 const element = (type, props) => ({ type, props })
 
-function loadSource(path, dependencies = {}) {
+function loadSource(path, dependencies = {}, globals = {}) {
   const source = ts.transpileModule(
     readFileSync(new URL(`../src/${path}`, import.meta.url), 'utf8')
       .replaceAll('import.meta.env.DEV', 'false'),
@@ -16,6 +18,7 @@ function loadSource(path, dependencies = {}) {
   ).outputText
   const module = { exports: {} }
   runInNewContext(source, {
+    ...globals,
     module,
     exports: module.exports,
     require: (id) => {
@@ -27,6 +30,11 @@ function loadSource(path, dependencies = {}) {
   })
   return module.exports
 }
+
+const queryErrorUtils = loadSource('features/quests/pages/home/utils/getQuestQueryError.ts', {
+  axios: { __esModule: true, default: axios },
+  zod: { z },
+})
 
 function findNode(tree, type) {
   if (!tree || typeof tree !== 'object') return null
@@ -59,6 +67,8 @@ function homeFixture() {
     activeQuestId: null,
     detailIds: [],
     navigations: [],
+    refetchCalls: [],
+    detailQuery: {},
   }
   const page = loadSource('features/quests/pages/home/QuestMapPage.tsx', {
     react: {
@@ -71,17 +81,29 @@ function homeFixture() {
     },
     'react-router': { useNavigate: () => (path) => fixture.navigations.push(path) },
     '@/features/quests/hooks/useGeolocation': { useGeolocation: () => ({ position: fixture.position, isLocating: false, error: null, requestLocation: async () => fixture.position }) },
-    '@/features/quests/hooks/useNearbyQuests': { useNearbyQuests: () => fixture.query },
+    '@/features/quests/hooks/useNearbyQuests': { useNearbyQuests: () => ({
+      isFetching: false,
+      refetch: (options) => { fixture.refetchCalls.push({ target: 'nearby', options }); return Promise.resolve() },
+      ...fixture.query,
+    }) },
     '@/features/quests/hooks/useRegionName': { useRegionName: () => 'Daegu' },
     '@/features/quests/hooks/useActiveQuest': { useActiveQuest: () => ({ activeQuestId: fixture.activeQuestId }) },
     '@/features/quests/hooks/useQuestDetail': {
       useQuestDetail: (id) => {
         fixture.detailIds.push(id)
-        return { data: id === null ? undefined : { ...quests[0], questId: id }, isPending: false, isError: false }
+        return {
+          data: id === null ? undefined : { ...quests[0], questId: id },
+          isPending: false,
+          isError: false,
+          isFetching: false,
+          refetch: (options) => { fixture.refetchCalls.push({ target: 'detail', options }); return Promise.resolve() },
+          ...fixture.detailQuery,
+        }
       },
     },
     './utils/getNearestQuest': loadSource('features/quests/pages/home/utils/getNearestQuest.ts'),
     './utils/getQuestVerifyPath': loadSource('features/quests/pages/home/utils/getQuestVerifyPath.ts'),
+    './utils/getQuestQueryError': queryErrorUtils,
   })
   return Object.assign(fixture, {
     render() { cursor = 0; tree = page.default(); return tree },
@@ -100,7 +122,8 @@ test('위치 미확인·조회 중·실패·성공 0개를 구분하고 mock 마
   assert.match(textOf(f.render()), /불러오는 중/)
   assert.equal(f.node('NearbyQuestCountCard').props.status, 'loading')
   f.query = { data: undefined, isPending: false, isError: true }
-  assert.match(textOf(f.render()), /불러오지 못/)
+  f.render()
+  assert.match(f.node('QuestQueryErrorNotice').props.info.message, /불러오지 못/)
   assert.equal(f.node('NearbyQuestCountCard').props.status, 'error')
   f.query = { data: [], isPending: false, isError: false }
   assert.match(textOf(f.render()), /주변에 등록된 퀘스트가 없어요/)
@@ -221,5 +244,196 @@ test('실제 상세 훅은 인증·선택을 검사하고 같은 사용자·ID�
     stopCard()
     stopDrawer()
     client.clear()
+  }
+})
+
+function httpError(status, code) {
+  return new axios.AxiosError('Private server diagnostics', undefined, undefined, undefined, {
+    status,
+    data: { code, message: 'Private server diagnostics' },
+  })
+}
+
+test('401·토큰 누락·403·404·통신·타임아웃·서버·응답 검증 오류를 안전한 문구로 구분한다', () => {
+  const { getQuestQueryError } = queryErrorUtils
+  for (const error of [httpError(401), { code: 'UNAUTHORIZED' }]) {
+    const info = getQuestQueryError(error, 'detail')
+    assert.equal(info.requiresLogin, true)
+    assert.equal(info.keepPreviousData, false)
+  }
+  assert.match(getQuestQueryError(httpError(404), 'detail').message, /이 퀘스트를 찾을 수 없어요/)
+  assert.match(getQuestQueryError(httpError(404), 'nearby').message, /주변 퀘스트 정보/)
+  assert.equal(getQuestQueryError(httpError(403), 'detail').keepPreviousData, false)
+  for (const [error, expected] of [
+    [new axios.AxiosError('Private server diagnostics', 'ERR_NETWORK'), /인터넷 연결/],
+    [new axios.AxiosError('Private server diagnostics', 'ECONNABORTED'), /시간이 초과/],
+    [new axios.AxiosError('Private server diagnostics', 'ETIMEDOUT'), /시간이 초과/],
+    [httpError(503), /서버에 일시적인 문제/],
+    [new z.ZodError([{ code: 'custom', path: [], message: 'Private server diagnostics' }]), /서버 응답/],
+  ]) {
+    const info = getQuestQueryError(error, 'nearby')
+    assert.match(info.message, expected)
+    assert.doesNotMatch(info.message, /Private server diagnostics/)
+    assert.equal(info.keepPreviousData, true)
+  }
+})
+
+test('첫 목록 실패에서 재시도하고 갱신 실패에서는 기존 마커와 카드를 유지한다', () => {
+  const f = homeFixture()
+  f.query = { data: undefined, isError: true, isPending: false, error: new axios.AxiosError('Network', 'ERR_NETWORK') }
+  f.render()
+  f.node('QuestQueryErrorNotice').props.onRetry()
+  assert.equal(f.refetchCalls[0].target, 'nearby')
+  assert.equal(f.refetchCalls[0].options.cancelRefetch, false)
+  f.query.data = quests
+  f.render()
+  assert.equal(f.node('QuestMap').props.quests, quests)
+  assert.ok(f.node('ActiveQuestCard'))
+  assert.equal(f.node('QuestQueryErrorNotice').props.showingPreviousData, true)
+  f.query.isFetching = true
+  f.render()
+  assert.equal(f.node('QuestQueryErrorNotice').props.isFetching, true)
+  f.query.error = httpError(401)
+  f.render()
+  assert.equal(f.node('QuestMap').props.quests.length, 0)
+  assert.equal(f.node('NearbyQuestCountCard').props.status, 'error')
+  assert.equal(f.node('QuestQueryErrorNotice').props.info.requiresLogin, true)
+  assert.equal(f.query.data, quests)
+})
+
+test('카드 갱신 실패는 기존 카드를 유지하지만 404 상세로 수행 버튼을 제공하지 않는다', () => {
+  const f = homeFixture()
+  f.query = { data: quests, isError: false, isPending: false }
+  f.detailQuery = { isError: true, error: new axios.AxiosError('Network', 'ERR_NETWORK') }
+  f.render()
+  assert.ok(f.node('ActiveQuestCard'))
+  assert.equal(f.node('QuestQueryErrorNotice').props.showingPreviousData, true)
+  f.node('QuestQueryErrorNotice').props.onRetry()
+  assert.equal(f.refetchCalls[0].target, 'detail')
+  f.detailQuery.error = httpError(404)
+  f.render()
+  assert.equal(f.node('ActiveQuestCard'), null)
+  assert.match(f.node('QuestQueryErrorNotice').props.info.message, /찾을 수 없어요/)
+})
+
+test('오류 안내는 조회 중 중복 클릭을 막고 401에서 로그인 링크만 표시한다', () => {
+  const { default: Notice } = loadSource('features/quests/pages/home/components/QuestQueryErrorNotice.tsx', {
+    'react-router': { Link: 'Link' },
+  })
+  let retries = 0
+  const props = {
+    info: queryErrorUtils.getQuestQueryError(httpError(503), 'nearby'),
+    isFetching: false,
+    onRetry: () => { retries++ },
+    showingPreviousData: true,
+  }
+  const initial = Notice(props)
+  assert.match(textOf(initial), /이전에 불러온 결과/)
+  findNode(initial, 'button').props.onClick()
+  assert.equal(retries, 1)
+  const fetching = Notice({ ...props, isFetching: true })
+  assert.equal(findNode(fetching, 'button').props.disabled, true)
+  findNode(fetching, 'button').props.onClick()
+  assert.equal(retries, 1)
+  const unauthorized = Notice({ ...props, info: queryErrorUtils.getQuestQueryError(httpError(401), 'nearby') })
+  assert.equal(findNode(unauthorized, 'button'), null)
+  assert.equal(findNode(unauthorized, 'Link').props.to, '/login')
+  assert.doesNotMatch(textOf(unauthorized), /이전에 불러온 결과/)
+})
+
+test('상세 Drawer는 재시도를 연결하고 일시적 오류의 기존 내용만 유지한다', () => {
+  const retries = []
+  const query = {
+    data: quests[0], isError: true, isPending: false, isFetching: false,
+    error: new axios.AxiosError('Network', 'ERR_NETWORK'),
+    refetch: (options) => { retries.push(options); return Promise.resolve() },
+  }
+  const { default: Drawer } = loadSource('features/quests/pages/home/components/QuestDetailDrawer.tsx', {
+    react: { useCallback: (fn) => fn, useRef: () => ({ current: null }), useState: (initial) => [initial, () => {}] },
+    'lucide-react': { X: 'X' },
+    '@/shared/components/ui/button': { Button: 'Button' },
+    '@/shared/components/RemotePhoto': { RemotePhoto: 'RemotePhoto' },
+    '@/features/quests/hooks/useQuestDetail': { useQuestDetail: () => query },
+    './QuestStartButton': { __esModule: true, default: 'QuestStartButton' },
+    './QuestQueryErrorNotice': { __esModule: true, default: 'QuestQueryErrorNotice' },
+    '../utils/getQuestQueryError': queryErrorUtils,
+    '@/shared/components/ui/drawer': Object.fromEntries(['Drawer', 'DrawerClose', 'DrawerContent', 'DrawerDescription', 'DrawerHeader', 'DrawerTitle'].map((name) => [name, name])),
+  })
+  const render = () => Drawer({ questId: 701, onPositionChange() {}, onClose() {} })
+  let tree = render()
+  assert.ok(findNode(tree, 'QuestStartButton'))
+  const notice = findNode(tree, 'QuestQueryErrorNotice')
+  assert.equal(notice.props.showingPreviousData, true)
+  notice.props.onRetry()
+  assert.equal(retries[0].cancelRefetch, false)
+  for (const status of [401, 403, 404]) {
+    query.error = httpError(status)
+    tree = render()
+    assert.equal(findNode(tree, 'QuestStartButton'), null)
+    assert.equal(findNode(tree, 'QuestQueryErrorNotice').props.info.keepPreviousData, false)
+  }
+})
+
+test('같은 상세 캐시를 쓰는 navbar도 접근 거절·404의 오래된 데이터로 이동하지 않는다', () => {
+  const alerts = [], navigations = []
+  const query = { data: quests[0], isError: true, isPending: false, error: httpError(404) }
+  const { default: Nav } = loadSource('features/quests/components/QuestVerifyNavItem.tsx', {
+    'lucide-react': { BadgeCheck: 'BadgeCheck' },
+    'react-router': { useNavigate: () => (path) => navigations.push(path) },
+    '../hooks/useActiveQuest': { useActiveQuest: () => ({ activeQuestId: 701 }) },
+    '../hooks/useQuestDetail': { useQuestDetail: () => query },
+    '../pages/home/utils/getQuestVerifyPath': loadSource('features/quests/pages/home/utils/getQuestVerifyPath.ts'),
+    '../pages/home/utils/getQuestQueryError': queryErrorUtils,
+  }, { window: { alert: (message) => alerts.push(message) } })
+  for (const status of [401, 403, 404]) {
+    query.error = httpError(status)
+    Nav().props.onClick()
+  }
+  assert.equal(navigations.length, 0)
+  assert.equal(alerts.length, 3)
+  query.error = new axios.AxiosError('Network', 'ERR_NETWORK')
+  Nav().props.onClick()
+  assert.equal(navigations[0], '/quests/701/verify?type=general')
+})
+
+test('같은 계정으로 재진입하면 신선한 데이터에 남은 401 오류도 즉시 재조회한다', { timeout: 2000 }, async () => {
+  for (const kind of ['nearby', 'detail']) {
+    let fail = false, calls = 0
+    const request = async () => {
+      calls++
+      if (fail) throw httpError(401)
+      return kind === 'nearby' ? quests : quests[0]
+    }
+    const hook = loadSource(`features/quests/hooks/${kind === 'nearby' ? 'useNearbyQuests' : 'useQuestDetail'}.ts`, {
+      '@tanstack/react-query': { useQuery: (options) => options },
+      '@/features/auth/hooks/useAuth': { useAuth: () => ({ status: 'authenticated', user: { userId: 1 } }) },
+      '../api/questQueries': { getNearbyQuests: request, getQuestDetail: request },
+    })
+    const options = () => kind === 'nearby' ? hook.useNearbyQuests(position) : hook.useQuestDetail(701)
+    const client = new QueryClient({ defaultOptions: { queries: { gcTime: Infinity } } })
+    const initial = new QueryObserver(client, options())
+    const stopInitial = initial.subscribe(() => {})
+    let stopNext = () => {}
+    try {
+      await initial.refetch()
+      fail = true
+      const failed = await initial.refetch()
+      assert.equal(failed.isError, true)
+      assert.notEqual(failed.data, undefined)
+      stopInitial()
+      fail = false
+      const next = new QueryObserver(client, options())
+      await new Promise((resolve) => {
+        stopNext = next.subscribe((result) => {
+          if (result.status === 'success' && result.fetchStatus === 'idle') resolve()
+        })
+      })
+      assert.equal(calls, 3)
+      assert.equal(next.getCurrentResult().isError, false)
+    } finally {
+      stopInitial()
+      stopNext()
+      client.clear()
+    }
   }
 })

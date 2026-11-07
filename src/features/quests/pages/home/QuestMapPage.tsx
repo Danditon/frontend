@@ -6,6 +6,7 @@ import QuestMap from './components/QuestMap.tsx'
 import NearbyQuestCountCard from './components/NearbyQuestCountCard'
 import QuestListDrawer from './components/QuestListDrawer'
 import QuestDetailDrawer from './components/QuestDetailDrawer'
+import QuestQueryErrorNotice from './components/QuestQueryErrorNotice'
 import ActiveQuestCard from './components/ActiveQuestCard'
 import LocationPromptCard from './components/LocationPromptCard'
 import HomeHeader from './components/HomeHeader'
@@ -17,6 +18,7 @@ import { useQuestDetail } from '@/features/quests/hooks/useQuestDetail'
 import { useActiveQuest } from '@/features/quests/hooks/useActiveQuest'
 import { getNearestQuest } from './utils/getNearestQuest'
 import { getQuestVerifyPath } from './utils/getQuestVerifyPath'
+import { getQuestQueryError } from './utils/getQuestQueryError'
 
 // 조회 전에는 같은 빈 배열을 전달해 마커·지도 범위 계산의 불필요한 재실행을 막습니다.
 const EMPTY_NEARBY_QUESTS: NearbyQuest[] = []
@@ -25,10 +27,13 @@ export default function QuestMapPage() {
   // 홈에서 위치 조회 상태를 관리하고, 버튼과 결과 표시에 연결합니다.
   const { position, isLocating, error, requestLocation } = useGeolocation()
   const nearbyQuery = useNearbyQuests(position)
-  const nearbyQuests = nearbyQuery.data ?? EMPTY_NEARBY_QUESTS
+  const nearbyError = nearbyQuery.isError ? getQuestQueryError(nearbyQuery.error, 'nearby') : null
+  // 일시적인 갱신 실패는 기존 마커를 유지하고, 인증·권한 거절 결과는 화면에서 제외합니다.
+  const nearbyData = nearbyError?.keepPreviousData === false ? undefined : nearbyQuery.data
+  const nearbyQuests = nearbyData ?? EMPTY_NEARBY_QUESTS
   const nearbyState = !position
     ? 'location-required'
-    : nearbyQuery.data !== undefined
+    : nearbyData !== undefined
       ? 'ready'
       : nearbyQuery.isError
         ? 'error'
@@ -42,6 +47,8 @@ export default function QuestMapPage() {
   const displayQuestId = activeQuestId ?? nearestQuest?.questId ?? null
   const cardMode = activeQuestId !== null ? 'active' : 'nearest'
   const cardQuery = useQuestDetail(displayQuestId)
+  const cardError = cardQuery.isError ? getQuestQueryError(cardQuery.error, 'detail') : null
+  const cardQuest = cardError?.keepPreviousData === false ? undefined : cardQuery.data
   // 어느 응답 배열로 계산한 결과인지 함께 보관해 목록 교체 직후의 오래된 개수를 숨깁니다.
   const [visibleResult, setVisibleResult] = useState<{
     source: NearbyQuest[]
@@ -81,7 +88,7 @@ export default function QuestMapPage() {
       return
     }
 
-    const quest = cardQuery.data
+    const quest = cardQuest
     if (!quest || quest.questId !== questId) return
 
     // 수행 중 카드는 상세를 다시 거치지 않고 인증 화면으로 이어갑니다.
@@ -104,14 +111,17 @@ export default function QuestMapPage() {
       // 첫 응답을 기다리거나 실패한 상태를 '주변 퀘스트 0개'로 표시하지 않습니다.
       if (nearbyState !== 'ready') {
         return (
-          <p
-            role={nearbyState === 'error' ? 'alert' : 'status'}
-            className="grid h-full place-items-center rounded-3xl bg-[#EDF4F5]/95 p-3 text-sm"
-          >
-            {nearbyState === 'error'
-              ? '주변 퀘스트를 불러오지 못했어요.'
-              : '주변 퀘스트를 불러오는 중이에요.'}
-          </p>
+          <div className="grid h-full place-items-center rounded-3xl bg-[#EDF4F5]/95 p-3 text-sm">
+            {nearbyError ? (
+              <QuestQueryErrorNotice
+                info={nearbyError}
+                isFetching={nearbyQuery.isFetching}
+                onRetry={() => { void nearbyQuery.refetch({ cancelRefetch: false }) }}
+              />
+            ) : (
+              <p role="status">주변 퀘스트를 불러오는 중이에요.</p>
+            )}
+          </div>
         )
       }
 
@@ -122,24 +132,27 @@ export default function QuestMapPage() {
       )
     }
 
-    if (cardQuery.isPending || cardQuery.isError) {
+    if (!cardQuest && (cardQuery.isPending || cardQuery.isError)) {
       return (
-        <p
-          role={cardQuery.isError ? 'alert' : 'status'}
-          className="grid h-full place-items-center rounded-3xl bg-[#EDF4F5]/95 p-3 text-sm"
-        >
-          {cardQuery.isError
-            ? cardQuery.error.message
-            : '퀘스트를 불러오는 중이에요.'}
-        </p>
+        <div className="grid h-full place-items-center rounded-3xl bg-[#EDF4F5]/95 p-3 text-sm">
+          {cardError ? (
+            <QuestQueryErrorNotice
+              info={cardError}
+              isFetching={cardQuery.isFetching}
+              onRetry={() => { void cardQuery.refetch({ cancelRefetch: false }) }}
+            />
+          ) : (
+            <p role="status">퀘스트를 불러오는 중이에요.</p>
+          )}
+        </div>
       )
     }
 
-    if (!cardQuery.data) return null
+    if (!cardQuest) return null
 
     return (
       <ActiveQuestCard
-        quest={cardQuery.data}
+        quest={cardQuest}
         mode={cardMode}
         onSelect={handleQuestCardSelect}
       />
@@ -164,15 +177,34 @@ export default function QuestMapPage() {
         onVisibleQuestsChange={handleVisibleQuestsChange}
       />
 
-      {/* 위치 권한 거절·시간 초과 등은 사용자에게 안내합니다. */}
-      {error && (
-        <p
-          role="alert"
-          className="absolute inset-x-4 top-20 z-20 rounded-lg bg-white p-3 text-sm text-red-600 shadow"
-        >
-          {error.message}
-        </p>
-      )}
+      {/* 위치 오류와 갱신 오류를 한 영역에 쌓아 서로 겹치지 않게 안내합니다. */}
+      <div className="pointer-events-none absolute inset-x-4 top-20 z-20 space-y-2">
+        {error && (
+          <p role="alert" className="rounded-lg bg-white p-3 text-sm text-red-600 shadow">
+            {error.message}
+          </p>
+        )}
+        {position && nearbyError && (nearbyData !== undefined || displayQuestId !== null || isListOpen || selectedQuestId !== null) && (
+          <div className="rounded-lg bg-white p-3 shadow">
+            <QuestQueryErrorNotice
+              info={nearbyError}
+              isFetching={nearbyQuery.isFetching}
+              onRetry={() => { void nearbyQuery.refetch({ cancelRefetch: false }) }}
+              showingPreviousData={nearbyData !== undefined}
+            />
+          </div>
+        )}
+        {cardError && cardQuest && !isListOpen && selectedQuestId === null && (
+          <div className="rounded-lg bg-white p-3 shadow">
+            <QuestQueryErrorNotice
+              info={cardError}
+              isFetching={cardQuery.isFetching}
+              onRetry={() => { void cardQuery.refetch({ cancelRefetch: false }) }}
+              showingPreviousData
+            />
+          </div>
+        )}
+      </div>
 
       {/* 개발 중에만 조회된 좌표와 정확도를 표시해 위치 조회 결과를 확인합니다. */}
       {import.meta.env.DEV && position && (

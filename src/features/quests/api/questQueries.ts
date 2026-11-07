@@ -48,7 +48,10 @@ const questIdSchema = z.number().int().positive()
 function requestOptions(signal?: AbortSignal) {
   // 모듈 로딩 때 토큰을 고정하지 않고 각 요청 시점의 최신 JWT를 사용합니다.
   const token = getAccessToken()
-  if (!token) throw new Error('로그인한 뒤 다시 시도해 주세요.')
+  if (!token) {
+    // HTTP 요청 전의 토큰 누락도 화면에서 401과 같은 로그인 안내로 구분합니다.
+    throw Object.assign(new Error('로그인한 뒤 다시 시도해 주세요.'), { code: 'UNAUTHORIZED' })
+  }
 
   // 서버 주소만 등록했거나 /api까지 등록한 경우 모두 /api를 한 번만 사용합니다.
   // 이번 조회에만 적용하므로 공용 Axios와 기존 인증·등록·수행 API는 변경하지 않습니다.

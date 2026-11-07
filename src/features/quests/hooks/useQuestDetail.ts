@@ -23,6 +23,8 @@ export function useQuestDetail(questId: number | null) {
     enabled: userId !== null && questId !== null,
 
     staleTime: 30_000,
+    // 재로그인 직후에도 이전 오류 캐시 때문에 로그인 안내가 반복되지 않게 합니다.
+    refetchOnMount: (query) => query.state.status === 'error' ? 'always' : true,
     retry: false,
     refetchOnWindowFocus: false,
   })

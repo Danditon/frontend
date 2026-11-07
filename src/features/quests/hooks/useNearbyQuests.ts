@@ -29,6 +29,8 @@ export function useNearbyQuests(position: UserPosition | null, radius = 50_000) 
 
     // 30초는 캐시 유효 시간입니다. 주기적인 GPS 조회나 API 폴링을 시작하지 않습니다.
     staleTime: 30_000,
+    // 같은 계정으로 재로그인해 돌아오면 캐시에 남은 401 등 오류를 즉시 다시 확인합니다.
+    refetchOnMount: (query) => query.state.status === 'error' ? 'always' : true,
     retry: false,
     refetchOnWindowFocus: false,
   })

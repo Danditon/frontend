@@ -1,5 +1,5 @@
 import { HistoryMap } from "@/features/history/components/HistoryMap";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router";
 import { Heart, LogOut } from "lucide-react";
 import { Back, Profile } from "@/shared/components/WireUI";
@@ -56,7 +56,10 @@ export default function MyPage() {
   const memories = token ? questsQuery.data ?? [] : [];
   const records = token ? recordsQuery.data ?? [] : [];
   const historyQuestId = history ? params.get("quest") : null;
-  const visibleRecords = records.filter((item) => !historyQuestId || item.questId === historyQuestId);
+  const visibleRecords = useMemo(() => {
+    const items = token ? recordsQuery.data ?? [] : [];
+    return historyQuestId ? items.filter((item) => item.questId === historyQuestId) : items;
+  }, [token, recordsQuery.data, historyQuestId]);
   const source = params.get("source");
   const fromRecords = source === "records" || source === "completed";
   const questParam = params.get("quest");
@@ -293,7 +296,7 @@ export default function MyPage() {
           </div>
         </div>
         <div className="relative min-h-0 flex-1">
-          <HistoryMap records={visibleRecords} source="records" />
+          <HistoryMap records={visibleRecords} source="records" token={token} />
           <div
             ref={historyPanel}
             className="absolute inset-x-4 bottom-[124px] z-10 max-h-[max(120px,calc(100%_-_190px))] overflow-y-auto overscroll-contain rounded-2xl bg-white/95 p-3 shadow-lg backdrop-blur-sm"

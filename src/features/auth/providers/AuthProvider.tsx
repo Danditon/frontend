@@ -3,14 +3,19 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import axios from 'axios'
 import { login, getMe } from '../api/auth'
 import { AuthContext } from '../hooks/useAuth'
-import type { AuthState, LoginRequest } from '../types/auth'
+import type { AuthState, LoginRequest, MeResponse } from '../types/auth'
 import { getAuthErrorMessage } from '../utils/getAuthErrorMessage'
 import { getAccessToken, setAccessToken, removeAccessToken } from '../utils/tokenStorage'
+
+// shortcut: 개발 중 사용자 조회를 건너뜁니다. API 정상화 후 false로 바꾸면 기존 검증을 복구합니다.
+const SKIP_CURRENT_USER_CHECK = import.meta.env.DEV
 
 type PendingSession = {
   accessToken: string
   // 로그인 직후에는 응답의 사용자 ID와 일치하는지도 확인합니다.
   expectedUserId?: number
+  // 사용자 조회를 생략할 때 사용할 로그인 응답 기반의 임시 정보입니다.
+  user?: MeResponse
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -49,7 +54,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (values) {
         const result = await login(values, controller.signal)
         ensureActive()
-        session = { accessToken: result.accessToken, expectedUserId: result.userId }
+        session = {
+          accessToken: result.accessToken,
+          expectedUserId: result.userId,
+          user: {
+            userId: result.userId,
+            email: values.email,
+            nickname: result.nickname,
+            // 로그인 응답에는 가입일이 없으므로 임의의 날짜를 넣지 않습니다.
+            createdAt: '',
+          },
+        }
         pendingSession.current = session
       } else if (!session) {
         const accessToken = getAccessToken()
@@ -61,9 +76,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return false
       }
 
+      // 새로고침 후에는 토큰만으로 사용자 정보를 꾸며내지 않고 재로그인을 기다립니다.
+      if (SKIP_CURRENT_USER_CHECK && !session.user) {
+        setState({ status: 'anonymous', user: null, error: null })
+        return false
+      }
+
       setState({ status: 'checking', user: null, error: null })
       step = 'session'
-      const user = await getMe(session.accessToken, controller.signal)
+      const user = SKIP_CURRENT_USER_CHECK && session.user
+        ? session.user
+        : await getMe(session.accessToken, controller.signal)
       ensureActive()
       if (session.expectedUserId !== undefined && user.userId !== session.expectedUserId) {
         throw new Error('로그인 응답과 사용자 정보가 일치하지 않아요.')

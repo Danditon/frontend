@@ -36,7 +36,7 @@ export async function signup(
   signal?: AbortSignal,
 ): Promise<SignupResponse> {
   const response = await apiClient.post<unknown>(
-    '/auth/signup',
+    '/api/auth/signup',
     {
       // 폼에 확인용 비밀번호 등이 있어도 명세의 필드만 전송합니다.
       email: payload.email,
@@ -59,7 +59,7 @@ export async function login(
   signal?: AbortSignal,
 ): Promise<LoginResponse> {
   const response = await apiClient.post<unknown>(
-    '/auth/login',
+    '/api/auth/login',
     {
       email: payload.email,
       password: payload.password,

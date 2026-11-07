@@ -1,33 +1,36 @@
-// 상세 Drawer의 퀘스트를 수행 중인 퀘스트로 지정하는 버튼입니다.
+// 상세 Drawer에서 선택한 퀘스트의 수행 인증 화면으로 이동하는 버튼입니다.
+import { useNavigate } from 'react-router'
 import { Button } from '@/shared/components/ui/button'
 import { useActiveQuest } from '@/features/quests/hooks/useActiveQuest'
 import type { QuestDetail } from '@/features/quests/types/quest'
+import { getQuestVerifyPath } from '../utils/getQuestVerifyPath'
 
 type Props = {
   quest: QuestDetail
-  onStarted: () => void // 수행 중 ID를 저장한 뒤 상세 Drawer를 닫습니다.
 }
 
-export default function QuestStartButton({ quest, onStarted }: Props) {
+export default function QuestStartButton({ quest }: Props) {
+  const navigate = useNavigate()
   const { activeQuestId, startQuest } = useActiveQuest()
+  const isCurrentQuest = activeQuestId === quest.questId
   const disabled = quest.isMine || quest.myStatus === 'PASSED'
 
   function handleStart() {
     // 비활성 버튼 외에 함수에서도 수행 불가 조건을 확인합니다.
     if (disabled) return
 
-    // 다른 마커를 구경하는 것만으로는 수행 중 퀘스트를 바꾸지 않습니다.
     if (
       activeQuestId !== null &&
-      activeQuestId !== quest.questId &&
+      !isCurrentQuest &&
       !window.confirm('수행 중인 퀘스트를 변경할까요?')
     ) {
       return
     }
 
-    // 현재는 mock 선택만 처리합니다. 실제 GPS 검사·인증 제출은 연결하지 않습니다.
+    // 홈으로 돌아왔을 때 수행 중 카드를 표시하도록 이동 전에 ID를 저장합니다.
+    // 실제 GPS 검사·인증 제출은 이 버튼에서 처리하지 않습니다.
     startQuest(quest.questId)
-    onStarted()
+    navigate(getQuestVerifyPath(quest))
   }
 
   return (
@@ -38,9 +41,7 @@ export default function QuestStartButton({ quest, onStarted }: Props) {
         onClick={handleStart}
         className="h-11 w-full rounded-full bg-[#242624] text-white hover:bg-[#242624]/90"
       >
-        {activeQuestId === quest.questId
-          ? '수행 중인 퀘스트 보기'
-          : '수행 시작'}
+        {isCurrentQuest ? '수행 계속하기' : '수행 시작하기'}
       </Button>
 
       {quest.isMine && (

@@ -17,7 +17,8 @@ export function RootLayout() {
     pathname.replace(/\/+$/, ""),
   );
 
-  const scoped = pathname.startsWith("/me") || pathname.endsWith("/verify");
+  const isQuestRegistration = pathname.replace(/\/+$/, "") === "/quests/new";
+  const scoped = isQuestRegistration || pathname.startsWith("/me") || pathname.endsWith("/verify");
 
   return (
     <div
@@ -43,7 +44,7 @@ export function RootLayout() {
           <Outlet />
         </main>
 
-        {!greetingScreen && !isAuthPage && (
+        {!greetingScreen && !isAuthPage && !isQuestRegistration && (
           <div
             className={`app-navigation ${
               floatingMemoriesNav

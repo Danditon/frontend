@@ -8,9 +8,11 @@ import QuestListDrawer from './components/QuestListDrawer'
 import QuestDetailDrawer from './components/QuestDetailDrawer'
 import ActiveQuestCard from './components/ActiveQuestCard'
 import LocationPromptCard from './components/LocationPromptCard'
+import HomeHeader from './components/HomeHeader'
 import { mockNearbyQuests } from './mocks/nearbyQuests'
 import CurrentLocationButton from './components/CurrentLocationButton'
 import { useGeolocation } from '@/features/quests/hooks/useGeolocation'
+import { useRegionName } from '@/features/quests/hooks/useRegionName'
 import { useQuestDetail } from '@/features/quests/hooks/useQuestDetail'
 import { useActiveQuest } from '@/features/quests/hooks/useActiveQuest'
 import { getNearestQuest } from './utils/getNearestQuest'
@@ -19,6 +21,7 @@ import { getQuestVerifyPath } from './utils/getQuestVerifyPath'
 export default function QuestMapPage() {
   // 홈에서 위치 조회 상태를 관리하고, 버튼과 결과 표시에 연결합니다.
   const { position, isLocating, error, requestLocation } = useGeolocation()
+  const regionLabel = useRegionName(position)
   const navigate = useNavigate()
   const { activeQuestId } = useActiveQuest()
   // 지도 표시 범위가 아닌 사용자 좌표를 기준으로 전체 목록에서 가장 가까운 항목을 찾습니다.
@@ -149,8 +152,8 @@ export default function QuestMapPage() {
       )}
 
       {/* 지도 위 상단 UI */}
-      <div className="absolute inset-x-0 top-0 z-10 p-4">
-        {/* 지역명·벨·MY 컴포넌트 */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 px-4 pt-[calc(0.75rem+env(safe-area-inset-top,0px))]">
+        <HomeHeader regionLabel={isLocating ? '위치 확인 중' : regionLabel} />
       </div>
 
       {/* Drawer가 닫혀 있을 때 현재 상태의 카드·개수 카드·현위치 버튼을 보여줍니다. */}

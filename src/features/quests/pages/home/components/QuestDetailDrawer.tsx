@@ -138,7 +138,7 @@ export default function QuestDetailDrawer({
 
               {/* 접힌 상태에서도 수행을 시작할 수 있게 상세 내용보다 먼저 배치합니다. */}
               <div className="mt-3">
-                <QuestStartButton quest={quest} onStarted={onClose} />
+                <QuestStartButton quest={quest} />
               </div>
 
               {isExpanded ? (

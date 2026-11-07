@@ -3,6 +3,7 @@ import { RootLayout } from "@/app/layouts/RootLayout";
 import RequireAuth from "@/features/auth/components/RequireAuth";
 import LoginPage from "@/features/auth/pages/login/LoginPage";
 import SignupPage from "@/features/auth/pages/signup/SignupPage";
+import OnboardingPage from "@/features/auth/pages/onboarding/OnboardingPage";
 import QuestMapPage from "@/features/quests/pages/home/QuestMapPage";
 import QuestCreatePage from "@/features/quests/pages/QuestCreatePage";
 import QuestDetailPage from "@/features/quests/pages/QuestDetailPage";
@@ -24,6 +25,8 @@ export const router = createBrowserRouter([
   {
     element: <RequireAuth />,
     children: [
+      // 온보딩은 인증이 필요하지만 공통 navbar는 표시하지 않습니다.
+      { path: "/onboarding", Component: OnboardingPage },
       {
         element: <RootLayout />,
         children: [

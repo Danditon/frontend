@@ -78,6 +78,18 @@ declare global {
 
         // services 라이브러리는 maps.load 완료 후 사용합니다.
         services?: {
+          Places: new () => {
+            keywordSearch(
+              keyword: string,
+              callback: (results: Array<{
+                place_name: string
+                address_name: string
+                road_address_name: string
+                x: string
+                y: string
+              }>, status: 'OK' | 'ZERO_RESULT' | 'ERROR') => void,
+            ): void
+          }
           Geocoder: new () => KakaoGeocoder
           Status: {
             OK: 'OK'

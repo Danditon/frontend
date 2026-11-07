@@ -1,6 +1,7 @@
 import axios from 'axios'
 import { z } from 'zod'
 import { apiClient } from '@/shared/api/client'
+import { getQuestPhotoError } from '../lib/questPhoto'
 
 const questSchema = z.object({
   questId: z.number().int().positive(), questType: z.enum(['GENERAL', 'IMAGE']),
@@ -44,7 +45,8 @@ export function createSubmissionForm(questType: 'GENERAL' | 'IMAGE', greeting: s
   if (!greeting.trim()) throw new Error('안부를 한 줄 이상 남겨주세요.')
   if (!Number.isFinite(location.lat) || !Number.isFinite(location.lng) || Math.abs(location.lat) > 90 || Math.abs(location.lng) > 180) throw new Error('현재 위치를 다시 확인해 주세요.')
   if (questType === 'IMAGE' && !photo) throw new Error('이미지 퀘스트는 인증 사진이 필요해요.')
-  if (photo && (photo.size > 10 * 1024 * 1024 || !/\.(jpe?g|png|webp)$/i.test(photo.name) || (photo.type && !['image/jpeg', 'image/png', 'image/webp'].includes(photo.type)))) throw new Error('10MB 이하 JPG, PNG, WEBP 사진을 선택해 주세요.')
+  const photoError = photo && getQuestPhotoError(photo)
+  if (photoError) throw new Error(photoError)
   const body = new FormData()
   body.append('request', new Blob([JSON.stringify({ greeting: greeting.trim(), lat: location.lat, lng: location.lng })], { type: 'application/json' }))
   if (photo) body.append('photo', photo)

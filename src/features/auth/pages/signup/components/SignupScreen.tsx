@@ -1,7 +1,9 @@
-// 회원가입 API와 화면 배치·기존 키프레임을 사용한 진입·복귀 동작을 연결합니다.
+// 회원가입 후 자동 로그인과 화면 진입·복귀 동작을 연결합니다.
+import axios from 'axios'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { signup } from '@/features/auth/api/auth'
+import { useAuth } from '@/features/auth/hooks/useAuth'
 import type { SignupRequest } from '@/features/auth/types/auth'
 import { getSafeReturnTo } from '@/features/auth/utils/getSafeReturnTo'
 import SignupHeader from './SignupHeader'
@@ -19,6 +21,7 @@ function prefersReducedMotion() {
 export default function SignupScreen() {
   const navigate = useNavigate()
   const location = useLocation()
+  const { signIn } = useAuth()
   const returnTo = getSafeReturnTo(new URLSearchParams(location.search).get('returnTo'))
   const loginHref = returnTo === '/'
     ? '/login'
@@ -34,7 +37,7 @@ export default function SignupScreen() {
   const navigateToLogin = useCallback(() => {
     if (navigationFinished.current) return
     navigationFinished.current = true
-    // 직접 접속·가입 성공 모두 로그인으로 돌아가며 비밀번호는 이동 상태에 남기지 않습니다.
+    // 뒤로가기·자동 로그인 실패 시 복귀하며 비밀번호는 이동 상태에 남기지 않습니다.
     navigate(loginHref, {
       replace: true,
       state: registeredEmail.current ? { registeredEmail: registeredEmail.current } : undefined,
@@ -75,13 +78,28 @@ export default function SignupScreen() {
       await signup(values, controller.signal)
       if (controller.signal.aborted) return
 
-      // 201과 응답 검사를 통과한 경우에만 복귀 애니메이션을 시작합니다.
+      // 자동 로그인이 실패해도 가입 완료 사실은 로그인 화면에 전달합니다.
       registeredEmail.current = values.email
-      if (prefersReducedMotion()) {
-        navigateToLogin()
-      } else {
-        setPhase('exit')
+
+      try {
+        await signIn(
+          { email: values.email, password: values.password },
+          controller.signal,
+        )
+      } catch (error) {
+        if (controller.signal.aborted || axios.isCancel(error)) return
+
+        // 가입 실패로 표시하거나 재가입하지 않고 기존 로그인 화면으로 안내합니다.
+        if (prefersReducedMotion()) {
+          navigateToLogin()
+        } else {
+          setPhase('exit')
+        }
+        return
       }
+
+      if (controller.signal.aborted) return
+      navigate('/', { replace: true })
     } finally {
       if (requestRef.current === controller) {
         requestRef.current = null

@@ -8,6 +8,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useActiveQuest } from "@/features/quests/hooks/useActiveQuest";
 import { useGeolocation } from "@/features/quests/hooks/useGeolocation";
 import { getAccessToken, getVerificationQuest, isQuestId, submitVerification, createSubmissionForm, verificationError, similarityPercent, type VerificationResult } from "@/features/quests/api/verification";
+import { decodeQuestPhoto } from "@/features/quests/lib/questPhoto";
 import { RemotePhoto } from "@/shared/components/RemotePhoto";
 type Step = "capture" | "compare" | "checking" | "success" | "failure";
 export default function QuestVerifyPage() {
@@ -80,29 +81,14 @@ function VerificationScreen({ questId }: { questId: string }) {
         const file = e.target.files?.[0];
         e.currentTarget.value = "";
         if (!file) return;
-        if (
-          file.size > 10 * 1024 * 1024 ||
-          !/\.(jpe?g|png|webp)$/i.test(file.name) ||
-          (file.type !== "" &&
-            !["image/jpeg", "image/png", "image/webp"].includes(file.type))
-        ) {
-          setError("10MB 이하 JPG, PNG, WEBP 사진을 선택해 주세요.");
-          return;
-        }
-        const url = URL.createObjectURL(file);
         try {
-          const image = new Image();
-          image.src = url;
-          await image.decode();
+          const url = await decodeQuestPhoto(file);
           setPhoto(url);
           setPhotoFile(file);
           setError("");
           go("compare");
-        } catch {
-          URL.revokeObjectURL(url);
-          setError(
-            "사진을 열 수 없어요. 정상적인 JPG, PNG, WEBP 사진을 선택해 주세요.",
-          );
+        } catch (cause) {
+          setError(cause instanceof Error ? cause.message : "사진을 열 수 없어요.");
         }
       }}
     />

@@ -60,7 +60,8 @@ const quests = [
 
 function homeFixture() {
   const states = []
-  let cursor = 0, tree
+  const memos = []
+  let cursor = 0, memoCursor = 0, tree
   const fixture = {
     position,
     query: { data: undefined, isPending: true, isError: false },
@@ -73,6 +74,13 @@ function homeFixture() {
   const page = loadSource('features/quests/pages/home/QuestMapPage.tsx', {
     react: {
       useCallback: (callback) => callback,
+      useMemo: (factory, deps) => {
+        const index = memoCursor++
+        if (!memos[index] || deps.some((value, i) => !Object.is(value, memos[index].deps[i]))) {
+          memos[index] = { deps, value: factory() }
+        }
+        return memos[index].value
+      },
       useState: (initial) => {
         const index = cursor++
         if (!(index in states)) states[index] = initial
@@ -106,7 +114,7 @@ function homeFixture() {
     './utils/getQuestQueryError': queryErrorUtils,
   })
   return Object.assign(fixture, {
-    render() { cursor = 0; tree = page.default(); return tree },
+    render() { cursor = 0; memoCursor = 0; tree = page.default(); return tree },
     node(type) { return findNode(tree, type) },
   })
 }
@@ -126,7 +134,7 @@ test('위치 미확인·조회 중·실패·성공 0개를 구분하고 mock 마
   assert.match(f.node('QuestQueryErrorNotice').props.info.message, /불러오지 못/)
   assert.equal(f.node('NearbyQuestCountCard').props.status, 'error')
   f.query = { data: [], isPending: false, isError: false }
-  assert.match(textOf(f.render()), /주변에 등록된 퀘스트가 없어요/)
+  assert.match(textOf(f.render()), /주변에 수행할 수 있는 퀘스트가 없어요/)
   f.node('QuestMap').props.onVisibleQuestsChange([])
   f.render()
   assert.equal(f.node('NearbyQuestCountCard').props.count, 0)
@@ -140,7 +148,7 @@ test('서버 목록으로 마커·가까운 카드·목록을 연결하고 모�
   const f = homeFixture()
   f.query = { data: quests, isPending: false, isError: false }
   f.render()
-  assert.equal(f.node('QuestMap').props.quests, quests)
+  assert.deepEqual(f.node('QuestMap').props.quests, quests)
   assert.equal(f.detailIds.at(-1), 701)
   f.node('QuestMap').props.onVisibleQuestsChange([quests[1]])
   f.render()
@@ -160,6 +168,93 @@ test('서버 목록으로 마커·가까운 카드·목록을 연결하고 모�
   f.node('QuestMap').props.onQuestSelect(702)
   f.render()
   assert.equal(f.node('QuestDetailDrawer').props.questId, 702)
+})
+
+test('본인 퀘스트를 마커·개수·목록·가까운 카드에서 함께 제외하고 API 배열을 보존한다', () => {
+  const f = homeFixture()
+  const mine = { ...quests[0], questId: 700, isMine: true }
+  const other = { ...quests[0], lat: 35.8724, distance: 100 }
+  const response = [mine, other, quests[1]]
+  f.query = { data: response, isPending: false, isError: false }
+  f.render()
+  const displayed = f.node('QuestMap').props.quests
+  assert.deepEqual(displayed.map((quest) => quest.questId), [701, 702])
+  assert.equal(f.detailIds.at(-1), 701)
+  assert.equal(f.node('ActiveQuestCard').props.quest.questId, 701)
+  f.node('QuestMap').props.onVisibleQuestsChange(displayed)
+  f.render()
+  assert.equal(f.node('QuestMap').props.quests, displayed)
+  assert.equal(f.node('NearbyQuestCountCard').props.count, 2)
+  f.node('NearbyQuestCountCard').props.onClick()
+  f.render()
+  assert.deepEqual(Array.from(f.node('QuestListDrawer').props.quests, (quest) => quest.questId), [701, 702])
+  assert.equal(f.query.data, response)
+  assert.equal(response.length, 3)
+  assert.equal(response[0], mine)
+})
+
+test('주변에 본인 퀘스트만 있으면 성공 0개와 수행할 퀘스트 없음 안내를 표시한다', () => {
+  const f = homeFixture()
+  f.query = { data: quests.map((quest) => ({ ...quest, isMine: true })), isPending: false, isError: false }
+  assert.match(textOf(f.render()), /주변에 수행할 수 있는 퀘스트가 없어요/)
+  assert.equal(f.node('QuestMap').props.quests.length, 0)
+  assert.equal(f.detailIds.at(-1), null)
+  assert.equal(f.node('ActiveQuestCard'), null)
+  f.node('QuestMap').props.onVisibleQuestsChange([])
+  f.render()
+  assert.equal(f.node('NearbyQuestCountCard').props.status, 'ready')
+  assert.equal(f.node('NearbyQuestCountCard').props.count, 0)
+})
+
+test('내 위치 점은 18px 이미지의 중심을 좌표에 맞추고 위치 변경 시 기존 마커를 재사용한다', () => {
+  const refs = [], effects = [], markers = [], images = []
+  let refCursor = 0, effectCursor = 0
+  const maps = {
+    LatLng: class { constructor(lat, lng) { Object.assign(this, { lat, lng }) } },
+    Size: class { constructor(width, height) { Object.assign(this, { width, height }) } },
+    Point: class { constructor(x, y) { Object.assign(this, { x, y }) } },
+    MarkerImage: class {
+      constructor(source, size, options) { Object.assign(this, { source, size, options }); images.push(this) }
+    },
+    Marker: class {
+      constructor(options) { this.options = options; markers.push(this) }
+      setMap(map) { this.options.map = map }
+      setPosition(position) { this.options.position = position }
+    },
+  }
+  const { default: UserMarker } = loadSource('features/quests/pages/home/components/UserLocationMarker.tsx', {
+    react: {
+      useRef: (initial) => {
+        const index = refCursor++
+        return refs[index] ??= { current: initial }
+      },
+      useEffect: (run, deps) => {
+        const index = effectCursor++
+        if (!effects[index] || deps.some((value, i) => !Object.is(value, effects[index].deps[i]))) {
+          effects[index]?.cleanup?.()
+          effects[index] = { deps, cleanup: run() }
+        }
+      },
+    },
+  }, { window: { kakao: { maps } } })
+  const map = {}
+  const render = (position) => { refCursor = 0; effectCursor = 0; UserMarker({ map, position }) }
+  render(null)
+  assert.equal(markers.length, 0)
+  render(position)
+  assert.equal(markers.length, 1)
+  assert.equal(images[0].size.width, 18)
+  assert.equal(images[0].size.height, 18)
+  assert.equal(images[0].options.offset.x, 9)
+  assert.equal(images[0].options.offset.y, 9)
+  assert.match(decodeURIComponent(images[0].source), /fill="#4285F4"/)
+  assert.equal(markers[0].options.image, images[0])
+  render({ ...position, lat: 35.88 })
+  assert.equal(markers.length, 1)
+  assert.equal(images.length, 1)
+  assert.equal(markers[0].options.position.lat, 35.88)
+  for (const effect of effects) effect.cleanup?.()
+  assert.equal(markers[0].options.map, null)
 })
 
 test('목록 응답 교체 후 이전 범위 계산값으로 개수나 목록을 열지 않는다', () => {
@@ -287,7 +382,7 @@ test('첫 목록 실패에서 재시도하고 갱신 실패에서는 기존 마�
   assert.equal(f.refetchCalls[0].options.cancelRefetch, false)
   f.query.data = quests
   f.render()
-  assert.equal(f.node('QuestMap').props.quests, quests)
+  assert.deepEqual(f.node('QuestMap').props.quests, quests)
   assert.ok(f.node('ActiveQuestCard'))
   assert.equal(f.node('QuestQueryErrorNotice').props.showingPreviousData, true)
   f.query.isFetching = true

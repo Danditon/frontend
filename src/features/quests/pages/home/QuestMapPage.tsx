@@ -1,5 +1,5 @@
 // 홈 지도의 위치 안내·가까운 퀘스트·수행 중 카드와 목록·상세 Drawer를 연결하는 화면입니다.
-import { useCallback, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
 import type { NearbyQuest } from '@/features/quests/types/quest'
 import QuestMap from './components/QuestMap.tsx'
@@ -30,7 +30,12 @@ export default function QuestMapPage() {
   const nearbyError = nearbyQuery.isError ? getQuestQueryError(nearbyQuery.error, 'nearby') : null
   // 일시적인 갱신 실패는 기존 마커를 유지하고, 인증·권한 거절 결과는 화면에서 제외합니다.
   const nearbyData = nearbyError?.keepPreviousData === false ? undefined : nearbyQuery.data
-  const nearbyQuests = nearbyData ?? EMPTY_NEARBY_QUESTS
+  // 본인 퀘스트는 홈의 마커·개수·목록·가까운 카드에서 함께 제외하고 서버 캐시는 보존합니다.
+  // 배열 참조를 유지해 일반 재렌더링마다 마커와 지도 범위 계산이 반복되지 않게 합니다.
+  const nearbyQuests = useMemo(
+    () => nearbyData?.filter((quest) => !quest.isMine) ?? EMPTY_NEARBY_QUESTS,
+    [nearbyData],
+  )
   const nearbyState = !position
     ? 'location-required'
     : nearbyData !== undefined
@@ -127,7 +132,7 @@ export default function QuestMapPage() {
 
       return (
         <p role="status" className="grid h-full place-items-center rounded-3xl bg-[#EDF4F5]/95 p-3 text-sm">
-          주변에 등록된 퀘스트가 없어요.
+          주변에 수행할 수 있는 퀘스트가 없어요.
         </p>
       )
     }

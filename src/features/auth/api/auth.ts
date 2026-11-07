@@ -84,7 +84,7 @@ export async function getMe(
   }
 
   const response = await apiClient.get<unknown>(
-    '/users/me',
+    '/api/users/me',
     {
       headers: {
         Authorization: `Bearer ${accessToken}`,

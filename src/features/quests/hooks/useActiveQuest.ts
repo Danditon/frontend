@@ -4,6 +4,7 @@ import { createContext, useContext } from 'react'
 type ActiveQuestContextValue = {
   activeQuestId: number | null // null이면 수행 중인 퀘스트가 없습니다.
   startQuest: (questId: number) => void // 수행 시작한 퀘스트의 ID를 저장합니다.
+  clearQuest: (questId: number) => void // 완료한 ID가 현재 수행 중인 ID와 같을 때만 해제합니다.
 }
 
 export const ActiveQuestContext =

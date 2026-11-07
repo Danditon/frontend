@@ -292,3 +292,30 @@
 
 .greeting-api-card {border-radius:24px;background:linear-gradient(#fff 35%,#c9eaf5);padding:20px;flex:1;}
 .verify-success:has(.success-sheet-content>div:first-of-type:not(:has(span))) .success-sheet-content>div:first-of-type {font-size:40px;letter-spacing:-2px;}
+/* 마이페이지 진입 시 본문만 오른쪽에서 제자리로 이동합니다. */
+.app-content[data-mypage="true"] {
+ animation:mypage-enter 280ms cubic-bezier(0.22,0.61,0.36,1);
+}
+
+@keyframes mypage-enter {
+ from {transform:translateX(100%);}
+ to {transform:translateX(0);}
+}
+
+/* 기기의 동작 줄이기 설정에서는 애니메이션을 생략합니다. */
+@media(prefers-reduced-motion:reduce){
+ .app-content[data-mypage="true"] {animation:none;}
+}
+
+/* 마이페이지의 키프레임을 회원가입 진입·복귀에도 재사용합니다. */
+.signup-screen[data-motion="enter"] {
+ animation:mypage-enter 280ms cubic-bezier(0.22,0.61,0.36,1) both;
+}
+.signup-screen[data-motion="exit"] {
+ animation:mypage-enter 280ms cubic-bezier(0.22,0.61,0.36,1) reverse both;
+}
+
+@media(prefers-reduced-motion:reduce){
+ .signup-screen[data-motion="enter"],
+ .signup-screen[data-motion="exit"] {animation:none;}
+}

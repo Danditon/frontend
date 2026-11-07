@@ -1,6 +1,7 @@
 import { Link } from "react-router";
-import { ChevronLeft, ChevronsRight, LogOut, MailPlus, House, BadgeCheck } from "lucide-react";
+import { ChevronLeft, ChevronsRight, LogOut, MailPlus, House } from "lucide-react";
 import type { ReactNode } from "react";
+import QuestVerifyNavItem from "@/features/quests/components/QuestVerifyNavItem";
 export function Back({ to = "/me/memories" }: { to?: string }) {
   return (
     <Link
@@ -36,7 +37,7 @@ export function Bottom() {
       className="absolute bottom-[26px] left-[15px] right-[15px] h-[62px] rounded-[36px] bg-[#242624] text-white grid grid-cols-3 place-items-center px-4 text-[14px] max-[500px]:[bottom:max(26px,_env(safe-area-inset-bottom))]"
       aria-label="주 메뉴"
     >
-      <Link className="nav-item" to="/quests/demo/verify"><span className="nav-icon"><BadgeCheck size={20} strokeWidth={1.6} aria-hidden="true" /></span><span>수행 인증</span></Link>
+      <QuestVerifyNavItem />
       <Link
         to="/"
         className="relative -translate-y-[22px] h-[60px] w-[60px] bg-white text-[#242624] rounded-full grid place-items-center text-[18px]"

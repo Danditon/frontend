@@ -13,12 +13,12 @@ export function Back({ to = "/me/memories" }: { to?: string }) {
     </Link>
   );
 }
-export function Profile() {
+export function Profile({ nickname, email }: { nickname?: string; email?: string }) {
   return (
     <header className="flex gap-[10px] items-center h-[60px] mb-[14px] text-[15px] [&_small]:block [&_small]:text-[10px] [&_:is(a,button)]:ml-auto">
       <span className="h-[54px] w-[54px] rounded-full bg-[#ff49bb]" />
       <div>
-        민지 님<small>minji11@example.com</small>
+        {nickname ? `${nickname} 님` : "내 프로필"}<small>{email}</small>
       </div>
       <Link
         to="/me/logout"

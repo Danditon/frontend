@@ -99,12 +99,19 @@ test("수행 저장 시 제목과 안부, 정확한 등록 시각을 보존하�
       setItem: (key: string, value: string) => values.set(key, value),
     },
   });
-  saveHistory("quest-b", { title: "장소 B", message: "다녀왔어요" });
+  saveHistory("quest-b", {
+    title: "장소 B",
+    message: "다녀왔어요",
+    questType: "IMAGE",
+    difficulty: 3,
+  });
   saveHistory("quest-b", { message: "중복" });
   const records = readHistory();
   assert.equal(records.length, 1);
   assert.equal(records[0].title, "장소 B");
   assert.equal(records[0].message, "다녀왔어요");
+  assert.equal(records[0].questType, "IMAGE");
+  assert.equal(records[0].difficulty, 3);
   assert.ok(timestamp(records[0].createdAt) > 0);
 });
 

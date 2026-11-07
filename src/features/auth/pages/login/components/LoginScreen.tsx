@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from 'react-router'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import type { LoginRequest } from '@/features/auth/types/auth'
 import { getSafeReturnTo } from '@/features/auth/utils/getSafeReturnTo'
+import { getAccessToken } from '@/features/auth/utils/tokenStorage'
 import LoginHeader from './LoginHeader'
 import LoginForm from './LoginForm'
 
@@ -24,6 +25,37 @@ export default function LoginScreen() {
     requestRef.current?.abort()
     requestRef.current = null
   }, [])
+
+  // shortcut: 기존 로그아웃의 /login 이동 시 상태를 맞춥니다. 다른 로그아웃 경로가 생기면 공통 signOut으로 연결합니다.
+  useEffect(() => {
+    if (status !== 'authenticated') return
+
+    let active = true
+    const controller = new AbortController()
+
+    // StrictMode의 첫 정리 작업 이후 실행해 중복 동기화를 피합니다.
+    queueMicrotask(() => {
+      if (!active || requestRef.current) return
+
+      try {
+        if (getAccessToken()) return
+      } catch {
+        // 저장소 접근 오류는 Provider의 기존 오류 처리로 전달합니다.
+      }
+
+      requestRef.current = controller
+      // 토큰이 없으면 Provider가 사용자 캐시·인증 상태·만료 타이머를 정리합니다.
+      void retrySession(controller.signal).finally(() => {
+        if (requestRef.current === controller) requestRef.current = null
+      })
+    })
+
+    return () => {
+      active = false
+      controller.abort()
+      if (requestRef.current === controller) requestRef.current = null
+    }
+  }, [status, retrySession])
 
   async function handleLogin(values: LoginRequest) {
     if (requestRef.current) return

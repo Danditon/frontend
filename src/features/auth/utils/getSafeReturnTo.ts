@@ -4,6 +4,7 @@ import { matchPath } from 'react-router'
 // 새 화면을 로그인 후 복귀 대상으로 허용할 때 이 목록도 함께 갱신합니다.
 const RETURN_PATHS = [
   '/',
+  '/onboarding',
   '/quests/new',
   '/quests/:questId',
   '/quests/:questId/verify',

@@ -1,5 +1,7 @@
 import type { RecordLocation } from "../types/location.ts";
 export type Entry = {
+  questType?: "GENERAL" | "IMAGE";
+  difficulty?: 1 | 2 | 3;
   id: string;
   title: string;
   place: string;
@@ -28,7 +30,13 @@ export function readHistory(): Entry[] {
 }
 export function saveHistory(
   id: string,
-  details?: { title?: string; message?: string; location?: RecordLocation },
+  details?: {
+    title?: string;
+    message?: string;
+    location?: RecordLocation;
+    questType?: "GENERAL" | "IMAGE";
+    difficulty?: 1 | 2 | 3;
+  },
 ) {
   const entries = readHistory();
   if (!entries.some((x) => x.id === id))
@@ -39,6 +47,8 @@ export function saveHistory(
       date: new Date().toLocaleDateString("ko-KR"),
       createdAt: new Date().toISOString(),
       location: details?.location,
+      questType: details?.questType,
+      difficulty: details?.difficulty,
       message: details?.message ?? "",
     });
   localStorage.setItem("geurium.demo.history", JSON.stringify(entries));

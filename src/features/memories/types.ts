@@ -16,6 +16,8 @@ export type Memory = {
   greetings: Greeting[];
 };
 export type RecordItem = {
+  questType?: "GENERAL" | "IMAGE";
+  difficulty?: 1 | 2 | 3;
   location?: RecordLocation;
   performerName?: string;
   questId?: string;

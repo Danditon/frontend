@@ -289,3 +289,6 @@
  .app-content>.memory-page,.app-content>.verify-page {min-height:100%;}
  .app-content>.verify-page:has(>.swipe-sheet) {height:100%;min-height:0;}
 }
+
+.greeting-api-card {border-radius:24px;background:linear-gradient(#fff 35%,#c9eaf5);padding:20px;flex:1;}
+.verify-success:has(.success-sheet-content>div:first-of-type:not(:has(span))) .success-sheet-content>div:first-of-type {font-size:40px;letter-spacing:-2px;}

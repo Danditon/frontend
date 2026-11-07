@@ -4,6 +4,7 @@ import LoginPage from "@/features/auth/pages/LoginPage";
 import QuestMapPage from "@/features/quests/pages/home/QuestMapPage";
 import QuestCreatePage from "@/features/quests/pages/QuestCreatePage";
 import QuestDetailPage from "@/features/quests/pages/QuestDetailPage";
+import QuestGreetingsPage from "@/features/quests/pages/QuestGreetingsPage";
 import QuestVerifyPage from "@/features/quests/pages/QuestVerifyPage";
 import MemoriesPage from "@/features/memories/pages/MemoriesPage";
 import MyPage from "@/features/memories/pages/MyPage";
@@ -19,6 +20,7 @@ export const router = createBrowserRouter([
       { path: "/quests/new", Component: QuestCreatePage },
       { path: "/quests/:questId", Component: QuestDetailPage },
       { path: "/quests/:questId/verify", Component: QuestVerifyPage },
+      { path: "/quests/:questId/greetings", Component: QuestGreetingsPage },
       { path: "/me", Component: MyPage },
       { path: "/me/logout", Component: MyPage },
       { path: "/me/memories", Component: MemoriesPage },

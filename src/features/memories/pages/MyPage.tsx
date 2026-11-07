@@ -11,14 +11,13 @@ import {
   otherPerformances,
 } from "@/features/memories/lib/performances";
 import {
-  previewMemories,
   previewCompletedRecords,
   previewRecordLocation,
   previewRecordQuest,
 } from "@/features/memories/data/preview";
 import type { RecordItem } from "@/features/memories/types";
 import { readHistory } from "@/shared/lib/demo";
-// The router uses previews until the backend publishes response DTOs.
+// The records tab can use local history and preview data.
 // Supply mapped API data through this boundary without changing the UI.
 export default function MyPage({ data }: { data?: MyPageData } = {}) {
   const { pathname } = useLocation();
@@ -29,7 +28,7 @@ export default function MyPage({ data }: { data?: MyPageData } = {}) {
   const historyPanel = useRef<HTMLDivElement>(null);
   const [liked, setLiked] = useState(false);
   const [error, setError] = useState("");
-  const memories = data?.memories ?? previewMemories;
+  const memories = data?.memories ?? [];
   const records: RecordItem[] = newestFirst(
     data?.records ??
       readHistory().map((entry) => ({

@@ -11,6 +11,15 @@ export type NearbyQuest = {
   isMine: boolean
 }
 
+// 주변 퀘스트 목록 요청의 검색 조건입니다. 반경은 미터 단위이며 생략 시 50km입니다.
+export type NearbyQuestParams = {
+  lat: number
+  lng: number
+  radius?: number
+  type?: NearbyQuest['questType']
+  difficulty?: NearbyQuest['difficulty']
+}
+
 // 퀘스트 상세 화면과 수행 중 카드에서 사용하는 상세 데이터입니다.
 export type QuestDetail = {
   questId: number

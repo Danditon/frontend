@@ -35,7 +35,7 @@ export function getNearestQuest(
   let nearestQuest: NearbyQuest | null = null
   let nearestDistance = Infinity
 
-  // mock의 distance는 예시 값이므로 실제 좌표로 계산하고, 원본 목록은 변경하지 않습니다.
+  // 현재 사용자 좌표로 거리를 계산하므로 응답 배열 순서에 의존하지 않고 원본도 변경하지 않습니다.
   for (const quest of quests) {
     const distance = getDistanceMeters(position, quest)
 

@@ -77,7 +77,7 @@ export async function getNearbyQuests(
   return nearbyQuestsSchema.parse(response.data)
 }
 
-// 선택한 실제 퀘스트 ID로 상세를 받으며, 홈의 기존 조회 훅 연결은 다음 단계에서 진행합니다.
+// 선택한 실제 퀘스트 ID로 상세를 받아 카드·Drawer에서 사용하도록 반환합니다.
 export async function getQuestDetail(
   questId: number,
   signal?: AbortSignal,

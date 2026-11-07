@@ -1,4 +1,4 @@
-// 선택한 퀘스트의 상세 mock과 수행 시작 버튼을 표시하며 지도 조작을 유지하는 Drawer입니다.
+// 선택한 실제 퀘스트의 상세 정보와 수행 시작 버튼을 표시하며 지도 조작을 유지하는 Drawer입니다.
 import { useCallback, useRef, useState, type CSSProperties } from 'react'
 import { X } from 'lucide-react'
 import { Button } from '@/shared/components/ui/button'
@@ -29,7 +29,7 @@ export default function QuestDetailDrawer({
   const [snapPoint, setSnapPoint] = useState(0.4)
   const isExpanded = snapPoint === 0.85
   const drawerRef = useRef<HTMLDivElement>(null)
-  // 마커·목록에서 선택한 ID로 같은 상세 mock을 조회합니다.
+  // 마커·목록·가까운 카드에서 선택한 ID로 실제 상세 API와 캐시를 공유합니다.
   const detailQuery = useQuestDetail(questId)
   const quest = detailQuery.data
 

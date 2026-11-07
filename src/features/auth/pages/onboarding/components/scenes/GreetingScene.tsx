@@ -1,4 +1,4 @@
-// 봉투가 먼저 나타난 뒤 사진 엽서가 안쪽에서 올라오는 세 번째 온보딩 장면입니다.
+// 봉투가 먼저 나타난 뒤 사진 엽서가 바로 뒤에서 부드럽게 모습을 드러내는 장면입니다.
 import { useEffect, useId, useRef, useState } from 'react'
 import { motion, useAnimationControls, type Variants } from 'motion/react'
 import background from '@/assets/onboarding/layers/greeting/background.png'
@@ -12,13 +12,15 @@ const envelopeMotion: Variants = {
   visible: { y: 0, opacity: 1, transition: { duration: 0.32, ease: 'easeOut' } },
 }
 const postcardMotion: Variants = {
-  hidden: { y: 520, opacity: 0 },
+  // 완성 위치보다 조금 아래에서 시작해 봉투 뒤에서 서서히 나타나게 합니다.
+  hidden: { y: 80, opacity: 0 },
   visible: {
     y: 0,
     opacity: 1,
     transition: {
-      y: { duration: 0.65, delay: 0.35, ease: 'easeOut' },
-      opacity: { duration: 0.12, delay: 0.35 },
+      duration: 0.7,
+      delay: 0.35,
+      ease: 'easeOut',
     },
   },
 }

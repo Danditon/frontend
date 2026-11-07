@@ -1,5 +1,4 @@
 import type { RecordLocation } from "@/shared/types/location";
-/** Frontend view model. Map API DTOs here once response schemas are finalized. */
 export type Greeting = {
   isMine?: boolean;
   id: string;
@@ -12,6 +11,7 @@ export type Memory = {
   id: string;
   title: string;
   sub: string;
+  passedCount?: number;
   photoUrl: string | null;
   greetings: Greeting[];
 };
@@ -26,9 +26,4 @@ export type RecordItem = {
   id: string;
   title: string;
   photoUrl: string | null;
-};
-export type MyPageData = {
-  memories: Memory[];
-  records: RecordItem[];
-  completedRecords?: RecordItem[];
 };

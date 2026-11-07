@@ -4,22 +4,31 @@ import { Link, useLocation, useNavigate, useSearchParams } from "react-router";
 import { Heart, LogOut } from "lucide-react";
 import { Back, Profile } from "@/shared/components/WireUI";
 import { RemotePhoto } from "@/shared/components/RemotePhoto";
-import type { MyPageData } from "@/features/memories/types";
-import {
-  newestFirst,
-  recordMemory,
-  otherPerformances,
-} from "@/features/memories/lib/performances";
-import {
-  previewCompletedRecords,
-  previewRecordLocation,
-  previewRecordQuest,
-} from "@/features/memories/data/preview";
-import type { RecordItem } from "@/features/memories/types";
-import { readHistory } from "@/shared/lib/demo";
-// The records tab can use local history and preview data.
-// Supply mapped API data through this boundary without changing the UI.
-export default function MyPage({ data }: { data?: MyPageData } = {}) {
+import { useQueries, useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/features/auth/hooks/useAuth";
+import { getAccessToken } from "@/features/auth/utils/tokenStorage";
+import { getMyQuests, getMySubmissions } from "../api/myPage";
+import { newestFirst } from "../lib/performances";
+import { getQuestGreetings } from "@/features/quests/api/verification";
+
+function ListStatus({ query, enabled, label, empty }: {
+  query: { isPending: boolean; isError: boolean; refetch: () => unknown };
+  enabled: boolean;
+  label: string;
+  empty: string;
+}) {
+  if (enabled && query.isError) {
+    return (
+      <p role="alert" className="py-2 text-xs">
+        {label} 불러오지 못했어요.{" "}
+        <button className="underline" onClick={() => { void query.refetch(); }}>다시 시도</button>
+      </p>
+    );
+  }
+  return <p role="status" className="py-2 text-xs">{enabled && query.isPending ? `${label} 불러오는 중이에요.` : empty}</p>;
+}
+
+export default function MyPage() {
   const { pathname } = useLocation();
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
@@ -28,70 +37,62 @@ export default function MyPage({ data }: { data?: MyPageData } = {}) {
   const historyPanel = useRef<HTMLDivElement>(null);
   const [liked, setLiked] = useState(false);
   const [error, setError] = useState("");
-  const memories = data?.memories ?? [];
-  const records: RecordItem[] = newestFirst(
-    data?.records ??
-      readHistory().map((entry) => ({
-        id: entry.id,
-        questId: entry.id,
-        questType: entry.questType ?? previewRecordQuest(entry.id)?.questType,
-        difficulty:
-          entry.difficulty ?? previewRecordQuest(entry.id)?.difficulty,
-        location: entry.location ?? previewRecordLocation(entry.id),
-        title: entry.title,
-        photoUrl: null,
-        createdAt: entry.createdAt ?? entry.date,
-        greetings: entry.message
-          ? [
-              {
-                id: `local-${entry.id}`,
-                greeting: entry.message,
-                photoUrl: null,
-                senderName: "나",
-                isMine: true,
-                createdAt: entry.createdAt ?? entry.date,
-              },
-            ]
-          : undefined,
-      })),
-  );
-  const completedRecords = newestFirst(
-    data?.completedRecords ?? (data ? [] : previewCompletedRecords),
-  );
+  const { user, retrySession } = useAuth();
+  const token = user && user.userId > 0 ? getAccessToken() : null;
+  const logout = pathname === "/me/logout";
+  const history = pathname === "/me/history";
+  const message = params.has("message") || params.get("tab") === "messages";
   const showOthers = params.get("showOthers") === "1";
-  const relatedOtherRecords = otherPerformances(records, completedRecords);
-  const historyQuestId =
-    pathname === "/me/history" ? params.get("quest") : null;
-  const visibleRecords = records.filter(
-    (item) => !historyQuestId || (item.questId ?? item.id) === historyQuestId,
-  );
+  const questsQuery = useQuery({
+    queryKey: ["my-quests", user?.userId],
+    queryFn: ({ signal }) => getMyQuests(token!, signal),
+    enabled: Boolean(token) && !logout,
+  });
+  const recordsQuery = useQuery({
+    queryKey: ["my-submissions", user?.userId],
+    queryFn: ({ signal }) => getMySubmissions(token!, signal),
+    enabled: Boolean(token) && !logout,
+  });
+  const memories = token ? questsQuery.data ?? [] : [];
+  const records = token ? recordsQuery.data ?? [] : [];
+  const historyQuestId = history ? params.get("quest") : null;
+  const visibleRecords = records.filter((item) => !historyQuestId || item.questId === historyQuestId);
   const source = params.get("source");
-  const sourceRecords = source === "completed" ? completedRecords : records;
-  const requestedRecord = sourceRecords.find(
-    (item) =>
-      item.id === params.get("record") ||
-      (!params.has("record") &&
-        (item.questId ?? item.id) === params.get("quest")),
-  );
-  const selected =
-    source === "records" || source === "completed"
-      ? requestedRecord &&
-        recordMemory(requestedRecord, memories, [
-          ...records,
-          ...completedRecords,
-        ])
-      : params.has("quest")
-        ? memories.find((item) => item.id === params.get("quest"))
-        : memories[0];
-  const greetings = newestFirst(selected?.greetings ?? []);
+  const fromRecords = source === "records" || source === "completed";
+  const questParam = params.get("quest");
+  const selected = fromRecords
+    ? records.find((item) => params.has("record") ? item.id === params.get("record") : item.questId === questParam)
+    : questParam ? memories.find((item) => item.id === questParam) : memories[0];
+  const selectedQuestId = selected && ("questId" in selected ? selected.questId : selected.id);
+  const peerQuestIds = history && showOthers
+    ? [...new Set(visibleRecords.map((record) => record.questId).filter((id): id is string => Boolean(id)))]
+    : [];
+  const greetingQuestIds = message && selectedQuestId ? [selectedQuestId] : peerQuestIds;
+  const greetingQueries = useQueries({
+    queries: greetingQuestIds.map((questId) => ({
+      queryKey: ["quest-greetings", questId, token],
+      queryFn: ({ signal }: { signal: AbortSignal }) => getQuestGreetings(questId, signal),
+      enabled: Boolean(token),
+      retry: false,
+    })),
+  });
+  const greetingQuery = message ? greetingQueries[0] : undefined;
+  const greetings = newestFirst((greetingQuery?.data?.submissions ?? [])
+    .filter((item) => item.verifyStatus === "PASSED")
+    .map((item) => ({
+      id: String(item.submissionId),
+      greeting: item.greeting,
+      photoUrl: item.photoUrl,
+      senderName: item.performer.nickname,
+      isMine: item.performer.userId === user?.userId,
+      createdAt: item.createdAt,
+    })));
   const requested = Number(params.get("message"));
-  const index = Number.isFinite(requested)
+  const linkedGreeting = greetings.findIndex((item) => item.id === params.get("submission"));
+  const index = linkedGreeting >= 0 ? linkedGreeting : Number.isFinite(requested)
     ? Math.max(0, Math.min(greetings.length - 1, Math.trunc(requested)))
     : 0;
   const greeting = greetings[index];
-  const message = params.has("message") || params.get("tab") === "messages";
-  const history = pathname === "/me/history";
-  const logout = pathname === "/me/logout";
   const recordCount = records.length;
   const backTo =
     source === "completed"
@@ -120,16 +121,18 @@ export default function MyPage({ data }: { data?: MyPageData } = {}) {
   }, [history]);
   function openGreeting(next: number) {
     setParams((previous) => {
+      previous.delete("submission");
       previous.set("message", String(next));
       return previous;
     });
     setLiked(false);
   }
-  function signOut() {
+  async function signOut() {
     try {
       localStorage.removeItem("accessToken");
       localStorage.removeItem("refreshToken");
       sessionStorage.removeItem("accessToken");
+      await retrySession();
       navigate("/login", { replace: true });
     } catch {
       setError("로그아웃하지 못했어요. 다시 시도해 주세요.");
@@ -160,12 +163,12 @@ export default function MyPage({ data }: { data?: MyPageData } = {}) {
           <Back to={backTo} />
           <div>
             <small>
-              {source === "records" || source === "completed"
+              {fromRecords
                 ? "수행한 퀘스트의 안부"
                 : "내 그리움에 도착한 안부"}{" "}
               {greeting ? index + 1 : 0}/{greetings.length}
             </small>
-            <strong>{selected?.title ?? "퀘스트를 찾을 수 없어요"}</strong>
+            <strong>{selected?.title ?? (token && (fromRecords ? recordsQuery : questsQuery).isPending ? "불러오는 중…" : "퀘스트를 찾을 수 없어요")}</strong>
           </div>
           <Link
             className="h-[54px] w-[54px] rounded-full bg-[#c9eaf5] inline-flex items-center justify-center shrink-0 [&_svg]:[stroke-width:1.25]"
@@ -184,7 +187,7 @@ export default function MyPage({ data }: { data?: MyPageData } = {}) {
             alt="도착한 안부 사진"
           />
           <p className="text-[20px] leading-[1.3] whitespace-pre-line text-center [margin:22px_0_10px] z-[1]">
-            {greeting?.greeting ?? "아직 도착한 안부가 없어요."}
+            {greeting?.greeting ?? (greetingQuery?.isPending ? "안부를 불러오는 중이에요." : greetingQuery?.isError ? "안부를 불러오지 못했어요." : "아직 도착한 안부가 없어요.")}
           </p>
           <small>
             {greeting
@@ -215,7 +218,7 @@ export default function MyPage({ data }: { data?: MyPageData } = {}) {
           className="mt-4 rounded-2xl bg-white p-3 text-[#242624]"
         >
           <h2 className="mb-2 text-sm font-semibold">
-            {source === "records" || source === "completed"
+            {fromRecords
               ? "나와 다른 수행자의 안부 · 최신순"
               : "도착한 수행 안부 · 최신순"}
           </h2>
@@ -250,9 +253,7 @@ export default function MyPage({ data }: { data?: MyPageData } = {}) {
               ))}
             </ol>
           ) : (
-            <p className="text-sm" role="status">
-              아직 등록된 수행 글이 없어요.
-            </p>
+            <ListStatus query={greetingQuery ?? (fromRecords ? recordsQuery : questsQuery)} enabled={Boolean(token)} label="안부를" empty="아직 등록된 수행 글이 없어요." />
           )}
         </section>
         </div>
@@ -276,17 +277,17 @@ export default function MyPage({ data }: { data?: MyPageData } = {}) {
         className="absolute inset-0 isolate flex flex-col overflow-hidden bg-white"
       >
         <div className="relative z-10 shrink-0 bg-white px-[15px] pb-3 pt-3">
-          <Profile />
+          <Profile nickname={token ? user?.nickname : undefined} email={token ? user?.email : undefined} />
           <div className="grid [grid-template-columns:1fr_1fr] gap-[6px] mb-0 [&_>_a]:h-[96px] [&_>_a]:rounded-[23px] [&_>_a]:bg-white/95 [&_>_a]:flex [&_>_a]:flex-col [&_>_a]:[padding:16px_14px_12px] [&_>_a]:relative [&_>_a]:justify-end [&_>_a.selected]:bg-[#c9eaf5] [&_strong]:font-normal [&_strong]:text-[38px] [&_strong]:leading-[1.05] [&_small]:text-[12px] [&_small]:mt-[4px]">
             <Link to="/me/memories" className="bg-[#e5e5e5]! text-[#242624]">
               <span className="text-[10px] absolute right-[12px] top-[14px] rounded-[15px] [padding:4px_7px] bg-[#dedede]">
                 도착한 안부
               </span>
-              <strong>{memories.length}</strong>
+              <strong>{questsQuery.data ? memories.length : "–"}</strong>
               <small>내 그리움</small>
             </Link>
             <Link to="/me/history" className={history ? "selected" : ""}>
-              <strong>{recordCount}</strong>
+              <strong>{recordsQuery.data ? recordCount : "–"}</strong>
               <small>내 기록</small>
             </Link>
           </div>
@@ -361,11 +362,10 @@ export default function MyPage({ data }: { data?: MyPageData } = {}) {
                 className="mt-2 flex max-h-[160px] flex-col gap-3 overflow-y-auto overscroll-contain"
               >
                 {visibleRecords.map((record) => {
-                  const peers = relatedOtherRecords.filter(
-                    (item) =>
-                      (item.questId ?? item.id) ===
-                      (record.questId ?? record.id),
-                  );
+                  const peerQuery = greetingQueries[peerQuestIds.indexOf(record.questId ?? record.id)];
+                  const peers = newestFirst((peerQuery?.data?.submissions ?? []).filter(
+                    (item) => item.verifyStatus === "PASSED" && item.performer.userId !== user?.userId,
+                  ));
                   return (
                     <section
                       key={record.id}
@@ -373,19 +373,18 @@ export default function MyPage({ data }: { data?: MyPageData } = {}) {
                       className="rounded-xl bg-white p-3 text-[#242624]"
                     >
                       <h3 className="mb-2 text-xs font-semibold">
-                        {record.title} · 다른 수행 기록 {peers.length}건
+                        {record.title}{peerQuery?.data && ` · 다른 수행 기록 ${peers.length}건`}
                       </h3>
                       {peers.length ? (
                         <ul className="flex flex-col gap-2">
                           {peers.map((peer) => (
-                            <li key={peer.id}>
+                            <li key={peer.submissionId}>
                               <Link
                                 className="block rounded-lg bg-[#edf4f6] p-3 text-xs"
-                                to={`/me/memories?${new URLSearchParams({ source: "records", record: record.id, quest: record.questId ?? record.id, message: "0", returnOthers: "1" })}`}
+                                to={`/me/memories?${new URLSearchParams({ source: "records", record: record.id, quest: record.questId ?? record.id, message: "0", submission: String(peer.submissionId), returnOthers: "1" })}`}
                               >
                                 <span>
-                                  {peer.performerName ?? "다른 수행자"} ·{" "}
-                                  {peer.title}
+                                  {peer.performer.nickname} · {peer.greeting}
                                 </span>
                                 <time
                                   className="mt-1 block text-[10px] text-neutral-500"
@@ -399,9 +398,7 @@ export default function MyPage({ data }: { data?: MyPageData } = {}) {
                           ))}
                         </ul>
                       ) : (
-                        <p className="text-xs text-neutral-500">
-                          다른 수행자의 기록이 아직 없어요.
-                        </p>
+                        peerQuery && <ListStatus query={peerQuery} enabled={Boolean(token)} label="다른 수행 기록을" empty="다른 수행자의 기록이 아직 없어요." />
                       )}
                     </section>
                   );
@@ -409,9 +406,7 @@ export default function MyPage({ data }: { data?: MyPageData } = {}) {
               </div>
             )}
             {visibleRecords.length === 0 && (
-              <p role="status" className="py-2 text-xs">
-                아직 수행한 기록이 없어요.
-              </p>
+              <ListStatus query={recordsQuery} enabled={Boolean(token)} label="수행 기록을" empty="아직 수행한 기록이 없어요." />
             )}
           </div>
         </div>
@@ -419,17 +414,17 @@ export default function MyPage({ data }: { data?: MyPageData } = {}) {
     );
   return (
     <section className="memory-page [padding:12px_15px_100px] min-h-[790px] relative flex-1 max-[500px]:[min-height:calc(100dvh_-_54px)]">
-      <Profile />
+      <Profile nickname={token ? user?.nickname : undefined} email={token ? user?.email : undefined} />
       <div className="grid [grid-template-columns:1fr_1fr] gap-[6px] mb-[16px] [&_>_a]:h-[115px] [&_>_a]:rounded-[23px] [&_>_a]:bg-[#c9eaf5] [&_>_a]:flex [&_>_a]:flex-col [&_>_a]:[padding:25px_14px_13px] [&_>_a]:relative [&_>_a]:justify-end [&_>_a.selected]:bg-[#242624] [&_strong]:font-normal [&_strong]:text-[45px] [&_strong]:leading-[1.05] [&_small]:text-[12px] [&_small]:mt-[4px]">
         <Link to="/me/memories" className={!history ? "selected" : ""}>
           <span className="text-[10px] absolute right-[12px] top-[14px] rounded-[15px] [padding:4px_7px] bg-[#dedede]">
             도착한 안부
           </span>
-          <strong>{memories.length}</strong>
+          <strong>{questsQuery.data ? memories.length : "–"}</strong>
           <small>내 그리움</small>
         </Link>
         <Link to="/me/history" className="bg-[#e5e5e5]! text-[#242624]">
-          <strong>{recordCount}</strong>
+          <strong>{recordsQuery.data ? recordCount : "–"}</strong>
           <small>내 기록</small>
         </Link>
       </div>
@@ -439,7 +434,7 @@ export default function MyPage({ data }: { data?: MyPageData } = {}) {
           <button
             key={x.id}
             onClick={() => {
-              if (x.greetings.length) {
+              if (x.passedCount) {
                 setParams({ quest: x.id, message: "0" });
                 setLiked(false);
               } else setError("아직 도착한 안부가 없어요.");
@@ -447,15 +442,15 @@ export default function MyPage({ data }: { data?: MyPageData } = {}) {
           >
             <strong>{x.title}</strong>
             <small>{x.sub}</small>
-            {x.greetings.length > 0 && (
-              <span>안부 {x.greetings.length}통 도착</span>
+            {Boolean(x.passedCount) && (
+              <span>안부 {x.passedCount}통 도착</span>
             )}
             <i className="memory-thumbnail">
               <RemotePhoto photoUrl={x.photoUrl} alt={x.title} />
             </i>
           </button>
         ))}
-        {memories.length === 0 && <p role="status">등록한 그리움이 없어요.</p>}
+        {memories.length === 0 && <ListStatus query={questsQuery} enabled={Boolean(token)} label="내 그리움을" empty="등록한 그리움이 없어요." />}
         {error && (
           <p className="text-[12px] p-[12px]" role="status">
             {error}

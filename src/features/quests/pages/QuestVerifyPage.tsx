@@ -60,6 +60,7 @@ function VerificationScreen({ questId }: { questId: string }) {
       setResult(response);
       if (response.verifyStatus === 'PASSED') {
         void queryClient.invalidateQueries({ queryKey: ['quest-greetings', questId] });
+        void queryClient.invalidateQueries({ queryKey: ['my-submissions'] });
 
       }
     } catch (cause) {

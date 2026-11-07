@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
+import { useQueryClient } from '@tanstack/react-query'
 import { Check, ChevronLeft, LoaderCircle, MailOpen, Plus, X } from 'lucide-react'
 import { QuestPlacePicker } from '../components/QuestPlacePicker'
 import {
@@ -15,6 +16,7 @@ const primary = 'min-h-11 flex-1 rounded-full bg-[#242624] px-4 py-3 text-center
 const secondary = 'min-h-11 rounded-full bg-neutral-100 px-4 py-3 text-sm'
 
 export default function QuestCreatePage() {
+  const queryClient = useQueryClient()
   const [stage, setStage] = useState<Stage>('details')
   const [questType, setQuestType] = useState<QuestType>('GENERAL')
   const [place, setPlace] = useState<RegistrationPlace | null>(null)
@@ -90,6 +92,7 @@ export default function QuestCreatePage() {
     move('registering')
     try {
       await registerQuest({ ...place, questType, longingText: reason.trim() }, preview, photo?.file ?? null, controller.signal)
+      void queryClient.invalidateQueries({ queryKey: ['my-quests'] })
       if (!controller.signal.aborted) setStage('done')
     } catch (cause) {
       if (controller.signal.aborted) return

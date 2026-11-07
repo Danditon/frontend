@@ -12,8 +12,7 @@ const element = (type, props) => ({ type, props })
 
 function loadSource(path, dependencies = {}, globals = {}) {
   const source = ts.transpileModule(
-    readFileSync(new URL(`../src/${path}`, import.meta.url), 'utf8')
-      .replaceAll('import.meta.env.DEV', 'false'),
+    readFileSync(new URL(`../src/${path}`, import.meta.url), 'utf8'),
     { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } },
   ).outputText
   const module = { exports: {} }
@@ -61,7 +60,8 @@ const quests = [
 function homeFixture() {
   const states = []
   const memos = []
-  let cursor = 0, memoCursor = 0, tree
+  const effects = [], microtasks = []
+  let cursor = 0, memoCursor = 0, effectCursor = 0, tree
   const fixture = {
     position,
     query: { data: undefined, isPending: true, isError: false },
@@ -70,10 +70,21 @@ function homeFixture() {
     navigations: [],
     refetchCalls: [],
     detailQuery: {},
+    locationRequests: 0,
+    isLocating: false,
+    locationError: null,
+    requestLocation: async () => { fixture.locationRequests++; return fixture.position },
   }
   const page = loadSource('features/quests/pages/home/QuestMapPage.tsx', {
     react: {
       useCallback: (callback) => callback,
+      useEffect: (run, deps) => {
+        const index = effectCursor++
+        if (!effects[index] || deps.some((value, i) => !Object.is(value, effects[index].deps[i]))) {
+          effects[index]?.cleanup?.()
+          effects[index] = { deps, run, cleanup: run() }
+        }
+      },
       useMemo: (factory, deps) => {
         const index = memoCursor++
         if (!memos[index] || deps.some((value, i) => !Object.is(value, memos[index].deps[i]))) {
@@ -88,7 +99,12 @@ function homeFixture() {
       },
     },
     'react-router': { useNavigate: () => (path) => fixture.navigations.push(path) },
-    '@/features/quests/hooks/useGeolocation': { useGeolocation: () => ({ position: fixture.position, isLocating: false, error: null, requestLocation: async () => fixture.position }) },
+    '@/features/quests/hooks/useGeolocation': { useGeolocation: () => ({
+      position: fixture.position,
+      isLocating: fixture.isLocating,
+      error: fixture.locationError,
+      requestLocation: fixture.requestLocation,
+    }) },
     '@/features/quests/hooks/useNearbyQuests': { useNearbyQuests: () => ({
       isFetching: false,
       refetch: (options) => { fixture.refetchCalls.push({ target: 'nearby', options }); return Promise.resolve() },
@@ -112,12 +128,67 @@ function homeFixture() {
     './utils/getNearestQuest': loadSource('features/quests/pages/home/utils/getNearestQuest.ts'),
     './utils/getQuestVerifyPath': loadSource('features/quests/pages/home/utils/getQuestVerifyPath.ts'),
     './utils/getQuestQueryError': queryErrorUtils,
-  })
+  }, { queueMicrotask: (callback) => microtasks.push(callback) })
   return Object.assign(fixture, {
-    render() { cursor = 0; memoCursor = 0; tree = page.default(); return tree },
+    render() { cursor = 0; memoCursor = 0; effectCursor = 0; tree = page.default(); return tree },
     node(type) { return findNode(tree, type) },
+    flushMicrotasks() { while (microtasks.length) microtasks.shift()() },
+    strictReplay() {
+      for (const effect of effects) effect.cleanup?.()
+      for (const effect of effects) effect.cleanup = effect.run()
+    },
+    unmount() { for (const effect of effects) effect.cleanup?.() },
   })
 }
+
+test('홈 진입 시 자동 위치 조회를 한 번 실행하고 StrictMode·일반 재렌더링은 중복하지 않는다', () => {
+  const f = homeFixture()
+  f.position = null
+  f.render()
+  f.strictReplay()
+  f.flushMicrotasks()
+  assert.equal(f.locationRequests, 1)
+  f.position = position
+  f.query = { data: quests, isPending: false, isError: false }
+  f.render()
+  f.flushMicrotasks()
+  assert.equal(f.locationRequests, 1)
+  f.node('CurrentLocationButton').props.onClick()
+  assert.equal(f.locationRequests, 2)
+})
+
+test('자동 위치 조회를 시작하기 전에 홈을 떠나면 예약된 요청을 실행하지 않는다', () => {
+  const f = homeFixture()
+  f.render()
+  f.unmount()
+  f.flushMicrotasks()
+  assert.equal(f.locationRequests, 0)
+})
+
+test('위치 조회 실패 시 안내와 수동 재시도를 유지하고 자동으로 반복 요청하지 않는다', () => {
+  const f = homeFixture()
+  f.position = null
+  f.render()
+  f.flushMicrotasks()
+  f.locationError = { code: 'PERMISSION_DENIED', message: '위치 권한을 허용해주세요.' }
+  assert.match(textOf(f.render()), /위치 권한을 허용/)
+  f.flushMicrotasks()
+  assert.equal(f.locationRequests, 1)
+  f.node('LocationPromptCard').props.onRequestLocation()
+  assert.equal(f.locationRequests, 2)
+  f.isLocating = true
+  f.render()
+  assert.equal(f.node('CurrentLocationButton').props.isLocating, true)
+})
+
+test('좌표·정확도 디버그 표시는 없애고 지도에 전달하는 위치 정보는 유지한다', () => {
+  const f = homeFixture()
+  const tree = f.render()
+  assert.equal(f.node('output'), null)
+  assert.doesNotMatch(textOf(tree), /위도:|경도:|정확도 범위:/)
+  assert.equal(f.node('QuestMap').props.position, position)
+  assert.equal(f.node('QuestMap').props.position.accuracy, 10)
+})
 
 test('위치 미확인·조회 중·실패·성공 0개를 구분하고 mock 마커로 대체하지 않는다', () => {
   const f = homeFixture()

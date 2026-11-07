@@ -1,5 +1,5 @@
 // 홈 지도의 위치 안내·가까운 퀘스트·수행 중 카드와 목록·상세 Drawer를 연결하는 화면입니다.
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
 import type { NearbyQuest } from '@/features/quests/types/quest'
 import QuestMap from './components/QuestMap.tsx'
@@ -26,6 +26,21 @@ const EMPTY_NEARBY_QUESTS: NearbyQuest[] = []
 export default function QuestMapPage() {
   // 홈에서 위치 조회 상태를 관리하고, 버튼과 결과 표시에 연결합니다.
   const { position, isLocating, error, requestLocation } = useGeolocation()
+
+  useEffect(() => {
+    let active = true
+
+    // 홈 진입 시 한 번 조회하며, StrictMode의 첫 정리 이후 실행해 중복 요청을 막습니다.
+    queueMicrotask(() => {
+      if (active) void requestLocation()
+    })
+
+    return () => {
+      // 조회 시작 전에 화면을 떠났다면 예약된 자동 조회를 실행하지 않습니다.
+      active = false
+    }
+  }, [requestLocation])
+
   const nearbyQuery = useNearbyQuests(position)
   const nearbyError = nearbyQuery.isError ? getQuestQueryError(nearbyQuery.error, 'nearby') : null
   // 일시적인 갱신 실패는 기존 마커를 유지하고, 인증·권한 거절 결과는 화면에서 제외합니다.
@@ -210,18 +225,6 @@ export default function QuestMapPage() {
           </div>
         )}
       </div>
-
-      {/* 개발 중에만 조회된 좌표와 정확도를 표시해 위치 조회 결과를 확인합니다. */}
-      {import.meta.env.DEV && position && (
-        <output
-          aria-live="polite"
-          className="absolute left-4 top-36 z-20 rounded-lg bg-white p-3 text-xs shadow"
-        >
-          <div>위도: {position.lat.toFixed(6)}</div>
-          <div>경도: {position.lng.toFixed(6)}</div>
-          <div>정확도 범위: {Math.round(position.accuracy)}m</div>
-        </output>
-      )}
 
       {/* 지도 위 상단 UI */}
       <div className="pointer-events-none absolute inset-x-0 top-0 z-10 px-4 pt-[calc(0.75rem+env(safe-area-inset-top,0px))]">

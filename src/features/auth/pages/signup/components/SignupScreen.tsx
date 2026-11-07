@@ -99,7 +99,8 @@ export default function SignupScreen() {
       }
 
       if (controller.signal.aborted) return
-      navigate('/', { replace: true })
+      // 자동 로그인과 사용자 확인이 끝난 신규 가입자에게 서비스 안내를 표시합니다.
+      navigate('/onboarding', { replace: true })
     } finally {
       if (requestRef.current === controller) {
         requestRef.current = null

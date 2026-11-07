@@ -26,10 +26,12 @@ export type KakaoMapProjection = {
 }
 
 export type KakaoBounds = {
+  extend(position: KakaoLatLng): void
   contain(position: KakaoLatLng): boolean // 퀘스트 좌표가 현재 지도 범위 안인지 확인
 }
 
 export type KakaoMap = {
+  setBounds(bounds: KakaoBounds, paddingTop?: number, paddingRight?: number, paddingBottom?: number, paddingLeft?: number): void
   getBounds(): KakaoBounds // 현재 지도 영역
   getCenter(): KakaoLatLng // 현재 지도 중심 좌표
   getProjection(): KakaoMapProjection // 화면·지도 좌표 변환 객체
@@ -44,6 +46,10 @@ export type KakaoMarker = {
   setMap(map: KakaoMap | null): void // 지도에 연결하거나 null로 제거
 }
 
+export type KakaoCustomOverlay = {
+  setMap(map: KakaoMap | null): void
+  setZIndex(zIndex: number): void
+}
 // 상단 지역명 표시에 필요한 행정구역 필드만 선언합니다.
 export type KakaoRegion = {
   region_type: 'H' | 'B'
@@ -82,6 +88,10 @@ declare global {
           latitude: number,
           longitude: number,
         ) => KakaoLatLng
+
+        CustomOverlay: new (options: { map: KakaoMap; position: KakaoLatLng; content: HTMLElement; xAnchor?: number; yAnchor?: number; zIndex?: number }) => KakaoCustomOverlay
+
+        LatLngBounds: new () => KakaoBounds
 
         Map: new (
           container: HTMLElement,

@@ -1,3 +1,4 @@
+import { mockNearbyQuests } from '@/features/quests/pages/home/mocks/nearbyQuests';
 import { motion, useReducedMotion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
@@ -58,7 +59,12 @@ export default function QuestVerifyPage() {
   }, [step, setParams]);
   function record() {
     try {
-      saveHistory(questId);
+      const quest = mockNearbyQuests.find(item => String(item.questId) === questId);
+      saveHistory(questId, {
+        title: quest?.questTitle,
+        message: note,
+        location: quest ? { lat: quest.lat, lng: quest.lng, placeName: quest.placeName } : undefined,
+      });
       setSaved(true);
     } catch {
       setError("기록을 저장하지 못했어요. 다시 시도해 주세요.");

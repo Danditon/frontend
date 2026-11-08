@@ -23,14 +23,15 @@ export default function CreationResultStep({ outcome, error, uncertain, active, 
       </div>
 
       <h1 className="creation-title">
-        {!failed ? '등록 완료' : needsCheck ? <>등록 결과를<br />확인해 주세요</> : <>퀘스트를<br />만들지 못했어요</>}
+        {!failed ? '등록 완료' : needsCheck ? <>등록 결과를<br />확인해 주세요</>
+          : registrationFailed ? <>퀘스트를<br />등록하지 못했어요</> : <>퀘스트를<br />만들지 못했어요</>}
       </h1>
       <div className="creation-result-copy">
         <p className="creation-description">
           {!failed ? <>누군가 다녀오면<br />안부가 도착해요.</>
-            : needsCheck ? '작성한 내용을 보존했어요. 등록 내역을 먼저 확인해 주세요.'
-              : registrationFailed ? '생성한 퀘스트를 등록하지 못했어요. 작성한 내용은 그대로 남아 있어요.'
-                : 'AI 퀘스트 생성에 실패했어요. 적어둔 내용은 그대로 있으니 다시 시도해 주세요.'}
+            : needsCheck ? <>작성한 내용을 보존했어요.<br />등록 내역을 먼저 확인해 주세요.</>
+              : registrationFailed ? <>생성한 퀘스트와 작성한 내용은 그대로 남아 있어요.<br />잠시 후 다시 등록해 주세요.</>
+                : <>AI 퀘스트 생성에 실패했어요.<br />적어둔 내용은 그대로 있으니 다시 시도해 주세요.</>}
         </p>
         {failed && error && <p role="alert" className="creation-result-error">{error}</p>}
       </div>

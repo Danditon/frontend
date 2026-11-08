@@ -21,7 +21,8 @@ export default function FloatingEnvelope({ failed, uncertain, active, reducedMot
       transition={{ duration: floating ? 4 : 0.2, repeat: floating ? Infinity : 0, ease: 'easeInOut' }}
     >
       {/* 봉투만 독립된 레이어로 움직이고 문구와 버튼은 고정합니다. */}
-      <g transform="rotate(-10 180 140)">
+      {/* 편지 본체의 중심을 SVG 영역의 중앙에 맞춥니다. */}
+      <g transform="translate(0 -14) rotate(-10 180 154)">
         <rect x="22" y="54" width="316" height="200" rx="20" fill="var(--envelope-paper)" stroke="var(--envelope-border)" />
         <path
           d="M22 74Q22 54 42 54H318Q338 54 338 74L196 163Q180 173 164 163Z"

@@ -120,13 +120,13 @@
 .creation-generation-ring { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
 .creation-generation-message { min-height: 44px; margin-top: 28px; color: #647a82; font-size: 13px; line-height: 1.6; }
 
-.creation-result { --envelope-paper: #f9fdff; --envelope-flap: #dfedf3; --envelope-border: #edf5f7; --envelope-seal: #e8f3f7; --envelope-ink: #839ca5; gap: 20px; padding-top: clamp(12px, 3dvh, 32px); }
+.creation-result { --envelope-paper: #f9fdff; --envelope-flap: #dfedf3; --envelope-border: #edf5f7; --envelope-seal: #e8f3f7; --envelope-ink: #839ca5; gap: 0; padding-top: clamp(24px, 4dvh, 40px); }
 .creation-result[data-failed="true"] { --envelope-paper: #fffafa; --envelope-flap: #f0dadd; --envelope-border: #f7ebed; --envelope-seal: #f4e4e7; --envelope-ink: #a7737c; }
-.creation-result-illustration { flex: none; width: 100%; max-width: 360px; align-self: center; padding: 8px 0 12px; }
+.creation-result-illustration { flex: none; width: 100%; max-width: 320px; align-self: center; padding: 0; margin-bottom: 32px; }
 .creation-envelope { display: block; width: 100%; height: auto; overflow: visible; filter: drop-shadow(0 8px 16px #7c9ca50a); }
 .creation-envelope text { font-family: inherit; letter-spacing: 0.04em; }
-.creation-result .creation-title { margin-top: 8px; }
-.creation-result-copy { display: flex; flex-direction: column; gap: 12px; overflow-wrap: anywhere; }
+.creation-result .creation-title { margin-top: 0; }
+.creation-result-copy { display: flex; flex-direction: column; gap: 12px; margin-top: 20px; overflow-wrap: anywhere; }
 .creation-result-error { color: #8b5b63; font-size: 13px; line-height: 1.6; }
 .creation-result[data-failed="true"] .creation-description { color: #79565d; }
 .creation-result[data-failed="true"] .creation-primary { background: #854b56; }
@@ -148,7 +148,8 @@
   .creation-photo { gap: 0; }
   .creation-photo-upload { height: clamp(220px, 40dvh, 300px); max-height: none; }
   .creation-generation-figure { width: min(74%, 240px); }
-  .creation-result-illustration { max-width: 300px; }
+  .creation-result { gap: 0; padding-top: 16px; }
+  .creation-result-illustration { max-width: 280px; margin-bottom: 24px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

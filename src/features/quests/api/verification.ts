@@ -81,10 +81,9 @@ export function verificationError(
     }
     if (code === 'OUT_OF_RANGE' && location) {
       const { distance } = location
-      const measured = `기기에서 측정한 거리는 약 ${Math.round(distance)}m예요.`
       return distance <= 200
-        ? `서버가 인증 가능 범위를 벗어났다고 응답했어요. ${measured}`
-        : `${messages.OUT_OF_RANGE} ${measured}`
+        ? '서버가 인증 가능 범위를 벗어났다고 응답했어요.'
+        : '퀘스트 장소에 조금 더 가까이 이동한 뒤 다시 시도해 주세요.'
     }
     if (typeof code === 'string' && messages[code]) return messages[code]
     if (error.response?.status === 401) return messages.UNAUTHORIZED

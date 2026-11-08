@@ -1,7 +1,8 @@
 import { motion, useReducedMotion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router";
-import { ChevronsLeftRight, Plus, X } from "lucide-react";
+import { isAxiosError } from "axios";
+import { ChevronsLeftRight, MapPin, Plus, X } from "lucide-react";
 import { Back, SlideButton } from "@/shared/components/WireUI";
 import { SwipeSheet } from "@/shared/components/SwipeSheet";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -26,6 +27,7 @@ function VerificationScreen({ questId }: { questId: string }) {
   const [note, setNote] = useState("");
   const [mix, setMix] = useState(50);
   const [error, setError] = useState("");
+  const [measuredDistance, setMeasuredDistance] = useState<number | null>(null);
   const [view, setView] = useState<Step>("capture");
   const [result, setResult] = useState<VerificationResult | null>(null);
   const [sending, setSending] = useState(false);
@@ -44,6 +46,7 @@ function VerificationScreen({ questId }: { questId: string }) {
   useEffect(() => () => request.current?.abort(), []);
   async function submit() {
     if (submitting.current || !quest) return;
+    setMeasuredDistance(null);
     if (!note.trim()) { setError('안부를 한 줄 이상 남겨주세요.'); return; }
     if (!general && !photoFile) { setError('인증 사진을 선택해 주세요.'); return; }
     if (quest.isMine || quest.myStatus === 'PASSED') { setError(quest.isMine ? '내가 등록한 퀘스트는 수행할 수 없어요.' : '이미 인증을 완료한 퀘스트예요.'); return; }
@@ -67,9 +70,11 @@ function VerificationScreen({ questId }: { questId: string }) {
       }
     } catch (cause) {
       if (!controller.signal.aborted) {
-        setError(verificationError(cause, position ? {
-          distance: getDistanceMeters(position, quest),
-        } : undefined));
+        const distance = position && isAxiosError(cause) && cause.response?.data?.code === "OUT_OF_RANGE"
+          ? getDistanceMeters(position, quest)
+          : null;
+        setMeasuredDistance(distance);
+        setError(verificationError(cause, distance === null ? undefined : { distance }));
       }
     } finally {
       submitting.current = false;
@@ -88,6 +93,7 @@ function VerificationScreen({ questId }: { questId: string }) {
         const file = e.target.files?.[0];
         e.currentTarget.value = "";
         if (!file) return;
+        setMeasuredDistance(null);
         try {
           const url = await decodeQuestPhoto(file);
           setPhoto(url);
@@ -313,9 +319,25 @@ function VerificationScreen({ questId }: { questId: string }) {
           onChange={(e) => setNote(e.target.value)}
           maxLength={500}
         />
-        {error && <p role="alert">{error}</p>}
+        {measuredDistance !== null ? (
+          <div role="alert" className="mt-4 rounded-2xl border border-[#d4e6eb] bg-[#eff8fa] p-4 text-[#243a40]">
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+              <span className="flex items-center gap-1.5 font-medium">
+                <MapPin size={15} aria-hidden="true" />
+                퀘스트까지 측정 거리
+              </span>
+              <span className="rounded-full bg-white px-2.5 py-1">인증 범위 200m 이내</span>
+            </div>
+            <p className="mt-1 text-3xl font-semibold tabular-nums">
+              <span className="mr-1 text-sm font-normal">약</span>
+              {Math.round(measuredDistance).toLocaleString("ko-KR")}
+              <span className="ml-1 text-base">m</span>
+            </p>
+            <p className="mt-1 text-xs leading-relaxed">{error}</p>
+          </div>
+        ) : error && <p role="alert">{error}</p>}
         {location.error && <p role="alert">{location.error.message}</p>}
-        <div className="mt-auto pt-[40px]">
+        <div className={measuredDistance === null ? "mt-auto pt-[40px]" : "mt-auto pt-4"}>
           <SlideButton
             disabled={sending || !note.trim() || (!photoFile && !general) || quest.isMine || quest.myStatus === "PASSED"}
             onClick={() => void submit()}

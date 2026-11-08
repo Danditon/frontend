@@ -43,6 +43,7 @@ function textOf(tree) {
 }
 
 const Details = load('components/creation/CreationDetailsStep.tsx', {
+  'motion/react': { motion: { span: 'motion.span' } },
   'lucide-react': { Check: 'Check' }, '../QuestPlacePicker': { QuestPlacePicker: 'QuestPlacePicker' },
 })
 const Photo = load('components/creation/CreationPhotoStep.tsx', {
@@ -152,7 +153,7 @@ function pageFixture() {
 
 test('입력 화면은 실제 장소 선택·공백이 아닌 이유를 요구하고 유형·입력 이벤트를 전달한다', () => {
   const changes = []
-  const props = { questType: 'GENERAL', place: null, reason: '', onQuestTypeChange: value => changes.push(value), onReasonChange: value => changes.push(value) }
+  const props = { questType: 'GENERAL', place: null, reason: '', reducedMotion: false, onQuestTypeChange: value => changes.push(value), onReasonChange: value => changes.push(value) }
   assert.equal(find(Details(props), 'button').props.disabled, true)
   assert.equal(find(Details({ ...props, place, reason: '   ' }), 'button').props.disabled, true)
   const tree = Details({ ...props, place, reason: '그리운 이유' })
@@ -162,6 +163,41 @@ test('입력 화면은 실제 장소 선택·공백이 아닌 이유를 요구�
   assert.deepEqual(changes, ['IMAGE', '수정한 이유'])
   assert.equal(find(tree, 'textarea').props.maxLength, 500)
   assert.match(textOf(tree), /글 필수사진 선택/)
+})
+
+test('유형을 바꾸면 라디오 선택과 체크 애니메이션이 함께 바뀌고 모션 축소 설정을 따른다', () => {
+  for (const questType of ['GENERAL', 'IMAGE']) {
+    for (const reducedMotion of [false, true]) {
+      const tree = Details({ questType, reason: '', place: null, reducedMotion })
+      for (const type of ['GENERAL', 'IMAGE']) {
+        const radio = find(tree, 'input', props => props.value === type)
+        const card = find(tree, 'label', props => props['data-selected'] === (type === questType))
+        const check = find(card, 'motion.span')
+        assert.equal(radio.props.checked, type === questType)
+        assert.equal(check.props.initial, false)
+        assert.equal(check.props.animate.opacity, type === questType ? 1 : 0)
+        assert.equal(check.props.animate.scale, type === questType ? 1 : 0.75)
+        assert.equal(check.props.transition.duration, reducedMotion ? 0 : 0.18)
+      }
+    }
+  }
+  const f = pageFixture()
+  f.reducedMotion = true
+  f.render()
+  assert.equal(f.props('CreationDetailsStep').reducedMotion, true)
+})
+
+test('이유 입력의 글자 수와 접근성 연결은 빈 값부터 최대 길이까지 현재 값을 반영한다', () => {
+  for (const reason of ['', '그리운 이유', '가'.repeat(500)]) {
+    const tree = Details({ questType: 'GENERAL', place, reason, reducedMotion: false })
+    const input = find(tree, 'textarea')
+    const label = find(tree, 'label', props => props.htmlFor === input.props.id)
+    const count = find(tree, 'p', props => props.id === input.props['aria-describedby'])
+    assert.equal(textOf(label), '그리운 이유')
+    assert.equal(textOf(count), `${reason.length}/500`)
+    assert.equal(input.props.value, reason)
+    assert.equal(input.props.maxLength, 500)
+  }
 })
 
 test('사진 화면은 일반 선택·이미지 필수 조건과 읽기 중 잠금을 유지하고 같은 파일도 다시 고를 수 있다', () => {
@@ -493,6 +529,10 @@ test('나가는 화면은 입력·접근성에서 제외하고 도착 완료 후
   assert.equal(tree.props.inert, false)
   assert.deepEqual(focus[0], ['tabindex', '-1'])
   assert.equal(focus[1].preventScroll, true)
+  for (const stage of ['details', 'photo', 'preview', 'registering', 'generating', 'previewError', 'registerError', 'done']) {
+    tree = Screen({ ...props, screen: { ...props.screen, stage } })
+    assert.equal(tree.props['data-surface'], ['details', 'photo', 'preview', 'registering'].includes(stage) ? 'form' : 'result')
+  }
 })
 
 test('화면 종료 후 대기 중인 결과와 오래된 전환 완료 이벤트가 다음 요청을 시작하지 않는다', async () => {

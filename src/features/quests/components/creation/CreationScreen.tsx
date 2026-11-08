@@ -13,6 +13,7 @@ type Props = {
 export default function CreationScreen({ screen, isTransitioning, reducedMotion, onComplete, children }: Props) {
   const present = useIsPresent()
   const element = useRef<HTMLDivElement>(null)
+  const formScreen = ['details', 'photo', 'preview', 'registering'].includes(screen.stage)
 
   useEffect(() => {
     if (!present || isTransitioning) return
@@ -25,6 +26,7 @@ export default function CreationScreen({ screen, isTransitioning, reducedMotion,
     <motion.div
       ref={element}
       className="creation-screen"
+      data-surface={formScreen ? 'form' : 'result'}
       custom={{ direction: screen.direction, kind: screen.kind, reducedMotion }}
       variants={creationVariants}
       initial="enter"

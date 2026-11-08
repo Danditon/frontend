@@ -1,4 +1,5 @@
 import { Check } from 'lucide-react'
+import { motion } from 'motion/react'
 import type { RegistrationPlace } from '../../api/questRegistration'
 import { QuestPlacePicker } from '../QuestPlacePicker'
 
@@ -6,6 +7,7 @@ type Props = {
   questType: 'GENERAL' | 'IMAGE'
   place: RegistrationPlace | null
   reason: string
+  reducedMotion: boolean
   onQuestTypeChange: (type: Props['questType']) => void
   onPlaceChange: (place: RegistrationPlace | null) => void
   onReasonChange: (reason: string) => void
@@ -13,7 +15,7 @@ type Props = {
 }
 
 export default function CreationDetailsStep({
-  questType, place, reason, onQuestTypeChange, onPlaceChange, onReasonChange, onNext,
+  questType, place, reason, reducedMotion, onQuestTypeChange, onPlaceChange, onReasonChange, onNext,
 }: Props) {
   return (
     <div className="creation-step creation-details">
@@ -32,7 +34,13 @@ export default function CreationDetailsStep({
               onChange={() => onQuestTypeChange(type)}
             />
             <span className="creation-type-check peer-focus-visible:ring-2" aria-hidden="true">
-              {questType === type && <Check size={16} />}
+              <motion.span
+                initial={false}
+                animate={{ opacity: questType === type ? 1 : 0, scale: questType === type ? 1 : 0.75 }}
+                transition={{ duration: reducedMotion ? 0 : 0.18, ease: 'easeOut' }}
+              >
+                <Check size={16} />
+              </motion.span>
             </span>
             <strong>{type === 'GENERAL' ? '일반' : '이미지'}</strong>
             <span className="creation-type-badges">
@@ -44,17 +52,22 @@ export default function CreationDetailsStep({
 
       <QuestPlacePicker value={place} onChange={onPlaceChange} />
 
-      <label className="creation-field">
-        <span>그리운 이유</span>
-        <textarea
-          value={reason}
-          maxLength={500}
-          rows={4}
-          placeholder="이 장소가 그리운 이유를 적어주세요."
-          className="creation-reason"
-          onChange={event => onReasonChange(event.target.value)}
-        />
-      </label>
+      <div className="creation-field">
+        <label htmlFor="longing-reason">그리운 이유</label>
+        <div className="creation-reason-input">
+          <textarea
+            id="longing-reason"
+            value={reason}
+            maxLength={500}
+            rows={4}
+            placeholder="이 장소가 그리운 이유를 적어주세요."
+            className="creation-reason"
+            aria-describedby="longing-reason-count"
+            onChange={event => onReasonChange(event.target.value)}
+          />
+          <p id="longing-reason-count" className="creation-reason-count">{reason.length}/500</p>
+        </div>
+      </div>
 
       <div className="creation-actions">
         <button type="button" className="creation-primary" disabled={!place || !reason.trim()} onClick={onNext}>

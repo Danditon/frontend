@@ -171,6 +171,7 @@ export default function QuestCreatePage() {
                 questType={questType}
                 place={place}
                 reason={reason}
+                reducedMotion={reducedMotion}
                 onQuestTypeChange={setQuestType}
                 onPlaceChange={setPlace}
                 onReasonChange={setReason}

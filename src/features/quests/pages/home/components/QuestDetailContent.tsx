@@ -1,12 +1,13 @@
 // 펼친 퀘스트 상세에서 수행할 내용, 작성자의 그리움, 장소와 주소를 표시하는 컴포넌트입니다.
-import { MapPin } from 'lucide-react'
 import type { QuestDetail } from '@/features/quests/types/quest'
+import QuestLocationCard from './QuestLocationCard'
 
 type Props = {
   quest: QuestDetail
+  onViewOnMap: () => void
 }
 
-export default function QuestDetailContent({ quest }: Props) {
+export default function QuestDetailContent({ quest, onViewOnMap }: Props) {
   return (
     <div className="space-y-4 pb-2">
       {/* 실제 수행할 내용을 먼저 보여주고, 사진은 상세 본문에 중복 배치하지 않습니다. */}
@@ -27,14 +28,13 @@ export default function QuestDetailContent({ quest }: Props) {
         </p>
       </section>
 
-      <section className="flex items-start gap-2 px-1 text-[#66757B]">
-        <MapPin className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-        <div className="min-w-0 space-y-1 text-xs leading-relaxed [overflow-wrap:anywhere]">
-          <h3 className="font-semibold text-[#303B3C]">위치</h3>
-          <p>{quest.placeName}</p>
-          <p>{quest.address}</p>
-        </div>
-      </section>
+      {/* 선택한 퀘스트가 바뀌면 이전 주소의 복사 결과도 함께 초기화합니다. */}
+      <QuestLocationCard
+        key={`${quest.questId}:${quest.address}`}
+        placeName={quest.placeName}
+        address={quest.address}
+        onViewOnMap={onViewOnMap}
+      />
     </div>
   )
 }

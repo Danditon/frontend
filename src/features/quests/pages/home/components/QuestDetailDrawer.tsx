@@ -36,11 +36,13 @@ export default function QuestDetailDrawer({
   onPositionChange,
   onExpandedPhotoChange,
 }: QuestDetailDrawerProps) {
-  // 기본 40%, 확장 75%로 두어 펼친 뒤에도 위쪽 지도가 보이게 합니다.
-  const [snapPoint, setSnapPoint] = useState(0.4)
+  // 접힌 높이는 실제 미리보기로 계산하고, 펼친 높이는 75%로 유지합니다.
+  const [collapsedHeight, setCollapsedHeight] = useState('320px')
+  const [snapPoint, setSnapPoint] = useState<number | string>('320px')
   const [isExpandedSettled, setIsExpandedSettled] = useState(false)
   const isExpanded = snapPoint === 0.75
   const drawerRef = useRef<HTMLDivElement>(null)
+  const layoutRef = useRef<HTMLDivElement>(null)
   // 마커·목록·가까운 카드에서 선택한 ID로 실제 상세 API와 캐시를 공유합니다.
   const detailQuery = useQuestDetail(questId)
   const detailError = detailQuery.isError ? getQuestQueryError(detailQuery.error, 'detail') : null
@@ -76,17 +78,38 @@ export default function QuestDetailDrawer({
   useEffect(() => {
     if (questId === null) return
 
-    // 화면 회전·주소창 크기 변경 후에도 사진 높이와 마커 이동 기준을 실제 Drawer 위치로 맞춥니다.
-    const observer = new ResizeObserver(reportPosition)
+    function measureAndReport() {
+      const drawer = drawerRef.current
+      const layout = layoutRef.current
+      if (!isExpanded && drawer && layout) {
+        // 사진 로드·줄바꿈·안전 영역까지 반영하되 펼친 본문으로 접힌 높이를 덮어쓰지 않습니다.
+        const handle = drawer.querySelector('[data-slot="drawer-swipe-handle"]')
+        const height = Math.ceil(
+          layout.getBoundingClientRect().height +
+          (handle?.getBoundingClientRect().height ?? 0) +
+          drawer.offsetHeight - drawer.clientHeight,
+        )
+        if (height > 0) {
+          const nextHeight = `${height}px`
+          setCollapsedHeight(nextHeight)
+          setSnapPoint((current) => current === 0.75 ? current : nextHeight)
+        }
+      }
+      reportPosition()
+    }
+
+    // 사진 크기·화면 회전이 바뀌면 높이를 다시 재고 기존 마커 이동 기준도 갱신합니다.
+    const observer = new ResizeObserver(measureAndReport)
     if (drawerRef.current) observer.observe(drawerRef.current)
-    window.addEventListener('resize', reportPosition)
+    if (layoutRef.current) observer.observe(layoutRef.current)
+    window.addEventListener('resize', measureAndReport)
     return () => {
       observer.disconnect()
-      window.removeEventListener('resize', reportPosition)
+      window.removeEventListener('resize', measureAndReport)
     }
-  }, [questId, reportPosition])
+  }, [questId, isExpanded, reportPosition])
 
-  function changeSnapPoint(nextPoint: number) {
+  function changeSnapPoint(nextPoint: number | string) {
     if (nextPoint === snapPoint) return
     setIsExpandedSettled(false)
     setSnapPoint(nextPoint)
@@ -105,14 +128,14 @@ export default function QuestDetailDrawer({
           reportPosition()
           setIsExpandedSettled(isExpanded)
         } else {
-          changeSnapPoint(0.4)
+          changeSnapPoint(collapsedHeight)
         }
       }}
       // 드래그 시 두 높이 사이를 이동하도록 공용 Drawer에 맡깁니다.
-      snapPoints={[0.4, 0.75]}
+      snapPoints={[collapsedHeight, 0.75]}
       snapPoint={snapPoint}
       onSnapPointChange={(nextPoint) => {
-        if (typeof nextPoint === 'number') changeSnapPoint(nextPoint)
+        if (typeof nextPoint === 'number' || typeof nextPoint === 'string') changeSnapPoint(nextPoint)
       }}
       // 배경을 막지 않아 Drawer 위로 보이는 지도를 계속 조작할 수 있습니다.
       modal={false}
@@ -142,19 +165,24 @@ export default function QuestDetailDrawer({
       >
         {/* snap 이동으로 화면 아래에 내려간 높이를 빼야 하단 버튼도 보이는 영역에 고정됩니다. */}
         <div
+          ref={layoutRef}
           className="flex min-h-0 shrink-0 flex-col overflow-hidden transition-[height] duration-450 ease-[cubic-bezier(0.22,1,0.36,1)] group-data-swiping/drawer-popup:duration-0 motion-reduce:transition-none"
-          style={{ height: 'calc(100% - max(0px, calc(var(--drawer-snap-point-offset, 0px) + var(--drawer-swipe-movement-y, 0px))))' }}
+          style={{
+            height: isExpanded ? 'calc(100% - max(0px, calc(var(--drawer-snap-point-offset, 0px) + var(--drawer-swipe-movement-y, 0px))))' : 'auto',
+            // 짧은 화면에서는 본문만 스크롤하고 확장 높이와도 구분되도록 제한합니다.
+            maxHeight: isExpanded ? undefined : 'calc(60dvh - 0.75rem - 1px)',
+          }}
         >
           <DrawerHeader className="relative gap-3 px-5 pt-3 text-left">
             {quest && (
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pr-10 text-xs">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pr-10 text-[11px]">
                 <span className="rounded-full bg-[#FAF3D8] px-3 py-1 font-semibold text-[#393D36]">
                   {quest.questType === 'GENERAL' ? '일반' : '이미지'} · 난이도 {quest.difficulty}
                 </span>
                 <span className="text-neutral-500">{distanceText}</span>
               </div>
             )}
-            <DrawerTitle className="line-clamp-2 break-words text-left text-xl font-bold leading-snug tracking-tight [font-family:inherit]">
+            <DrawerTitle className="line-clamp-2 break-words text-left text-lg font-semibold leading-6 tracking-tight [font-family:inherit]">
               {quest?.questTitle ?? '퀘스트 상세'}
             </DrawerTitle>
             <DrawerDescription className="sr-only">
@@ -173,7 +201,7 @@ export default function QuestDetailDrawer({
 
           {/* 본문만 스크롤하여 내용·오류가 길어져도 수행 버튼을 밀어내지 않습니다. */}
           <div
-            className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-3"
+            className={`min-h-0 overflow-y-auto overscroll-contain px-5 py-3 ${isExpanded ? 'flex-1' : 'flex-[0_1_auto]'}`}
           >
             {detailQuery.isPending && questId !== null && (
               <p role="status">상세 내용을 불러오는 중이에요.</p>
@@ -189,7 +217,7 @@ export default function QuestDetailDrawer({
             )}
 
             {quest && (isExpanded
-              ? <QuestDetailContent quest={quest} />
+              ? <QuestDetailContent quest={quest} onViewOnMap={() => changeSnapPoint(collapsedHeight)} />
               : <QuestDetailPreview quest={quest} />)}
           </div>
           {quest && (
@@ -200,12 +228,13 @@ export default function QuestDetailDrawer({
                 size="sm"
                 className="min-h-9 text-xs text-neutral-500"
                 aria-expanded={isExpanded}
-                onClick={() => changeSnapPoint(isExpanded ? 0.4 : 0.75)}
+                onClick={() => changeSnapPoint(isExpanded ? collapsedHeight : 0.75)}
               >
                 <ChevronUp className={`size-4 ${isExpanded ? 'rotate-180' : ''}`} aria-hidden="true" />
                 {isExpanded ? '접기' : '위로 올려 자세히 보기'}
               </Button>
-              <QuestStartButton quest={quest} />
+              {/* 접힌 상태에서는 미리보기에 집중하고, 펼친 뒤에만 수행 버튼을 제공합니다. */}
+              {isExpanded && <QuestStartButton quest={quest} />}
             </DrawerFooter>
           )}
         </div>

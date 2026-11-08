@@ -9,11 +9,12 @@ type Props = {
 export default function QuestDetailPreview({ quest }: Props) {
   // 일반 퀘스트에도 사진이 있을 수 있으므로 종류 대신 실제 사진 주소로 나눕니다.
   if (quest.photoUrl?.trim()) {
+    // 공용 사진의 회색 배경·cover 스타일은 이 미리보기에서만 덮어 전체 사진을 보여줍니다.
     return (
       <RemotePhoto
         photoUrl={quest.photoUrl}
         alt={`${quest.placeName} 등록 사진`}
-        className="grid h-full min-h-24 w-full place-items-center overflow-hidden rounded-2xl bg-neutral-100 text-sm text-neutral-500 [&>img]:h-full [&>img]:w-full [&>img]:object-cover"
+        className="grid w-full place-items-center bg-transparent! text-sm text-neutral-500 [&>img]:h-auto! [&>img]:max-h-[220px] [&>img]:w-full [&>img]:rounded-xl [&>img]:object-contain!"
       />
     )
   }

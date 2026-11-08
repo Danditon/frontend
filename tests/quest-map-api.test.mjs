@@ -651,9 +651,54 @@ test('접힌 상세 미리보기는 사진이 있으면 사진만, 없으면 그
   }
 })
 
+test('위치 카드는 주소를 복사하고 중복 클릭·권한 거절·미지원·빈 주소를 처리한다', async () => {
+  const dependencies = {
+    'lucide-react': { Copy: 'Copy', MapPin: 'MapPin' },
+    '@/shared/components/ui/button': { Button: 'Button' },
+  }
+  const writes = []
+  let finishCopy, views = 0
+  const browser = { clipboard: { writeText: (address) => {
+    writes.push(address)
+    return new Promise((resolve) => { finishCopy = resolve })
+  } } }
+  const props = { placeName: '서점', address: ' 대구 중구 테스트 주소 ', onViewOnMap: () => views++ }
+  const f = componentFixture('features/quests/pages/home/components/QuestLocationCard.tsx', dependencies, { navigator: browser })
+  let tree = f.render(props)
+  const copyButton = findNode(tree, 'Button')
+  copyButton.props.onClick()
+  copyButton.props.onClick()
+  assert.deepEqual(writes, ['대구 중구 테스트 주소'])
+  tree = f.render(props)
+  assert.equal(findNode(tree, 'Button').props.disabled, true)
+  assert.match(textOf(tree), /복사 중/)
+  finishCopy()
+  await new Promise(setImmediate)
+  tree = f.render(props)
+  assert.equal(findNode(tree, 'Button').props.disabled, false)
+  assert.match(textOf(tree), /주소를 복사했어요/)
+  tree.props.children[1].props.children[1].props.onClick()
+  assert.equal(views, 1)
+
+  browser.clipboard.writeText = async () => { throw new Error('Permission denied') }
+  findNode(tree, 'Button').props.onClick()
+  await new Promise(setImmediate)
+  tree = f.render(props)
+  assert.match(textOf(tree), /주소를 선택해 직접 복사/)
+  assert.equal(findNode(tree, 'Button').props.disabled, false)
+  browser.clipboard = undefined
+  findNode(tree, 'Button').props.onClick()
+  tree = f.render(props)
+  assert.match(textOf(tree), /주소를 선택해 직접 복사/)
+  const blank = componentFixture('features/quests/pages/home/components/QuestLocationCard.tsx', dependencies, { navigator: browser })
+  tree = blank.render({ ...props, address: '  ' })
+  assert.match(textOf(tree), /등록된 주소가 없어요/)
+  assert.equal(findNode(tree, 'Button').props.disabled, true)
+})
+
 test('펼친 상세 본문은 수행 내용·그리움 전문·작성자·위치를 사진 유무와 관계없이 표시한다', () => {
   const { default: Content } = loadSource('features/quests/pages/home/components/QuestDetailContent.tsx', {
-    'lucide-react': { MapPin: 'MapPin' },
+    './QuestLocationCard': { __esModule: true, default: 'QuestLocationCard' },
   })
   const quest = {
     ...quests[0], author: { userId: 3, nickname: '기억하는사람' },
@@ -661,14 +706,17 @@ test('펼친 상세 본문은 수행 내용·그리움 전문·작성자·위치
     questDescription: '서점이 그대로 있는지 확인해주세요.\n가게 앞 모습을 남겨주세요.',
     longingText: '학교가 끝나면 들르던 서점이에요.\n' + '오래된 기억을 전합니다. '.repeat(80),
   }
+  const onViewOnMap = () => {}
   for (const photoUrl of [null, 'https://example.com/quest.jpg']) {
-    const tree = Content({ quest: { ...quest, photoUrl } })
+    const tree = Content({ quest: { ...quest, photoUrl }, onViewOnMap })
     const text = textOf(tree)
     assert.ok(text.includes(quest.questDescription))
     assert.ok(text.includes(quest.longingText))
     assert.ok(text.includes('기억하는사람님이 남긴 그리움'))
-    assert.ok(text.includes(quest.placeName))
-    assert.ok(text.includes(quest.address))
+    const location = findNode(tree, 'QuestLocationCard')
+    assert.equal(location.props.placeName, quest.placeName)
+    assert.equal(location.props.address, quest.address)
+    assert.equal(location.props.onViewOnMap, onViewOnMap)
     assert.ok(text.indexOf(quest.questDescription) < text.indexOf(quest.longingText))
     assert.equal(findNode(tree, 'img'), null)
     assert.doesNotMatch(text, /등록 사진|등록된 사진이 없어요/)
@@ -678,7 +726,7 @@ test('펼친 상세 본문은 수행 내용·그리움 전문·작성자·위치
 test('상세 Drawer는 미리보기·확장·고정 수행 버튼과 오류 재시도를 연결한다', () => {
   const retries = []
   let viewerPosition = position
-  let expandedPhoto = null, hostTop = 200, resized, observed = false, disconnected = 0
+  let expandedPhoto = null, hostTop = 200, layoutHeight = 330, resized, observed = false, disconnected = 0
   const positions = []
   const onPositionChange = (top) => positions.push(top)
   const onExpandedPhotoChange = (photo) => { expandedPhoto = photo }
@@ -708,11 +756,26 @@ test('상세 Drawer는 미리보기·확장·고정 수행 버튼과 오류 재�
   })
   const render = () => drawer.render({ questId: 701, position: viewerPosition, onPositionChange, onExpandedPhotoChange, onClose() {} })
   let tree = render()
-  const host = { getBoundingClientRect: () => ({ top: hostTop }) }
+  const host = {
+    getBoundingClientRect: () => ({ top: hostTop }),
+    querySelector: () => ({ getBoundingClientRect: () => ({ height: 12 }) }),
+    offsetHeight: 600, clientHeight: 599,
+  }
   drawer.refs[0].current = host
+  drawer.refs[1].current = { getBoundingClientRect: () => ({ height: layoutHeight }) }
   assert.match(textOf(tree), /내 위치에서 약 0m/)
   assert.equal(findNode(tree, 'QuestDetailPreview').props.quest, query.data)
-  assert.ok(findNode(findNode(tree, 'DrawerFooter'), 'QuestStartButton'))
+  resized()
+  tree = render()
+  assert.equal(findNode(tree, 'Drawer').props.snapPoint, '343px')
+  assert.equal(findNode(tree, 'Drawer').props.snapPoints[0], '343px')
+  // 사진 로드 뒤 높이가 바뀌어도 고정 비율로 돌아가지 않고 내용 크기를 따라갑니다.
+  layoutHeight = 350
+  resized()
+  tree = render()
+  assert.equal(findNode(tree, 'Drawer').props.snapPoint, '363px')
+  positions.length = 0
+  assert.equal(findNode(tree, 'QuestStartButton'), null)
   assert.equal(findNode(tree, 'RemotePhoto'), null)
   const expand = findNode(tree, 'Button')
   assert.equal(expand.props['aria-expanded'], false)
@@ -743,16 +806,24 @@ test('상세 Drawer는 미리보기·확장·고정 수행 버튼과 오류 재�
   assert.equal(findNode(expanded, 'RemotePhoto'), null)
   assert.ok(findNode(findNode(expanded, 'DrawerFooter'), 'QuestStartButton'))
   assert.equal(findNode(expanded, 'Button').props['aria-expanded'], true)
-  findNode(expanded, 'Button').props.onClick()
-  assert.ok(findNode(render(), 'QuestDetailPreview'))
+  // 지도 보기는 선택한 ID를 유지한 채 접어서 사진 레이어를 해제합니다.
+  findNode(expanded, 'QuestDetailContent').props.onViewOnMap()
+  const collapsed = render()
+  assert.ok(findNode(collapsed, 'QuestDetailPreview'))
+  assert.equal(findNode(collapsed, 'Drawer').props.snapPoint, '363px')
+  assert.equal(findNode(collapsed, 'Drawer').props.open, true)
+  assert.equal(findNode(collapsed, 'QuestStartButton'), null)
   assert.equal(expandedPhoto, null)
+  hostTop = 400
+  findNode(collapsed, 'DrawerContent').props.onTransitionEnd({ target: host, currentTarget: host, propertyName: 'transform' })
+  assert.equal(positions.at(-1), 400)
   viewerPosition = { ...position, lat: position.lat - 0.001 }
   assert.match(textOf(render()), /내 위치에서 약 111m/)
   viewerPosition = { ...position, lng: position.lng - 0.1 }
   assert.match(textOf(render()), /내 위치에서 약 [0-9.]+km/)
   viewerPosition = null
   assert.match(textOf(render()), /위치 확인 후 거리 표시/)
-  assert.ok(findNode(tree, 'QuestStartButton'))
+  assert.equal(findNode(tree, 'QuestStartButton'), null)
   const notice = findNode(tree, 'QuestQueryErrorNotice')
   assert.equal(notice.props.showingPreviousData, true)
   notice.props.onRetry()

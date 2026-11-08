@@ -6,7 +6,8 @@ import { Back, SlideButton } from "@/shared/components/WireUI";
 import { SwipeSheet } from "@/shared/components/SwipeSheet";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useActiveQuest } from "@/features/quests/hooks/useActiveQuest";
-import { useGeolocation } from "@/features/quests/hooks/useGeolocation";
+import { getDistanceMeters } from "./home/utils/getNearestQuest";
+import { useGeolocation, type UserPosition } from "@/features/quests/hooks/useGeolocation";
 import { getAccessToken, getVerificationQuest, isQuestId, submitVerification, createSubmissionForm, verificationError, similarityPercent, type VerificationResult } from "@/features/quests/api/verification";
 import { decodeQuestPhoto } from "@/features/quests/lib/questPhoto";
 import { RemotePhoto } from "@/shared/components/RemotePhoto";
@@ -50,8 +51,9 @@ function VerificationScreen({ questId }: { questId: string }) {
     const controller = new AbortController();
     request.current = controller;
     setError(''); setSending(true);
+    let position: UserPosition | null = null;
     try {
-      const position = await location.requestLocation();
+      position = await location.requestLocation();
       if (controller.signal.aborted) return;
       if (!position) { setError('현재 위치를 확인하지 못했어요. 위치 권한을 확인하고 다시 시도해 주세요.'); return; }
       const body = createSubmissionForm(quest.questType, note, position, photoFile);
@@ -64,7 +66,11 @@ function VerificationScreen({ questId }: { questId: string }) {
 
       }
     } catch (cause) {
-      if (!controller.signal.aborted) setError(verificationError(cause));
+      if (!controller.signal.aborted) {
+        setError(verificationError(cause, position ? {
+          distance: getDistanceMeters(position, quest),
+        } : undefined));
+      }
     } finally {
       submitting.current = false;
       if (!controller.signal.aborted) setSending(false);

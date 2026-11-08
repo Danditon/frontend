@@ -6,7 +6,7 @@ type Coordinates = {
   lng: number
 }
 
-function getDistanceMeters(from: Coordinates, to: Coordinates): number {
+export function getDistanceMeters(from: Coordinates, to: Coordinates): number {
   const radians = (degrees: number) => degrees * Math.PI / 180
   const latDifference = radians(to.lat - from.lat)
   const lngDifference = radians(to.lng - from.lng)

@@ -1,4 +1,4 @@
-// 수행 시작 버튼·수행 중 카드·navbar가 함께 사용하는 수행 화면 경로입니다.
+// 상세 화면에서 선택한 퀘스트의 인증 화면 경로입니다.
 import type { QuestDetail } from '@/features/quests/types/quest'
 
 type QuestTarget = Pick<QuestDetail, 'questId' | 'questType'>

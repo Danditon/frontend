@@ -1,6 +1,8 @@
 // 홈 지도에 가까운 미완료 퀘스트와 목록·상세 Drawer를 연결하는 화면입니다.
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useLocation, useNavigate, useOutletContext } from 'react-router'
 import type { NearbyQuest } from '@/features/quests/types/quest'
+import type { QuestMapOutletContext } from '@/features/quests/types/nearbyNavigation'
 import QuestMap from './components/QuestMap.tsx'
 import QuestListDrawer from './components/QuestListDrawer'
 import QuestDetailDrawer from './components/QuestDetailDrawer'
@@ -20,6 +22,9 @@ import { getQuestQueryError } from './utils/getQuestQueryError'
 const EMPTY_NEARBY_QUESTS: NearbyQuest[] = []
 
 export default function QuestMapPage() {
+  const location = useLocation()
+  const navigate = useNavigate()
+  const { onNearbyNavigationChange } = useOutletContext<QuestMapOutletContext>()
   // 홈에서 위치 조회 상태를 관리하고, 버튼과 결과 표시에 연결합니다.
   const { position, isLocating, error, requestLocation } = useGeolocation()
 
@@ -77,6 +82,22 @@ export default function QuestMapPage() {
   const isDetailPhotoVisible = detailPhoto !== null && visiblePhoto === detailPhoto
   const showMapControls = !isListOpen && selectedQuestId === null
   const canOpenList = nearbyState === 'ready' && visibleQuests !== null
+  const nearbyCount = canOpenList ? visibleQuests.length : null
+  const isListLoading = nearbyState === 'loading' || (nearbyState === 'ready' && visibleQuests === null)
+
+  useEffect(() => {
+    onNearbyNavigationChange({ count: nearbyCount, isLoading: isListLoading })
+    return () => onNearbyNavigationChange(null)
+  }, [nearbyCount, isListLoading, onNearbyNavigationChange])
+
+  const clearListRequest = useCallback(() => {
+    if (location.state?.openQuestList !== true) return
+    // 한 번 소비한 요청은 새로고침·캐시 갱신 시 목록을 다시 열지 않습니다.
+    void navigate({ pathname: location.pathname, search: location.search, hash: location.hash }, {
+      replace: true,
+      state: { ...location.state, openQuestList: false },
+    })
+  }, [location.pathname, location.search, location.hash, location.state, navigate])
 
   const handleVisibleQuestsChange = useCallback((quests: NearbyQuest[]) => {
     setVisibleResult({ source: nearbyQuests, quests })
@@ -84,13 +105,14 @@ export default function QuestMapPage() {
 
   // 마커·목록 행·가까운 퀘스트 바가 같은 상세 Drawer를 사용합니다.
   const handleQuestSelect = useCallback((questId: number) => {
+    clearListRequest()
     setIsListOpen(false)
     setSelectedQuestId(questId)
 
     // 선택한 ID의 상세 조회는 QuestDetailDrawer의 useQuestDetail에서 처리합니다.
-  }, [])
+  }, [clearListRequest])
 
-  const handleOpenList = () => {
+  const handleOpenList = useCallback(() => {
     if (nearbyState !== 'ready' || visibleQuests === null) return
 
     setSelectedQuestId(null)
@@ -100,7 +122,19 @@ export default function QuestMapPage() {
     // 열린 목록은 지도를 옮겨도 행이 바뀌지 않게 현재 배열을 저장합니다.
     setListSnapshot([...visibleQuests])
     setIsListOpen(true)
-  }
+  }, [nearbyState, visibleQuests])
+
+  useEffect(() => {
+    if (location.state?.openQuestList !== true) return
+    if (!canOpenList && nearbyState !== 'error' && !error) return
+    let active = true
+    queueMicrotask(() => {
+      if (!active) return
+      if (canOpenList) handleOpenList()
+      clearListRequest()
+    })
+    return () => { active = false }
+  }, [location.state, canOpenList, nearbyState, error, handleOpenList, clearListRequest])
 
   function renderNearestQuest() {
     if (!position) {
@@ -222,19 +256,7 @@ export default function QuestMapPage() {
       )}
 
       {showMapControls && (
-        <div className="pointer-events-none absolute inset-x-4 bottom-[calc(7rem+env(safe-area-inset-bottom,0px))] z-20 flex items-end justify-between gap-3">
-          {/* shortcut: 3단계 navbar 연결 전까지 작은 목록 버튼으로 진입점을 유지합니다. */}
-          <button
-            type="button"
-            disabled={!canOpenList}
-            aria-busy={nearbyState === 'loading' || (nearbyState === 'ready' && visibleQuests === null)}
-            aria-label={canOpenList ? `주변 퀘스트 ${visibleQuests.length}개 목록 열기` : '주변 퀘스트 목록 준비 중'}
-            onClick={handleOpenList}
-            className="pointer-events-auto flex min-h-11 items-center gap-2 rounded-full border border-white/90 bg-white/95 px-4 text-xs font-medium text-[#242624] shadow-md disabled:text-neutral-500"
-          >
-            주변 퀘스트
-            {canOpenList && <span className="rounded-full bg-[#D5EAF4] px-2 py-0.5 tabular-nums">{visibleQuests.length}개</span>}
-          </button>
+        <div className="pointer-events-none absolute inset-x-4 bottom-[calc(7rem+env(safe-area-inset-bottom,0px))] z-20 flex items-end justify-end">
           <div className="pointer-events-auto">
             <CurrentLocationButton
               isLocating={isLocating}

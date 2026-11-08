@@ -6,7 +6,6 @@ import { ChevronsLeftRight, MapPin, Plus, X } from "lucide-react";
 import { Back, SlideButton } from "@/shared/components/WireUI";
 import { SwipeSheet } from "@/shared/components/SwipeSheet";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useActiveQuest } from "@/features/quests/hooks/useActiveQuest";
 import { getDistanceMeters } from "./home/utils/getNearestQuest";
 import { useGeolocation, type UserPosition } from "@/features/quests/hooks/useGeolocation";
 import { getAccessToken, getVerificationQuest, isQuestId, submitVerification, createSubmissionForm, verificationError, similarityPercent, type VerificationResult } from "@/features/quests/api/verification";
@@ -15,8 +14,7 @@ import { RemotePhoto } from "@/shared/components/RemotePhoto";
 type Step = "capture" | "compare" | "checking" | "success" | "failure";
 export default function QuestVerifyPage() {
   const { questId = "" } = useParams();
-  const { activeQuestId } = useActiveQuest();
-  const id = isQuestId(questId) ? questId : activeQuestId ? String(activeQuestId) : "";
+  const id = isQuestId(questId) ? questId : "";
   return <VerificationScreen key={id} questId={id} />;
 }
 function VerificationScreen({ questId }: { questId: string }) {
@@ -66,7 +64,8 @@ function VerificationScreen({ questId }: { questId: string }) {
       if (response.verifyStatus === 'PASSED') {
         void queryClient.invalidateQueries({ queryKey: ['quest-greetings', questId] });
         void queryClient.invalidateQueries({ queryKey: ['my-submissions'] });
-
+        void queryClient.invalidateQueries({ queryKey: ['quests'] });
+        void queryClient.invalidateQueries({ queryKey: ['verification-quest', questId] });
       }
     } catch (cause) {
       if (!controller.signal.aborted) {

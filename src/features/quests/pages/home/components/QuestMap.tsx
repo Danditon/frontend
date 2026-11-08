@@ -31,7 +31,7 @@ export default function QuestMap({
   const [map, setMap] = useState<KakaoMap | null>(null)
   const latestPositionRef = useRef<UserPosition | null>(position)
 
-  // 지도 범위의 퀘스트를 계산해 개수 카드와 목록에 전달합니다.
+  // 지도 범위의 퀘스트를 계산해 navbar 개수와 목록에 전달합니다.
   useVisibleQuests(map, quests, onVisibleQuestsChange)
 
   // 위치 조회가 성공하면 기존 지도의 중심만 이동합니다.

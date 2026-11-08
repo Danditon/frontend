@@ -38,10 +38,10 @@ const queryErrorUtils = loadSource('features/quests/pages/home/utils/getQuestQue
 const distanceUtils = loadSource('features/quests/pages/home/utils/getDistanceMeters.ts')
 
 // 상세·사진 컴포넌트의 Effect 정리와 이벤트 후 재렌더링을 서버 없이 확인합니다.
-function componentFixture(path, dependencies, globals = {}) {
+function componentFixture(path, dependencies, globals = {}, select = module => module.default) {
   const states = [], setters = [], refs = [], effects = []
   let stateIndex = 0, refIndex = 0, effectIndex = 0, pending = [], mounted = true
-  const { default: Component } = loadSource(path, {
+  const Component = select(loadSource(path, {
     ...dependencies,
     react: {
       useCallback: (fn) => fn,
@@ -65,7 +65,7 @@ function componentFixture(path, dependencies, globals = {}) {
         }
       },
     },
-  }, globals)
+  }, globals))
   return {
     refs,
     render(props) {
@@ -106,6 +106,9 @@ function homeFixture() {
   const effects = [], microtasks = []
   let cursor = 0, memoCursor = 0, effectCursor = 0, tree
   const fixture = {
+    location: { pathname: '/', search: '', hash: '', state: null },
+    navigation: null,
+    navigations: [],
     position,
     query: { data: undefined, isPending: true, isError: false },
     nearestInputs: [],
@@ -116,7 +119,17 @@ function homeFixture() {
     locationError: null,
     requestLocation: async () => { fixture.locationRequests++; return fixture.position },
   }
+  const onNearbyNavigationChange = (navigation) => { fixture.navigation = navigation }
+  const navigate = (to, options) => {
+    fixture.navigations.push({ to, options })
+    fixture.location = { ...fixture.location, ...to, state: options.state }
+  }
   const page = loadSource('features/quests/pages/home/QuestMapPage.tsx', {
+    'react-router': {
+      useLocation: () => fixture.location,
+      useNavigate: () => navigate,
+      useOutletContext: () => ({ onNearbyNavigationChange }),
+    },
     react: {
       useCallback: (callback) => callback,
       useEffect: (run, deps) => {
@@ -171,7 +184,11 @@ function homeFixture() {
   return Object.assign(fixture, {
     render() { cursor = 0; memoCursor = 0; effectCursor = 0; tree = page.default(); return tree },
     node(type) { return findNode(tree, type) },
-    listButton() { return findNode(tree, 'button', props => props['aria-label']?.startsWith('주변 퀘스트')) },
+    openList() {
+      fixture.location = { ...fixture.location, state: { openQuestList: true } }
+      this.render()
+      this.flushMicrotasks()
+    },
     flushMicrotasks() { while (microtasks.length) microtasks.shift()() },
     strictReplay() {
       for (const effect of effects) effect.cleanup?.()
@@ -316,21 +333,21 @@ test('위치 미확인·조회 중·실패·성공 0개를 구분하고 mock 마
   f.render()
   assert.match(textOf(f.render()), /위치를 확인하고 가까운 퀘스트/)
   assert.equal(f.node('QuestMap').props.quests.length, 0)
-  assert.equal(f.listButton().props.disabled, true)
+  assert.equal(f.navigation.count, null)
   f.position = position
   assert.match(textOf(f.render()), /불러오는 중/)
-  assert.equal(f.listButton().props['aria-busy'], true)
+  assert.equal(f.navigation.isLoading, true)
   f.query = { data: undefined, isPending: false, isError: true }
   f.render()
   assert.match(f.node('QuestQueryErrorNotice').props.info.message, /불러오지 못/)
-  assert.equal(f.listButton().props.disabled, true)
+  assert.equal(f.navigation.count, null)
   f.query = { data: [], isPending: false, isError: false }
   assert.match(textOf(f.render()), /주변에 새로 수행할 퀘스트가 없어요/)
   f.node('QuestMap').props.onVisibleQuestsChange([])
   f.render()
-  assert.match(textOf(f.listButton()), /0개/)
-  assert.equal(f.listButton().props.disabled, false)
-  f.listButton().props.onClick()
+  assert.equal(f.navigation.count, 0)
+  assert.notEqual(f.navigation.count, null)
+  f.openList()
   f.render()
   assert.equal(f.node('QuestListDrawer').props.open, true)
   assert.equal(f.node('QuestListDrawer').props.quests.length, 0)
@@ -345,8 +362,8 @@ test('서버 목록으로 마커·추천 바·목록을 연결하고 모두 같�
   assert.equal(f.nearestInputs.at(-1).position, position)
   f.node('QuestMap').props.onVisibleQuestsChange([quests[1]])
   f.render()
-  assert.match(textOf(f.listButton()), /1개/)
-  f.listButton().props.onClick()
+  assert.equal(f.navigation.count, 1)
+  f.openList()
   f.render()
   assert.equal(f.node('QuestListDrawer').props.quests[0], quests[1])
   f.node('QuestListDrawer').props.onSelect(702)
@@ -377,8 +394,8 @@ test('본인 퀘스트를 마커·개수·목록·추천 후보에서 함께 제
   f.node('QuestMap').props.onVisibleQuestsChange(displayed)
   f.render()
   assert.equal(f.node('QuestMap').props.quests, displayed)
-  assert.match(textOf(f.listButton()), /2개/)
-  f.listButton().props.onClick()
+  assert.equal(f.navigation.count, 2)
+  f.openList()
   f.render()
   assert.deepEqual(Array.from(f.node('QuestListDrawer').props.quests, (quest) => quest.questId), [701, 702])
   assert.equal(f.query.data, response)
@@ -395,8 +412,8 @@ test('주변에 본인 퀘스트만 있으면 성공 0개와 수행할 퀘스트
   assert.equal(f.node('NearestQuestBar'), null)
   f.node('QuestMap').props.onVisibleQuestsChange([])
   f.render()
-  assert.equal(f.listButton().props.disabled, false)
-  assert.match(textOf(f.listButton()), /0개/)
+  assert.notEqual(f.navigation.count, null)
+  assert.equal(f.navigation.count, 0)
 })
 
 test('내 위치 점은 18px 이미지의 중심을 좌표에 맞추고 위치 변경 시 기존 마커를 재사용한다', () => {
@@ -457,20 +474,20 @@ test('목록 응답 교체 후 이전 범위 계산값으로 개수나 목록을
   const oldCallback = f.node('QuestMap').props.onVisibleQuestsChange
   oldCallback(quests)
   f.render()
-  assert.match(textOf(f.listButton()), /2개/)
+  assert.equal(f.navigation.count, 2)
   const updated = [{ ...quests[0], questId: 801 }]
   f.query = { data: updated, isPending: false, isError: false }
   f.render()
   oldCallback(quests)
   f.render()
-  assert.equal(f.listButton().props.disabled, true)
-  assert.doesNotMatch(textOf(f.listButton()), /2개/)
-  f.listButton().props.onClick()
+  assert.equal(f.navigation.count, null)
+  assert.equal(f.navigation.isLoading, true)
+  f.openList()
   f.render()
   assert.equal(f.node('QuestListDrawer').props.open, false)
   f.node('QuestMap').props.onVisibleQuestsChange(updated)
   f.render()
-  assert.match(textOf(f.listButton()), /1개/)
+  assert.equal(f.navigation.count, 1)
 })
 
 test('추천 결과의 ID로 상세를 열고 추천 변경·위치 갱신에도 클릭한 ID를 유지한다', () => {
@@ -543,13 +560,217 @@ test('목록을 열면 상단 추천을 숨기고 닫으면 복원한다', () =>
   assert.ok(f.node('NearestQuestBar'))
   f.node('QuestMap').props.onVisibleQuestsChange(quests)
   f.render()
-  f.listButton().props.onClick()
+  f.openList()
   f.render()
   assert.equal(f.node('NearestQuestBar'), null)
   assert.equal(f.node('QuestListDrawer').props.open, true)
   f.node('QuestListDrawer').props.onClose()
   f.render()
   assert.ok(f.node('NearestQuestBar'))
+})
+
+test('navbar 목록 요청은 지도 계산을 기다리고 한 번만 열며 닫은 후 갱신해도 다시 열지 않는다', () => {
+  const f = homeFixture()
+  f.location.state = { openQuestList: true, preserved: 'value' }
+  f.render()
+  f.flushMicrotasks()
+  assert.equal(f.node('QuestListDrawer').props.open, false)
+  assert.equal(f.navigation.count, null)
+  f.query = { data: quests, isPending: false, isError: false }
+  f.render()
+  f.node('QuestMap').props.onVisibleQuestsChange(quests)
+  f.render()
+  f.strictReplay()
+  f.flushMicrotasks()
+  f.render()
+  assert.equal(f.node('QuestListDrawer').props.open, true)
+  assert.equal(f.navigations.length, 1)
+  assert.equal(f.location.state.openQuestList, false)
+  assert.equal(f.location.state.preserved, 'value')
+  assert.equal(f.navigations[0].options.replace, true)
+  f.node('QuestListDrawer').props.onClose()
+  f.query = { data: [...quests], isPending: false, isError: false }
+  f.render()
+  f.node('QuestMap').props.onVisibleQuestsChange(quests)
+  f.render()
+  f.flushMicrotasks()
+  f.render()
+  assert.equal(f.node('QuestListDrawer').props.open, false)
+  // 같은 홈 화면에서 다시 눌러도 새 요청으로 처리합니다.
+  f.openList()
+  f.render()
+  assert.equal(f.node('QuestListDrawer').props.open, true)
+  assert.equal(f.navigations.length, 2)
+  f.unmount()
+  assert.equal(f.navigation, null)
+})
+
+test('목록 준비 중 상세를 선택하면 늦은 목록 준비가 선택 ID를 덮어쓰지 않는다', () => {
+  const f = homeFixture()
+  f.openList()
+  f.node('QuestMap').props.onQuestSelect(702)
+  f.query = { data: quests, isPending: false, isError: false }
+  f.render()
+  f.node('QuestMap').props.onVisibleQuestsChange(quests)
+  f.render()
+  f.flushMicrotasks()
+  f.render()
+  assert.equal(f.node('QuestListDrawer').props.open, false)
+  assert.equal(f.node('QuestDetailDrawer').props.questId, 702)
+  assert.equal(f.location.state.openQuestList, false)
+})
+
+test('GPS·목록 조회 실패로 소비한 메뉴 요청은 수동 재시도 성공 시 자동으로 다시 열리지 않는다', () => {
+  for (const gps of [true, false]) {
+    const f = homeFixture()
+    if (gps) {
+      f.position = null
+      f.locationError = { message: '위치 권한을 허용해주세요.' }
+    } else {
+      f.query = { data: undefined, isError: true, isPending: false }
+    }
+    f.openList()
+    assert.equal(f.location.state.openQuestList, false)
+    f.position = position
+    f.locationError = null
+    f.query = { data: quests, isPending: false, isError: false }
+    f.render()
+    f.node('QuestMap').props.onVisibleQuestsChange(quests)
+    f.render()
+    f.flushMicrotasks()
+    f.render()
+    assert.equal(f.node('QuestListDrawer').props.open, false)
+  }
+})
+
+test('열린 목록은 지도 이동에도 스냅샷을 유지하고 다음 메뉴 클릭에서 최신 범위를 사용한다', () => {
+  const f = homeFixture()
+  f.query = { data: quests, isPending: false, isError: false }
+  f.render()
+  f.node('QuestMap').props.onVisibleQuestsChange(quests)
+  f.render()
+  f.openList()
+  f.render()
+  f.node('QuestMap').props.onVisibleQuestsChange([quests[1]])
+  f.render()
+  assert.equal(f.navigation.count, 1)
+  assert.equal(f.node('QuestListDrawer').props.quests.length, 2)
+  f.openList()
+  f.render()
+  assert.equal(f.node('QuestListDrawer').props.quests.length, 1)
+  assert.equal(f.node('QuestListDrawer').props.quests[0].questId, 702)
+})
+
+test('주변 navbar는 상태·상세 조회 없이 홈에 목록 열기를 요청하고 미확인 개수를 0으로 표시하지 않는다', () => {
+  const { default: Nav } = loadSource('features/quests/components/NearbyQuestNavItem.tsx', {
+    'react-router': { Link: 'Link' },
+    'lucide-react': { MapPin: 'MapPin' },
+  })
+  for (const count of [null, 0, 12]) {
+    const tree = Nav({ count, isLoading: count === null })
+    assert.equal(tree.type, 'Link')
+    assert.equal(tree.props.to, '/')
+    assert.equal(tree.props.state.openQuestList, true)
+    assert.equal(tree.props['aria-busy'], count === null)
+    assert.doesNotMatch(textOf(tree), /수행 인증/)
+    if (count === null) assert.doesNotMatch(textOf(tree), /0개/)
+    else assert.ok(textOf(tree).includes(`${count}개`))
+  }
+})
+
+test('공통 레이아웃은 홈에서 전달한 개수만 navbar에 연결하고 다른 화면에서는 숨긴다', () => {
+  let pathname = '/', navigation = null
+  const { RootLayout } = loadSource('app/layouts/RootLayout.tsx', {
+    react: { useState: () => [navigation, next => { navigation = next }] },
+    'react-router': {
+      Outlet: 'Outlet', useLocation: () => ({ pathname }), useSearchParams: () => [new URLSearchParams()],
+    },
+    '@/shared/components/WireUI': { Bottom: 'Bottom' },
+  })
+  let tree = RootLayout()
+  findNode(tree, 'Outlet').props.context.onNearbyNavigationChange({ count: 12, isLoading: false })
+  tree = RootLayout()
+  assert.equal(findNode(tree, 'Bottom').props.nearbyNavigation.count, 12)
+  pathname = '/me'
+  assert.equal(findNode(RootLayout(), 'Bottom').props.nearbyNavigation, null)
+})
+
+test('상세 인증 버튼은 선택 ID로 바로 이동하고 본인·완료 퀘스트는 함수에서도 차단한다', () => {
+  const navigations = []
+  const { default: Start } = loadSource('features/quests/pages/home/components/QuestStartButton.tsx', {
+    'react-router': { useNavigate: () => path => navigations.push(path) },
+    '@/shared/components/ui/button': { Button: 'Button' },
+    '../utils/getQuestVerifyPath': loadSource('features/quests/pages/home/utils/getQuestVerifyPath.ts'),
+  })
+  for (const myStatus of ['NONE', 'FAILED', 'PASSED']) {
+    for (const isMine of [false, true]) {
+      const tree = Start({ quest: { ...quests[0], myStatus, isMine } })
+      const button = findNode(tree, 'Button')
+      const before = navigations.length
+      assert.equal(button.props.disabled, isMine || myStatus === 'PASSED')
+      assert.equal(textOf(button), '수행 인증하기')
+      button.props.onClick()
+      assert.equal(navigations.length - before, button.props.disabled ? 0 : 1)
+    }
+  }
+  assert.deepEqual(navigations, ['/quests/701/verify?type=general', '/quests/701/verify?type=general'])
+})
+
+test('인증은 URL ID만 사용하고 성공 시 추천·상세·목록·인증 캐시를 함께 갱신한다', async () => {
+  for (const status of ['PASSED', 'FAILED']) {
+    const client = new QueryClient({ defaultOptions: { queries: { gcTime: Infinity } } })
+    const keys = [
+      ['quests', 'detail', 1, 701], ['quests', 'nearest', 1], ['quests', 'nearby', 1],
+      ['verification-quest', '701', 'token'], ['quest-greetings', '701'], ['my-submissions'],
+    ]
+    keys.forEach(key => client.setQueryData(key, {}))
+    client.setQueryData(['unrelated'], {})
+    let params = { questId: '701' }, calls = 0
+    const dependencies = {
+      'react-router': { useParams: () => params, Link: 'Link' },
+      'motion/react': { useReducedMotion: () => true, motion: { div: 'motion.div' } },
+      axios: { isAxiosError: axios.isAxiosError },
+      'lucide-react': { ChevronsLeftRight: 'ChevronsLeftRight', MapPin: 'MapPin', Plus: 'Plus', X: 'X' },
+      '@/shared/components/WireUI': { Back: 'Back', SlideButton: 'SlideButton' },
+      '@/shared/components/SwipeSheet': { SwipeSheet: 'SwipeSheet' },
+      '@tanstack/react-query': {
+        useQueryClient: () => client,
+        useQuery: () => ({ data: { ...quests[0], myStatus: 'NONE', photoUrl: null, author: { nickname: '작성자' } }, isPending: false, isError: false }),
+      },
+      './home/utils/getNearestQuest': distanceUtils,
+      '@/features/quests/hooks/useGeolocation': { useGeolocation: () => ({ requestLocation: async () => position }) },
+      '@/features/quests/api/verification': {
+        isQuestId: id => /^\d+$/.test(id), getAccessToken: () => 'token', similarityPercent: () => null,
+        createSubmissionForm: () => ({}),
+        submitVerification: async id => { calls++; assert.equal(id, '701'); return { verifyStatus: status } },
+        verificationError: cause => String(cause),
+      },
+      '@/features/quests/lib/questPhoto': { decodeQuestPhoto: () => {} },
+      '@/shared/components/RemotePhoto': { RemotePhoto: 'RemotePhoto' },
+    }
+    const f = componentFixture('features/quests/pages/QuestVerifyPage.tsx', dependencies,
+      { AbortController }, module => {
+        assert.equal(module.default().props.questId, '701')
+        params = { questId: 'invalid' }
+        assert.equal(module.default().props.questId, '')
+        params = { questId: '701' }
+        return module.default().type
+      })
+    try {
+      let tree = f.render({ questId: '701' })
+      findNode(tree, 'textarea').props.onChange({ target: { value: '안부를 남겨요' } })
+      tree = f.render({ questId: '701' })
+      findNode(tree, 'SlideButton').props.onClick()
+      await new Promise(resolve => setImmediate(resolve))
+      assert.equal(calls, 1)
+      for (const key of keys) assert.equal(client.getQueryState(key).isInvalidated, status === 'PASSED')
+      assert.equal(client.getQueryState(['unrelated']).isInvalidated, false)
+      assert.match(textOf(f.render({ questId: '701' })), status === 'PASSED' ? /인증 성공/ : /인증 실패/)
+    } finally {
+      f.unmount()
+      client.clear()
+    }
+  }
 })
 
 test('실제 상세 훅은 인증·선택을 검사하고 같은 사용자·ID의 요청과 캐시를 공유한다', async () => {
@@ -638,7 +859,7 @@ test('첫 목록 실패에서 재시도하고 갱신 실패에서는 기존 마�
   f.query.error = httpError(401)
   f.render()
   assert.equal(f.node('QuestMap').props.quests.length, 0)
-  assert.equal(f.listButton().props.disabled, true)
+  assert.equal(f.navigation.count, null)
   assert.equal(f.node('QuestQueryErrorNotice').props.info.requiresLogin, true)
   assert.equal(f.query.data, quests)
 })
@@ -900,27 +1121,6 @@ test('상세 Drawer는 미리보기·확장·고정 수행 버튼과 오류 재�
   assert.equal(expandedPhoto, null)
 })
 
-test('같은 상세 캐시를 쓰는 navbar도 접근 거절·404의 오래된 데이터로 이동하지 않는다', () => {
-  const alerts = [], navigations = []
-  const query = { data: quests[0], isError: true, isPending: false, error: httpError(404) }
-  const { default: Nav } = loadSource('features/quests/components/QuestVerifyNavItem.tsx', {
-    'lucide-react': { BadgeCheck: 'BadgeCheck' },
-    'react-router': { useNavigate: () => (path) => navigations.push(path) },
-    '../hooks/useActiveQuest': { useActiveQuest: () => ({ activeQuestId: 701 }) },
-    '../hooks/useQuestDetail': { useQuestDetail: () => query },
-    '../pages/home/utils/getQuestVerifyPath': loadSource('features/quests/pages/home/utils/getQuestVerifyPath.ts'),
-    '../pages/home/utils/getQuestQueryError': queryErrorUtils,
-  }, { window: { alert: (message) => alerts.push(message) } })
-  for (const status of [401, 403, 404]) {
-    query.error = httpError(status)
-    Nav().props.onClick()
-  }
-  assert.equal(navigations.length, 0)
-  assert.equal(alerts.length, 3)
-  query.error = new axios.AxiosError('Network', 'ERR_NETWORK')
-  Nav().props.onClick()
-  assert.equal(navigations[0], '/quests/701/verify?type=general')
-})
 
 test('같은 계정으로 재진입하면 신선한 데이터에 남은 401 오류도 즉시 재조회한다', { timeout: 2000 }, async () => {
   for (const kind of ['nearby', 'detail']) {

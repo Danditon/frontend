@@ -15,6 +15,7 @@ export default function CreationGeneratingStep({ photoUrl, ready, active, reduce
   const progress = useMotionValue(0)
   const offset = useTransform(progress, value => 1 - value)
   const [slow, setSlow] = useState(false)
+  const moving = present && active && !ready && !reducedMotion
 
   useEffect(() => {
     if (!present || !active) return
@@ -43,8 +44,21 @@ export default function CreationGeneratingStep({ photoUrl, ready, active, reduce
 
       <div className="creation-generation-figure">
         <div className="creation-generation-photo">
-          {photoUrl ? <img src={photoUrl} alt="선택한 그리움 사진" className="creation-photo-image" />
-            : <MailOpen size={72} strokeWidth={1} aria-hidden="true" />}
+          <motion.div
+            className="creation-generation-memory"
+            initial={false}
+            animate={{
+              y: moving ? [0, -4, 0, 4, 0] : 0,
+              rotateY: moving ? [0, 6, 0, -6, 0] : 0,
+              rotateZ: moving ? [0, -1, 0, 1, 0] : 0,
+            }}
+            transition={moving
+              ? { duration: 6, repeat: Infinity, ease: 'easeInOut' }
+              : { duration: reducedMotion ? 0 : 0.3, ease: 'easeOut' }}
+          >
+            {photoUrl ? <img src={photoUrl} alt="선택한 그리움 사진" className="creation-photo-image" />
+              : <MailOpen size={72} strokeWidth={1} aria-hidden="true" />}
+          </motion.div>
         </div>
         <svg viewBox="0 0 240 240" className="creation-generation-ring" aria-hidden="true">
           <circle cx="120" cy="120" r="114" fill="none" stroke="white" strokeWidth="6" />

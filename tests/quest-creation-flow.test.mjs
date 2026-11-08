@@ -599,7 +599,7 @@ function generationFixture() {
     },
     'lucide-react': { MailOpen: 'MailOpen' },
     'motion/react': {
-      motion: { circle: 'motion.circle' },
+      motion: { circle: 'motion.circle', div: 'motion.div' },
       useIsPresent: () => f.present,
       useMotionValue: () => progress,
       useTransform: (value, transform) => ({ get: () => transform(value.get()) }),
@@ -660,8 +660,41 @@ test('대기 링은 10초에 88%까지 채우고 응답이 없으면 90초 뒤�
   assert.equal(f.progress.get(), 0.88)
   assert.equal(f.completed, 0)
   assert.match(textOf(tree), /처리가 조금 더 걸리고/)
+  assert.equal(find(tree, 'motion.div').props.transition.repeat, Infinity)
   assert.ok(Math.abs(find(tree, 'motion.circle').props.style.strokeDashoffset.get() - 0.12) < 0.0001)
   f.unmount()
+})
+
+test('사진과 편지는 대기 중에만 부유하고 성공·비활성·퇴장·모션 축소 시 정위치로 돌아온다', () => {
+  for (const photoUrl of [null, 'blob:memory']) {
+    const f = generationFixture()
+    let tree = f.render({ photoUrl })
+    let memory = find(tree, 'motion.div')
+    assert.equal(memory.props.initial, false)
+    assert.deepEqual(Array.from(memory.props.animate.y), [0, -4, 0, 4, 0])
+    assert.deepEqual(Array.from(memory.props.animate.rotateY), [0, 6, 0, -6, 0])
+    assert.deepEqual(Array.from(memory.props.animate.rotateZ), [0, -1, 0, 1, 0])
+    assert.equal(memory.props.transition.duration, 6)
+    assert.equal(memory.props.transition.repeat, Infinity)
+    assert.ok(find(memory, photoUrl ? 'img' : 'MailOpen'))
+    // 진행 링은 사진 모션 레이어 밖에 있어 함께 기울어지지 않습니다.
+    assert.equal(find(memory, 'svg'), null)
+    assert.ok(find(tree, 'svg'))
+
+    for (const next of [{ active: false }, { active: true, ready: true }, { ready: false, reducedMotion: true }]) {
+      tree = f.render(next)
+      memory = find(tree, 'motion.div')
+      for (const value of Object.values(memory.props.animate)) assert.equal(value, 0)
+      assert.equal(memory.props.transition.repeat, undefined)
+      assert.equal(memory.props.transition.duration, next.reducedMotion ? 0 : 0.3)
+    }
+    f.render({ ready: false, active: true, reducedMotion: false })
+    f.present = false
+    memory = find(f.render(), 'motion.div')
+    for (const value of Object.values(memory.props.animate)) assert.equal(value, 0)
+    assert.equal(memory.props.transition.repeat, undefined)
+    f.unmount()
+  }
 })
 
 test('부분 진행 중 응답이 오면 현재 위치에서 100%를 채운 뒤 한 번만 완료한다', () => {

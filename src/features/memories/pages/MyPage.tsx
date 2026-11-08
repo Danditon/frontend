@@ -344,42 +344,14 @@ export default function MyPage() {
           <HistoryMap records={visibleRecords} source="records" token={token} />
           <div
             ref={historyPanel}
-            className="absolute inset-x-4 bottom-[124px] z-10 max-h-[max(120px,calc(100%_-_190px))] overflow-y-auto overscroll-contain rounded-2xl bg-white/95 p-3 shadow-lg backdrop-blur-sm"
+            className="absolute inset-x-4 bottom-[124px] z-10 max-h-[min(max(120px,calc(100%_-_190px)),max(0px,calc(100%_-_136px)))] overflow-x-hidden overflow-y-auto overscroll-y-contain rounded-2xl bg-white/95 p-3 shadow-lg backdrop-blur-sm"
           >
             {historyQuestId && (
               <Link to="/me/history" className="block py-2 text-sm underline">
                 내 기록 전체 보기
               </Link>
             )}
-            <div
-              aria-label="내 수행 퀘스트 사진"
-              className="flex gap-2 overflow-x-auto overscroll-x-contain pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-            >
-              {visibleRecords.map((record) => (
-                <Link
-                  key={record.id}
-                  className="w-[86px] shrink-0 text-center text-[#242624]"
-                  to={`/me/memories?${new URLSearchParams({ source: "records", record: record.id, quest: record.questId ?? record.id, message: "0", returnOthers: showOthers ? "1" : "0" })}`}
-                >
-                  <RemotePhoto
-                    className="aspect-square w-full rounded-lg!"
-                    photoUrl={record.photoUrl}
-                    alt={record.title}
-                  />
-                  <h3 className="line-clamp-2 pt-1 text-[10px] font-normal leading-snug">
-                    {record.title}
-                  </h3>
-                  <span className="sr-only">나와 다른 수행자의 안부 보기</span>
-                </Link>
-              ))}
-              <Link
-                className="grid h-[86px] w-[86px] shrink-0 place-items-center rounded-lg border border-dotted border-neutral-400 bg-white/80 p-2 text-center text-[10px]"
-                to="/"
-              >
-                다음 퀘스트 찾기
-              </Link>
-            </div>
-            <header className="mt-2 flex items-center justify-between gap-3">
+            <header className="mb-2 flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-[11px] font-medium">수행 기록 · 최신순</h2>
               <button
                 aria-expanded={showOthers}
@@ -399,6 +371,31 @@ export default function MyPage() {
                   : "다른 수행자 기록 보기"}
               </button>
             </header>
+            <div role="region" tabIndex={0} aria-label="내 수행 퀘스트 목록" className="relative grid w-full min-w-0 grid-flow-col auto-cols-[calc((100%_-_1rem)/3)] snap-x snap-proximity gap-2 overflow-x-auto overscroll-x-contain pb-2 [scrollbar-width:thin]">
+              {visibleRecords.map((record) => (
+                <Link
+                  key={record.id}
+                  className="min-w-0 snap-start rounded-xl bg-[#edf4f6] p-2 text-[#242624]"
+                  to={`/me/memories?${new URLSearchParams({ source: "records", record: record.id, quest: record.questId ?? record.id, message: "0", returnOthers: showOthers ? "1" : "0" })}`}
+                >
+                  <RemotePhoto
+                    className="h-16 w-full rounded-lg!"
+                    photoUrl={record.photoUrl}
+                    alt={record.title}
+                  />
+                  <h3 className="mt-1 text-xs font-medium leading-snug [overflow-wrap:anywhere]">
+                    {record.title}
+                  </h3>
+                  <span className="sr-only">나와 다른 수행자의 안부 보기</span>
+                </Link>
+              ))}
+              <Link
+                className="grid min-w-0 snap-start place-items-center rounded-lg border border-dotted border-neutral-400 bg-white/80 p-2 text-center text-xs"
+                to="/"
+              >
+                다음 퀘스트 찾기
+              </Link>
+            </div>
             <p className="sr-only">
               {showOthers
                 ? "내가 수행한 퀘스트의 다른 수행 기록도 함께 보여요."
@@ -407,7 +404,7 @@ export default function MyPage() {
             {showOthers && (
               <div
                 id="other-performance-list"
-                className="mt-2 flex max-h-[160px] flex-col gap-3 overflow-y-auto overscroll-contain"
+                className="mt-2 flex flex-col gap-3"
               >
                 {visibleRecords.map((record) => {
                   const peerQuery = greetingQueries[peerQuestIds.indexOf(record.questId ?? record.id)];

@@ -9,7 +9,24 @@ import { useAuth } from "@/features/auth/hooks/useAuth";
 import { getAccessToken } from "@/features/auth/utils/tokenStorage";
 import { getMyQuests, getMySubmissions } from "../api/myPage";
 import { newestFirst } from "../lib/performances";
-import { getQuestGreetings, toggleSubmissionLike, type QuestGreetings } from "@/features/quests/api/verification";
+import type { Memory } from "../types";
+import { getQuestGreetings, getVerificationQuest, toggleSubmissionLike, type QuestGreetings } from "@/features/quests/api/verification";
+
+function MemoryThumbnail({ memory, token }: { memory: Memory; token: string | null }) {
+  const detail = useQuery({
+    queryKey: ["verification-quest", memory.id, token],
+    queryFn: ({ signal }) => getVerificationQuest(memory.id, signal),
+    enabled: Boolean(token) && !memory.photoUrl,
+    staleTime: 60_000,
+    retry: false,
+  });
+
+  return (
+    <i className="memory-thumbnail">
+      <RemotePhoto photoUrl={memory.photoUrl ?? detail.data?.photoUrl} alt={memory.title} />
+    </i>
+  );
+}
 
 function ListStatus({ query, enabled, label, empty }: {
   query: { isPending: boolean; isError: boolean; refetch: () => unknown };
@@ -475,9 +492,7 @@ export default function MyPage() {
             {Boolean(x.passedCount) && (
               <span>안부 {x.passedCount}통 도착</span>
             )}
-            <i className="memory-thumbnail">
-              <RemotePhoto photoUrl={x.photoUrl} alt={x.title} />
-            </i>
+            <MemoryThumbnail memory={x} token={token} />
           </button>
         ))}
         {memories.length === 0 && <ListStatus query={questsQuery} enabled={Boolean(token)} label="내 그리움을" empty="등록한 그리움이 없어요." />}

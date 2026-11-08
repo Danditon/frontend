@@ -53,12 +53,7 @@ function requestOptions(signal?: AbortSignal) {
     throw Object.assign(new Error('로그인한 뒤 다시 시도해 주세요.'), { code: 'UNAUTHORIZED' })
   }
 
-  // 서버 주소만 등록했거나 /api까지 등록한 경우 모두 /api를 한 번만 사용합니다.
-  // 이번 조회에만 적용하므로 공용 Axios와 기존 인증·등록·수행 API는 변경하지 않습니다.
-  const baseURL = (apiClient.defaults.baseURL || '/api').replace(/\/+$/, '')
-
   return {
-    baseURL: baseURL.endsWith('/api') ? baseURL : `${baseURL}/api`,
     headers: { Authorization: `Bearer ${token}` },
     signal,
     timeout: QUEST_QUERY_TIMEOUT_MS,

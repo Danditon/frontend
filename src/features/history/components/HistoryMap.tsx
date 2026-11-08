@@ -46,6 +46,20 @@ export function HistoryMap({
   token: string | null;
 }) {
   const points = useMemo(() => locatedRecords(records), [records]);
+  const offsets = useMemo(() => {
+    const groups = new Map<string, string[]>();
+    for (const { id, location } of points) {
+      const key = `${location.lat},${location.lng}`;
+      const group = groups.get(key) ?? [];
+      group.push(id);
+      groups.set(key, group);
+    }
+    const byId = new Map<string, number>();
+    for (const ids of groups.values()) {
+      ids.forEach((id, index) => byId.set(id, (index - (ids.length - 1) / 2) * 56));
+    }
+    return byId;
+  }, [points]);
   const questIds = [...new Set(points.flatMap(({ questId, questType, difficulty }) =>
     questId && isQuestId(questId) && (!questType || !difficulty) ? [questId] : [],
   ))];
@@ -91,19 +105,20 @@ export function HistoryMap({
       const marker = markersRef.current.get(record.id);
       if (!marker) continue;
       const isSelected = record.id === selectedId;
-      marker.setZIndex(isSelected ? 10 : 0);
+      const offset = offsets.get(record.id) ?? 0;
+      marker.setZIndex(isSelected ? 10 : offset ? 1 : 0);
       const detail = questDetails.find((quest) => String(quest?.questId) === record.questId);
       const questType = record.questType ?? detail?.questType;
       const difficulty = record.difficulty ?? detail?.difficulty;
       if (questType && (difficulty === 1 || difficulty === 2 || difficulty === 3)) {
-        marker.setImage(createQuestMarkerImage(maps, questType, difficulty, isSelected));
+        marker.setImage(createQuestMarkerImage(maps, questType, difficulty, isSelected, offset));
       }
     }
   });
 
   useEffect(() => {
     updateMarkerImages();
-  }, [points, questDetails, selectedId]);
+  }, [points, offsets, questDetails, selectedId]);
 
   useEffect(() => {
     if (!points.length) return;

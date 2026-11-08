@@ -1,10 +1,12 @@
-// 선택한 퀘스트의 상세 mock과 수행 시작 버튼을 표시하며 지도 조작을 유지하는 Drawer입니다.
+// 선택한 실제 퀘스트의 상세 정보와 수행 시작 버튼을 표시하며 지도 조작을 유지하는 Drawer입니다.
 import { useCallback, useRef, useState, type CSSProperties } from 'react'
 import { X } from 'lucide-react'
 import { Button } from '@/shared/components/ui/button'
 import { RemotePhoto } from '@/shared/components/RemotePhoto'
 import { useQuestDetail } from '@/features/quests/hooks/useQuestDetail'
 import QuestStartButton from './QuestStartButton'
+import QuestQueryErrorNotice from './QuestQueryErrorNotice'
+import { getQuestQueryError } from '../utils/getQuestQueryError'
 import {
   Drawer,
   DrawerClose,
@@ -29,9 +31,11 @@ export default function QuestDetailDrawer({
   const [snapPoint, setSnapPoint] = useState(0.4)
   const isExpanded = snapPoint === 0.85
   const drawerRef = useRef<HTMLDivElement>(null)
-  // 마커·목록에서 선택한 ID로 같은 상세 mock을 조회합니다.
+  // 마커·목록·가까운 카드에서 선택한 ID로 실제 상세 API와 캐시를 공유합니다.
   const detailQuery = useQuestDetail(questId)
-  const quest = detailQuery.data
+  const detailError = detailQuery.isError ? getQuestQueryError(detailQuery.error, 'detail') : null
+  // 통신 오류에는 기존 상세를 유지하지만, 401·403·404의 오래된 수행 버튼은 숨깁니다.
+  const quest = detailError?.keepPreviousData === false ? undefined : detailQuery.data
 
   // 접힌 상태의 DOM 높이 대신, 실제 화면에 보이는 상단 위치를 측정합니다.
   const reportPosition = useCallback(() => {
@@ -125,8 +129,13 @@ export default function QuestDetailDrawer({
             <p role="status">상세 내용을 불러오는 중이에요.</p>
           )}
 
-          {detailQuery.isError && (
-            <p role="alert">{detailQuery.error.message}</p>
+          {detailError && (
+            <QuestQueryErrorNotice
+              info={detailError}
+              isFetching={detailQuery.isFetching}
+              onRetry={() => { void detailQuery.refetch({ cancelRefetch: false }) }}
+              showingPreviousData={quest !== undefined}
+            />
           )}
 
           {quest && (

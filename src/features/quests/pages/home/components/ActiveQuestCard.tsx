@@ -27,7 +27,7 @@ export default function ActiveQuestCard({
         isActive ? 'border-[#FDE68A]' : 'border-white/80'
       }`}
     >
-      {/* 현재 mock 사진은 null입니다. URL이 생기면 같은 카드에 사진을 표시합니다. */}
+      {/* 상세 응답에 사진 URL이 있는 경우에만 표시하고, 없으면 기본 배경을 사용합니다. */}
       {quest.photoUrl && (
         <RemotePhoto
           key={quest.photoUrl}

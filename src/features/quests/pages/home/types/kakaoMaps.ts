@@ -120,6 +120,7 @@ declare global {
         MarkerImage: new (
           source: string,
           size: KakaoSize,
+          options?: { offset?: KakaoPoint }, // 이미지 안에서 실제 지도 좌표에 맞출 기준점
         ) => KakaoMarkerImage
 
         // 마커 클릭 이벤트의 등록과 정리에 사용합니다.

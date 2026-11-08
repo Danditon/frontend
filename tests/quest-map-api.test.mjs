@@ -542,6 +542,30 @@ test('접힌 상세 미리보기는 사진이 있으면 사진만, 없으면 그
   }
 })
 
+test('펼친 상세 본문은 수행 내용·그리움 전문·작성자·위치를 사진 유무와 관계없이 표시한다', () => {
+  const { default: Content } = loadSource('features/quests/pages/home/components/QuestDetailContent.tsx', {
+    'lucide-react': { MapPin: 'MapPin' },
+  })
+  const quest = {
+    ...quests[0], author: { userId: 3, nickname: '기억하는사람' },
+    address: '대구 중구 테스트 주소',
+    questDescription: '서점이 그대로 있는지 확인해주세요.\n가게 앞 모습을 남겨주세요.',
+    longingText: '학교가 끝나면 들르던 서점이에요.\n' + '오래된 기억을 전합니다. '.repeat(80),
+  }
+  for (const photoUrl of [null, 'https://example.com/quest.jpg']) {
+    const tree = Content({ quest: { ...quest, photoUrl } })
+    const text = textOf(tree)
+    assert.ok(text.includes(quest.questDescription))
+    assert.ok(text.includes(quest.longingText))
+    assert.ok(text.includes('기억하는사람님이 남긴 그리움'))
+    assert.ok(text.includes(quest.placeName))
+    assert.ok(text.includes(quest.address))
+    assert.ok(text.indexOf(quest.questDescription) < text.indexOf(quest.longingText))
+    assert.equal(findNode(tree, 'img'), null)
+    assert.doesNotMatch(text, /등록 사진|등록된 사진이 없어요/)
+  }
+})
+
 test('상세 Drawer는 미리보기·확장·고정 수행 버튼과 오류 재시도를 연결한다', () => {
   const retries = []
   let viewerPosition = position
@@ -555,10 +579,10 @@ test('상세 Drawer는 미리보기·확장·고정 수행 버튼과 오류 재�
     react: { useCallback: (fn) => fn, useRef: () => ({ current: null }), useState: () => [snapPoint, (next) => { snapPoint = next }] },
     'lucide-react': { ChevronUp: 'ChevronUp', X: 'X' },
     '@/shared/components/ui/button': { Button: 'Button' },
-    '@/shared/components/RemotePhoto': { RemotePhoto: 'RemotePhoto' },
     '@/features/quests/hooks/useQuestDetail': { useQuestDetail: () => query },
     './QuestStartButton': { __esModule: true, default: 'QuestStartButton' },
     './QuestDetailPreview': { __esModule: true, default: 'QuestDetailPreview' },
+    './QuestDetailContent': { __esModule: true, default: 'QuestDetailContent' },
     './QuestQueryErrorNotice': { __esModule: true, default: 'QuestQueryErrorNotice' },
     '../utils/getQuestQueryError': queryErrorUtils,
     '../utils/getDistanceMeters': distanceUtils,
@@ -573,9 +597,11 @@ test('상세 Drawer는 미리보기·확장·고정 수행 버튼과 오류 재�
   const expand = findNode(tree, 'Button')
   assert.equal(expand.props['aria-expanded'], false)
   expand.props.onClick()
+  assert.equal(snapPoint, 0.75)
   const expanded = render()
   assert.equal(findNode(expanded, 'QuestDetailPreview'), null)
-  assert.ok(findNode(expanded, 'RemotePhoto'))
+  assert.equal(findNode(expanded, 'QuestDetailContent').props.quest, query.data)
+  assert.equal(findNode(expanded, 'RemotePhoto'), null)
   assert.ok(findNode(findNode(expanded, 'DrawerFooter'), 'QuestStartButton'))
   assert.equal(findNode(expanded, 'Button').props['aria-expanded'], true)
   findNode(expanded, 'Button').props.onClick()
@@ -596,6 +622,7 @@ test('상세 Drawer는 미리보기·확장·고정 수행 버튼과 오류 재�
     tree = render()
     assert.equal(findNode(tree, 'QuestStartButton'), null)
     assert.equal(findNode(tree, 'QuestDetailPreview'), null)
+    assert.equal(findNode(tree, 'QuestDetailContent'), null)
     assert.equal(findNode(tree, 'QuestQueryErrorNotice').props.info.keepPreviousData, false)
   }
 })

@@ -2,11 +2,11 @@
 import { useCallback, useRef, useState, type CSSProperties } from 'react'
 import { ChevronUp, X } from 'lucide-react'
 import { Button } from '@/shared/components/ui/button'
-import { RemotePhoto } from '@/shared/components/RemotePhoto'
 import { useQuestDetail } from '@/features/quests/hooks/useQuestDetail'
 import type { UserPosition } from '@/features/quests/hooks/useGeolocation'
 import QuestStartButton from './QuestStartButton'
 import QuestDetailPreview from './QuestDetailPreview'
+import QuestDetailContent from './QuestDetailContent'
 import QuestQueryErrorNotice from './QuestQueryErrorNotice'
 import { getQuestQueryError } from '../utils/getQuestQueryError'
 import { getDistanceMeters } from '../utils/getDistanceMeters'
@@ -33,9 +33,9 @@ export default function QuestDetailDrawer({
   onClose,
   onPositionChange,
 }: QuestDetailDrawerProps) {
-  // 기본 40%, 확장 85% 중 현재 높이를 관리합니다.
+  // 기본 40%, 확장 75%로 두어 펼친 뒤에도 위쪽 지도가 보이게 합니다.
   const [snapPoint, setSnapPoint] = useState(0.4)
-  const isExpanded = snapPoint === 0.85
+  const isExpanded = snapPoint === 0.75
   const drawerRef = useRef<HTMLDivElement>(null)
   // 마커·목록·가까운 카드에서 선택한 ID로 실제 상세 API와 캐시를 공유합니다.
   const detailQuery = useQuestDetail(questId)
@@ -74,7 +74,7 @@ export default function QuestDetailDrawer({
         }
       }}
       // 드래그 시 두 높이 사이를 이동하도록 공용 Drawer에 맡깁니다.
-      snapPoints={[0.4, 0.85]}
+      snapPoints={[0.4, 0.75]}
       snapPoint={snapPoint}
       onSnapPointChange={(nextPoint) => {
         if (typeof nextPoint === 'number') setSnapPoint(nextPoint)
@@ -99,7 +99,7 @@ export default function QuestDetailDrawer({
         // 고정 높이 대신 확장 시 최대 높이만 제한하고, 이동은 snapPoints로 처리합니다.
         style={
           {
-            '--drawer-content-max-height': '85dvh',
+            '--drawer-content-max-height': '75dvh',
           } as CSSProperties
         }
         className="data-[swipe-direction=down]:rounded-t-[2rem] font-['Pretendard',system-ui,sans-serif]"
@@ -121,7 +121,7 @@ export default function QuestDetailDrawer({
             <DrawerTitle className="line-clamp-2 break-words text-left text-xl font-bold leading-snug tracking-tight [font-family:inherit]">
               {quest?.questTitle ?? '퀘스트 상세'}
             </DrawerTitle>
-            <DrawerDescription className={isExpanded ? 'text-left' : 'sr-only'}>
+            <DrawerDescription className="sr-only">
               {quest
                 ? `${quest.placeName}에서 온 그리움`
                 : '선택한 퀘스트를 확인하는 공간입니다.'}
@@ -152,37 +152,9 @@ export default function QuestDetailDrawer({
               />
             )}
 
-            {quest && (
-              <>
-                {isExpanded ? (
-                  <>
-                    <section className="mt-4">
-                      <h3 className="font-semibold">등록 사진</h3>
-                      <RemotePhoto
-                        photoUrl={quest.photoUrl}
-                        alt={`${quest.placeName} 등록 사진`}
-                        className="mt-2 grid aspect-video place-items-center overflow-hidden rounded-xl bg-neutral-100 text-neutral-500 [&>img]:h-full [&>img]:w-full [&>img]:object-cover"
-                      />
-                    </section>
-                    <section className="mt-4">
-                      <h3 className="font-semibold">이곳에 남긴 그리움</h3>
-                      <p className="whitespace-pre-wrap break-words">{quest.longingText}</p>
-                    </section>
-                    <section className="mt-4">
-                      <h3 className="font-semibold">전해줄 안부</h3>
-                      <p className="whitespace-pre-wrap break-words">{quest.questDescription}</p>
-                    </section>
-                    <section className="mt-4">
-                      <h3 className="font-semibold">위치</h3>
-                      <p>{quest.placeName}</p>
-                      <p className="break-words">{quest.address}</p>
-                    </section>
-                  </>
-                ) : (
-                  <QuestDetailPreview quest={quest} />
-                )}
-              </>
-            )}
+            {quest && (isExpanded
+              ? <QuestDetailContent quest={quest} />
+              : <QuestDetailPreview quest={quest} />)}
           </div>
           {quest && (
             <DrawerFooter className="gap-1 bg-white px-5 pb-[max(1rem,env(safe-area-inset-bottom,0px))]">
@@ -192,7 +164,7 @@ export default function QuestDetailDrawer({
                 size="sm"
                 className="min-h-9 text-xs text-neutral-500"
                 aria-expanded={isExpanded}
-                onClick={() => setSnapPoint(isExpanded ? 0.4 : 0.85)}
+                onClick={() => setSnapPoint(isExpanded ? 0.4 : 0.75)}
               >
                 <ChevronUp className={`size-4 ${isExpanded ? 'rotate-180' : ''}`} aria-hidden="true" />
                 {isExpanded ? '접기' : '위로 올려 자세히 보기'}

@@ -63,6 +63,19 @@ export async function getQuestGreetings(id: string, signal?: AbortSignal) {
   const response = await apiClient.get(`/quests/${id}/submissions`, { headers: headers(), signal, timeout: 15000 })
   return greetingsSchema.parse(response.data)
 }
+const submissionLikeSchema = z.object({
+  submissionId: z.number().int().positive(),
+  isLiked: z.boolean(),
+})
+
+export async function toggleSubmissionLike(submissionId: number) {
+  const response = await apiClient.patch(`/submissions/${submissionId}/like`, undefined, {
+    headers: headers(),
+    timeout: 15000,
+  })
+  return submissionLikeSchema.parse(response.data)
+}
+
 export function verificationError(error: unknown): string {
   if (axios.isAxiosError(error)) {
     const code = error.response?.data?.code

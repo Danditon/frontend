@@ -4,12 +4,12 @@ import { Link, useLocation, useNavigate, useSearchParams } from "react-router";
 import { Heart, LogOut } from "lucide-react";
 import { Back, Profile } from "@/shared/components/WireUI";
 import { RemotePhoto } from "@/shared/components/RemotePhoto";
-import { useQueries, useQuery } from "@tanstack/react-query";
+import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { getAccessToken } from "@/features/auth/utils/tokenStorage";
 import { getMyQuests, getMySubmissions } from "../api/myPage";
 import { newestFirst } from "../lib/performances";
-import { getQuestGreetings } from "@/features/quests/api/verification";
+import { getQuestGreetings, toggleSubmissionLike, type QuestGreetings } from "@/features/quests/api/verification";
 
 function ListStatus({ query, enabled, label, empty }: {
   query: { isPending: boolean; isError: boolean; refetch: () => unknown };
@@ -35,8 +35,8 @@ export default function MyPage() {
   const messageTop = useRef<HTMLElement>(null);
   const greetingBody = useRef<HTMLDivElement>(null);
   const historyPanel = useRef<HTMLDivElement>(null);
-  const [liked, setLiked] = useState(false);
   const [error, setError] = useState("");
+  const queryClient = useQueryClient();
   const { user, retrySession } = useAuth();
   const token = user && user.userId > 0 ? getAccessToken() : null;
   const logout = pathname === "/me/logout";
@@ -84,6 +84,8 @@ export default function MyPage() {
     .filter((item) => item.verifyStatus === "PASSED")
     .map((item) => ({
       id: String(item.submissionId),
+      submissionId: item.submissionId,
+      isLiked: item.isLiked,
       greeting: item.greeting,
       photoUrl: item.photoUrl,
       senderName: item.performer.nickname,
@@ -96,6 +98,26 @@ export default function MyPage() {
     ? Math.max(0, Math.min(greetings.length - 1, Math.trunc(requested)))
     : 0;
   const greeting = greetings[index];
+  const liked = greeting?.isLiked ?? false;
+  const canLike = Boolean(token && greeting && selectedQuestId && greetingQuery?.data?.viewerRole === "AUTHOR");
+  const likeMutation = useMutation({
+    mutationFn: ({ submissionId }: { submissionId: number; questId: string; token: string }) =>
+      toggleSubmissionLike(submissionId),
+    retry: false,
+    onMutate: ({ questId, token }) => queryClient.cancelQueries({ queryKey: ["quest-greetings", questId, token] }),
+    onSuccess: (result, { questId, token }) => {
+      queryClient.setQueryData<QuestGreetings>(["quest-greetings", questId, token], (current) =>
+        current && {
+          ...current,
+          submissions: current.submissions.map((item) =>
+            item.submissionId === result.submissionId ? { ...item, isLiked: result.isLiked } : item,
+          ),
+        },
+      );
+    },
+    onError: (_error, { questId, token }) =>
+      queryClient.invalidateQueries({ queryKey: ["quest-greetings", questId, token] }),
+  });
   const recordCount = records.length;
   const backTo =
     source === "completed"
@@ -128,7 +150,6 @@ export default function MyPage() {
       previous.set("message", String(next));
       return previous;
     });
-    setLiked(false);
   }
   async function signOut() {
     try {
@@ -198,13 +219,17 @@ export default function MyPage() {
               : ""}
           </small>
           <div className="absolute [inset:38%_0_0] bg-[#c9eaf5] [clip-path:polygon(0_0,_50%_37%,_100%_0,_100%_100%,_0_100%)]" />
-          <div className="relative mt-auto z-[1] text-center pt-[90px] [&_:is(a,button)]:h-[66px] [&_:is(a,button)]:w-[66px] [&_:is(a,button)]:bg-[#242624] [&_.liked]:bg-[#999] [&_p]:text-[11px] [&_p]:[margin:12px_0_34px]">
+          {canLike && <div className="relative mt-auto z-[1] text-center pt-[90px] [&_:is(a,button)]:h-[66px] [&_:is(a,button)]:w-[66px] [&_:is(a,button)]:bg-[#242624] [&_.liked]:bg-[#999] [&_p]:text-[11px] [&_p]:[margin:12px_0_34px]">
             <button
               className={`h-[54px] w-[54px] rounded-full bg-[#c9eaf5] inline-flex items-center justify-center shrink-0 [&_svg]:[stroke-width:1.25] ${liked ? "liked" : ""}`}
               aria-label="안부 좋아요"
               aria-pressed={liked}
-              disabled={!greeting}
-              onClick={() => setLiked(!liked)}
+              disabled={likeMutation.isPending}
+              onClick={() => {
+                if (token && greeting && selectedQuestId && !likeMutation.isPending) {
+                  likeMutation.mutate({ submissionId: greeting.submissionId, questId: selectedQuestId, token });
+                }
+              }}
             >
               <Heart fill={liked ? "currentColor" : "none"} />
             </button>
@@ -213,7 +238,10 @@ export default function MyPage() {
                 ? "고마운 마음을 전했어요"
                 : "좋아요로 고마움을 전해보세요"}
             </p>
-          </div>
+            {likeMutation.isError && likeMutation.variables.submissionId === greeting?.submissionId && (
+              <p role="alert">좋아요를 변경하지 못했어요. 다시 시도해 주세요.</p>
+            )}
+          </div>}
 
         </article>
         <section
@@ -439,7 +467,6 @@ export default function MyPage() {
             onClick={() => {
               if (x.passedCount) {
                 setParams({ quest: x.id, message: "0" });
-                setLiked(false);
               } else setError("아직 도착한 안부가 없어요.");
             }}
           >

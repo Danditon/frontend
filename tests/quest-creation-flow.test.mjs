@@ -209,8 +209,15 @@ test('사진 화면은 일반 선택·이미지 필수 조건과 읽기 중 잠�
         const tree = Photo({ questType, photoUrl, readingPhoto, error: '', onChoose: file => chosen.push(file) })
         const button = find(tree, 'button', props => props.className === 'creation-primary')
         assert.equal(button.props.disabled, readingPhoto || (questType === 'IMAGE' && !photoUrl))
+        assert.equal(textOf(button), readingPhoto ? '사진 확인 중…' : questType === 'IMAGE' && !photoUrl ? '사진을 골라주세요' : 'AI로 퀘스트 만들기')
+        assert.equal(tree.props['aria-busy'], readingPhoto)
+        assert.equal(find(tree, 'input').props.disabled, readingPhoto)
+        for (const className of photoUrl ? ['creation-photo-remove', 'creation-photo-replace'] : ['creation-photo-upload creation-photo-empty']) {
+          assert.equal(find(tree, 'button', props => props.className === className).props.disabled, readingPhoto)
+        }
         assert.equal(find(tree, 'img')?.props.src ?? null, photoUrl)
         assert.equal(Boolean(find(tree, 'p', props => props.role === 'status')), readingPhoto)
+        assert.equal(Boolean(find(tree, 'p', props => props.className === 'creation-photo-hint')), !readingPhoto)
       }
     }
   }
@@ -219,6 +226,27 @@ test('사진 화면은 일반 선택·이미지 필수 조건과 읽기 중 잠�
   input.props.onChange(event)
   assert.equal(event.currentTarget.value, '')
   assert.equal(chosen[0], file)
+})
+
+test('사진 안내는 파일 조건·확인 중·오류를 하나씩 표시하고 정상 상태에서 조건 안내로 돌아온다', () => {
+  const props = { questType: 'IMAGE', photoUrl: null, readingPhoto: false, error: '' }
+  let tree = Photo(props)
+  assert.equal(textOf(find(tree, 'div', props => props.className === 'creation-photo-feedback')), 'JPG, PNG, WEBP · 최대 10MB')
+
+  tree = Photo({ ...props, error: '사진을 열 수 없어요. 다른 사진을 골라 주세요.' })
+  assert.equal(textOf(find(tree, 'p', props => props.role === 'alert')), '사진을 열 수 없어요. 다른 사진을 골라 주세요.')
+  assert.equal(find(tree, 'p', props => props.className === 'creation-photo-hint'), null)
+  assert.equal(find(tree, 'button', props => props.className === 'creation-primary').props.disabled, true)
+
+  tree = Photo({ ...props, readingPhoto: true, error: '이전 오류' })
+  assert.equal(textOf(find(tree, 'p', props => props.role === 'status')), '사진을 확인하는 중…')
+  assert.equal(find(tree, 'p', props => props.role === 'alert'), null)
+
+  tree = Photo({ ...props, photoUrl: 'blob:memory' })
+  assert.equal(find(tree, 'p', props => props.role === 'status'), null)
+  assert.equal(find(tree, 'p', props => props.role === 'alert'), null)
+  assert.match(textOf(tree), /JPG, PNG, WEBP · 최대 10MB/)
+  assert.equal(find(tree, 'button', props => props.className === 'creation-primary').props.disabled, false)
 })
 
 test('미리보기는 사진 없는 장소 카드·편집·공백 검증을 유지하고 등록 결과 미확인 시 읽기 전용으로 표시한다', () => {

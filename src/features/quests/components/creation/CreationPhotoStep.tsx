@@ -18,15 +18,17 @@ export default function CreationPhotoStep({
   const general = questType === 'GENERAL'
 
   return (
-    <div className="creation-step creation-photo">
-      <span className="creation-type-tag">{general ? '일반' : '이미지'} 퀘스트</span>
-      <h1 className="creation-title">
-        {general ? <>사진이 있다면<br />함께 올려주세요</> : <>그때 찍은 사진을<br />올려주세요</>}
-      </h1>
-      <p className="creation-description">
-        {general ? <>없어도 괜찮아요.<br />글만으로도 퀘스트를 만들 수 있어요.</>
-          : <>다녀오는 사람에게<br />촬영 방향을 알려주는 힌트가 돼요.</>}
-      </p>
+    <div className="creation-step creation-photo" aria-busy={readingPhoto}>
+      <div className="creation-photo-intro">
+        <span className="creation-type-tag">{general ? '일반' : '이미지'} 퀘스트</span>
+        <h1 className="creation-title">
+          {general ? <>사진이 있다면<br />함께 올려주세요</> : <>그때 찍은 사진을<br />올려주세요</>}
+        </h1>
+        <p className="creation-description">
+          {general ? <>없어도 괜찮아요.<br />글만으로도 퀘스트를 만들 수 있어요.</>
+            : <>다녀오는 사람에게<br />촬영 방향을 알려주는 힌트가 돼요.</>}
+        </p>
+      </div>
 
       <input
         ref={input}
@@ -70,12 +72,19 @@ export default function CreationPhotoStep({
         </button>
       )}
 
-      {readingPhoto && <p role="status" className="creation-description">사진을 확인하는 중…</p>}
-      {error && <p role="alert" className="creation-error">{error}</p>}
+      <div className="creation-photo-feedback">
+        {readingPhoto ? (
+          <p role="status" className="creation-description">사진을 확인하는 중…</p>
+        ) : error ? (
+          <p role="alert" className="creation-error">{error}</p>
+        ) : (
+          <p className="creation-photo-hint">JPG, PNG, WEBP · 최대 10MB</p>
+        )}
+      </div>
 
       <div className="creation-actions">
         <button type="button" className="creation-primary" disabled={readingPhoto || (!general && !photoUrl)} onClick={onGenerate}>
-          {!general && !photoUrl ? '사진을 골라주세요' : 'AI로 퀘스트 만들기'}
+          {readingPhoto ? '사진 확인 중…' : !general && !photoUrl ? '사진을 골라주세요' : 'AI로 퀘스트 만들기'}
         </button>
       </div>
     </div>

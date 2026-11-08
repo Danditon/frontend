@@ -79,14 +79,21 @@
 .creation-place-search>button:disabled { opacity: 0.5; }
 
 .creation-type-tag { align-self: flex-start; padding: 4px 12px; border-radius: 999px; background: #f9e8a9; font-size: 13px; font-weight: 500; }
-.creation-photo { gap: 20px; }
-.creation-photo .creation-title { margin-top: 6px; }
-.creation-photo-upload { position: relative; width: 100%; min-height: 220px; max-height: 360px; flex: none; aspect-ratio: 1; overflow: hidden; border: 0; border-radius: 24px; background: #f5f5f5; }
-.creation-photo-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; font-size: 14px; }
+.creation-photo { gap: 0; padding-top: 8px; }
+.creation-photo-intro { display: flex; flex-direction: column; align-items: flex-start; margin-bottom: 24px; }
+.creation-photo .creation-title { margin-top: 24px; }
+.creation-photo-intro .creation-description { margin-top: 14px; }
+.creation-photo-upload { position: relative; width: 100%; height: clamp(240px, 42dvh, 360px); min-height: 0; max-height: none; flex: none; aspect-ratio: auto; overflow: hidden; border: 0; border-radius: 24px; background: #f5f5f5; }
+.creation-photo-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; font-size: 14px; transition: transform 120ms ease; }
+.creation-photo-empty:active:not(:disabled) { transform: scale(0.99); }
 .creation-photo-plus { display: grid; place-items: center; width: 56px; height: 56px; border-radius: 50%; color: #626b67; background: #d1e7f2; }
-.creation-photo-image { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+/* 촬영 구도를 확인할 수 있도록 원본 전체를 보여줍니다. */
+.creation-photo-image { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
 .creation-photo-remove { position: absolute; top: 12px; right: 12px; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: #fff; }
 .creation-photo-replace { position: absolute; bottom: 12px; left: 12px; min-height: 40px; padding: 8px 14px; border-radius: 999px; background: #fff; font-size: 12px; }
+/* 짧은 상태 문구가 바뀌어도 아래 버튼의 이동을 줄입니다. */
+.creation-photo-feedback { min-height: 44px; padding-top: 12px; }
+.creation-photo-hint { color: #69736e; font-size: 12px; line-height: 1.6; }
 
 .creation-preview-summary { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 8px; }
 .creation-preview-place { position: relative; display: flex; min-height: 154px; flex-direction: column; align-items: flex-start; justify-content: flex-end; gap: 16px; overflow: hidden; padding: 12px; border-radius: 24px; background: #f1f5f6; }
@@ -135,11 +142,14 @@
   .creation-title { font-size: 26px; }
   .creation-type-option { min-height: 116px; padding: 14px; }
   .creation-details .creation-type-option { min-height: 112px; }
-  .creation-photo-upload { max-height: 310px; }
+  .creation-photo { gap: 0; }
+  .creation-photo-upload { height: clamp(220px, 40dvh, 300px); max-height: none; }
   .creation-result-illustration { max-width: 300px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .creation-photo-empty { transition: none; }
+  .creation-photo-empty:active:not(:disabled) { transform: none; }
   .creation-details .creation-type-option, .creation-details .creation-type-check { transition: none; }
   .creation-details .creation-type-option:active { transform: none; }
   .quest-create-page::before, .quest-create-page::after, .creation-failure-backdrop { transition-duration: 120ms; }

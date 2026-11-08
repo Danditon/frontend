@@ -212,8 +212,7 @@
 .verify-failure>div:last-of-type {padding-top:24px;}
 .verify-checking>.checking-card {bottom:28px;left:15px;padding:20px 22px;}
 .checking-card h1 {font-size:27px;margin-top:14px;}
-.memory-page>div.grid {gap:12px;margin-bottom:24px;}
-.memory-page>div.grid>a {height:126px;padding:24px 16px 16px;}
+.memory-page>div.grid {margin-bottom:24px;}
 .memory-page>div.flex {gap:10px;}
 .memory-page>div.flex>button {height:116px;border-radius:18px;padding:20px 16px;}
 .memory-page .memory-thumbnail {width:65px;height:85px;top:15px;right:18px;}

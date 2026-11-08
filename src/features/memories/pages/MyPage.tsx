@@ -12,6 +12,9 @@ import { newestFirst } from "../lib/performances";
 import type { Memory } from "../types";
 import { getQuestGreetings, getVerificationQuest, toggleSubmissionLike, type QuestGreetings } from "@/features/quests/api/verification";
 
+const profileTabsClass =
+  "grid [grid-template-columns:1fr_1fr] gap-[6px] [&_>_a]:h-[96px] [&_>_a]:rounded-[23px] [&_>_a]:flex [&_>_a]:flex-col [&_>_a]:[padding:16px_14px_12px] [&_>_a]:relative [&_>_a]:justify-end [&_strong]:font-normal [&_strong]:text-[38px] [&_strong]:leading-[1.05] [&_small]:text-[12px] [&_small]:mt-[4px]";
+
 function MemoryThumbnail({ memory, token }: { memory: Memory; token: string | null }) {
   const detail = useQuery({
     queryKey: ["verification-quest", memory.id, token],
@@ -352,7 +355,7 @@ export default function MyPage() {
       >
         <div className="relative z-10 shrink-0 bg-white px-[15px] pb-3 pt-3">
           <Profile nickname={token ? user?.nickname : undefined} email={token ? user?.email : undefined} />
-          <div className="grid [grid-template-columns:1fr_1fr] gap-[6px] mb-0 [&_>_a]:h-[96px] [&_>_a]:rounded-[23px] [&_>_a]:bg-white/95 [&_>_a]:flex [&_>_a]:flex-col [&_>_a]:[padding:16px_14px_12px] [&_>_a]:relative [&_>_a]:justify-end [&_>_a.selected]:bg-[#c9eaf5] [&_strong]:font-normal [&_strong]:text-[38px] [&_strong]:leading-[1.05] [&_small]:text-[12px] [&_small]:mt-[4px]">
+          <div className={profileTabsClass + " [&_>_a]:bg-white/95 [&_>_a.selected]:bg-[#c9eaf5]"}>
             <Link to="/me/memories" className="bg-[#e5e5e5]! text-[#242624]">
               <span className="text-[10px] absolute right-[12px] top-[14px] rounded-[15px] [padding:4px_7px] bg-[#dedede]">
                 도착한 안부
@@ -450,7 +453,7 @@ export default function MyPage() {
   return (
     <section className="memory-page [padding:12px_15px_100px] min-h-[790px] relative flex-1 max-[500px]:[min-height:calc(100dvh_-_54px)]">
       <Profile nickname={token ? user?.nickname : undefined} email={token ? user?.email : undefined} />
-      <div className="grid [grid-template-columns:1fr_1fr] gap-[6px] mb-[16px] [&_>_a]:h-[115px] [&_>_a]:rounded-[23px] [&_>_a]:bg-[#c9eaf5] [&_>_a]:flex [&_>_a]:flex-col [&_>_a]:[padding:25px_14px_13px] [&_>_a]:relative [&_>_a]:justify-end [&_>_a.selected]:bg-[#242624] [&_strong]:font-normal [&_strong]:text-[45px] [&_strong]:leading-[1.05] [&_small]:text-[12px] [&_small]:mt-[4px]">
+      <div className={profileTabsClass + " mb-[16px] [&_>_a]:bg-[#c9eaf5] [&_>_a.selected]:bg-[#242624]"}>
         <Link to="/me/memories" className={!history ? "selected" : ""}>
           <span className="text-[10px] absolute right-[12px] top-[14px] rounded-[15px] [padding:4px_7px] bg-[#dedede]">
             도착한 안부

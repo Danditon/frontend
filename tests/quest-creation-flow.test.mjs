@@ -3,6 +3,9 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import { runInNewContext } from 'node:vm'
 import ts from 'typescript'
+import axios from 'axios'
+import { z } from 'zod'
+import { QueryClient } from '@tanstack/react-query'
 
 const element = (type, props) => ({ type, props })
 
@@ -45,7 +48,15 @@ const Details = load('components/creation/CreationDetailsStep.tsx', {
 const Photo = load('components/creation/CreationPhotoStep.tsx', {
   react: { useRef: () => ({ current: null }) }, 'lucide-react': { Plus: 'Plus', X: 'X' },
 })
-const Preview = load('components/creation/CreationPreviewStep.tsx', { 'lucide-react': { MapPin: 'MapPin' } })
+const Preview = load('components/creation/CreationPreviewStep.tsx', { 'lucide-react': { MapPin: 'MapPin' }, 'react-router': { Link: 'Link' } })
+const Result = load('components/creation/CreationResultStep.tsx', {
+  'react-router': { Link: 'Link' }, './FloatingEnvelope': { __esModule: true, default: 'FloatingEnvelope' },
+})
+const registrationApi = load('api/questRegistration.ts', {
+  axios: { __esModule: true, default: axios }, zod: { z },
+  '@/shared/api/client': { apiClient: { post: async () => ({ data: {} }) } }, '@/features/auth/utils/tokenStorage': { getAccessToken: () => 'test-token' },
+  '../lib/questPhoto': { getQuestPhotoError: () => null },
+}, { FormData, Blob, Error })
 const creationMotion = load('components/creation/questCreationMotion.ts')
 const place = { placeName: '그리운 카페', address: '대구 중구', lat: 35.87, lng: 128.6 }
 const preview = { questTitle: '카페에 안부 남기기', questDescription: '방문하고 안부를 남겨주세요.', difficulty: 1, difficultyReason: '방문하기 쉬워요.' }
@@ -86,13 +97,17 @@ function pageFixture() {
     '../components/creation/questCreationMotion': creationMotion,
     'motion/react': { AnimatePresence: 'AnimatePresence', useReducedMotion: () => f.reducedMotion },
     'react-router': { Link: 'Link' },
-    '@tanstack/react-query': { useQueryClient: () => ({ invalidateQueries: options => f.invalidations.push(options) }) },
+    '@tanstack/react-query': { useQueryClient: () => ({ invalidateQueries: options => {
+      f.invalidations.push(options)
+      return f.client?.invalidateQueries(options)
+    } }) },
     'lucide-react': { MailOpen: 'MailOpen' },
     '../lib/questPhoto': { decodeQuestPhoto: file => f.decode(file) },
     '../api/questRegistration': {
       previewQuest: (draft, signal) => { f.calls.push({ action: 'preview', draft, signal }); return f.generate() },
       registerQuest: (draft, value, file, signal) => { f.calls.push({ action: 'register', draft, preview: value, file, signal }); return f.register() },
-      registrationError: error => error.message,
+      registrationError: registrationApi.registrationError,
+      isRegistrationUncertain: registrationApi.isRegistrationUncertain,
     },
   }, { AbortController, URL: { revokeObjectURL: url => f.revoked.push(url) } })
 
@@ -170,9 +185,9 @@ test('사진 화면은 일반 선택·이미지 필수 조건과 읽기 중 잠�
   assert.equal(chosen[0], file)
 })
 
-test('미리보기는 사진 없는 장소 카드·제목과 설명 편집·공백 검증·등록 실패 재시도를 유지한다', () => {
+test('미리보기는 사진 없는 장소 카드·편집·공백 검증을 유지하고 등록 결과 미확인 시 읽기 전용으로 표시한다', () => {
   const edits = []
-  const props = { preview, placeName: place.placeName, photoUrl: null, registrationFailed: false, onChange: value => edits.push(value) }
+  const props = { preview, placeName: place.placeName, photoUrl: null, onChange: value => edits.push(value) }
   let tree = Preview(props)
   assert.equal(find(tree, 'img'), null)
   assert.match(textOf(tree), /그리운 카페/)
@@ -185,10 +200,12 @@ test('미리보기는 사진 없는 장소 카드·제목과 설명 편집·공�
     tree = Preview({ ...props, preview: { ...preview, [key]: '  ' } })
     assert.equal(find(tree, 'button', props => props.className === 'creation-primary').props.disabled, true)
   }
-  tree = Preview({ ...props, photoUrl: 'blob:memory', registrationFailed: true, error: '응답을 받지 못했어요.' })
+  tree = Preview({ ...props, photoUrl: 'blob:memory', registrationUncertain: true, error: '응답을 받지 못했어요.' })
   assert.equal(find(tree, 'img').props.src, 'blob:memory')
-  assert.equal(find(tree, 'input'), null)
-  assert.match(textOf(tree), /문구 수정다시 등록하기/)
+  assert.equal(find(tree, 'input').props.readOnly, true)
+  assert.equal(find(tree, 'textarea').props.readOnly, true)
+  assert.equal(find(tree, 'button').props.disabled, true)
+  assert.equal(find(tree, 'Link').props.to, '/me')
   assert.match(textOf(find(tree, 'p', props => props.role === 'alert')), /응답을 받지 못/)
 })
 
@@ -208,20 +225,20 @@ test('입력 상태를 보존하며 일반 퀘스트는 사진 없이 생성하�
   assert.equal(f.calls[0].draft.longingText, '친구들과 자주 가던 카페예요.')
   f.props('CreationPreviewStep').onChange({ ...preview, questTitle: '수정한 제목' })
   f.render()
-  f.register = async () => { throw new Error('등록 응답을 받지 못했어요.') }
+  f.register = async () => { throw new Error('등록 요청이 거절됐어요.') }
   f.props('CreationPreviewStep').onRegister()
   await tick()
   f.render()
-  assert.equal(f.props('CreationPreviewStep').registrationFailed, true)
-  assert.equal(f.props('CreationPreviewStep').preview.questTitle, '수정한 제목')
-  assert.match(f.props('CreationPreviewStep').error, /등록 응답/)
-  f.props('CreationPreviewStep').onEdit()
+  assert.equal(f.props('CreationResultStep').outcome, 'registerError')
+  assert.match(f.props('CreationResultStep').error, /등록 요청/)
+  f.props('CreationResultStep').onEdit()
   f.render()
-  assert.equal(f.props('CreationPreviewStep').registrationFailed, false)
+  assert.equal(f.props('CreationPreviewStep').preview.questTitle, '수정한 제목')
   f.register = async () => ({ questId: 701 })
   f.props('CreationPreviewStep').onRegister()
   await tick()
-  assert.match(textOf(f.render()), /등록 완료/)
+  f.render()
+  assert.equal(f.props('CreationResultStep').outcome, 'done')
   assert.deepEqual(f.calls.map(call => call.action), ['preview', 'register', 'register'])
   assert.equal(f.calls[1].file, null)
   assert.equal(f.calls[2].preview.questTitle, '수정한 제목')
@@ -277,8 +294,8 @@ test('생성 실패 후 수정하기는 입력을 보존하고 재시도 중 중
   f.props('CreationPhotoStep').onGenerate()
   await tick()
   let tree = f.render()
-  assert.match(textOf(tree), /AI 처리 실패/)
-  find(tree, 'button', props => props.children === '수정하기').props.onClick()
+  assert.match(f.props('CreationResultStep').error, /AI 처리 실패/)
+  f.props('CreationResultStep').onEdit()
   f.render()
   assert.equal(f.props('CreationDetailsStep').place, place)
   f.props('CreationDetailsStep').onNext()
@@ -400,12 +417,12 @@ test('빠른 생성 오류도 진입 완료 뒤 표시하며 수정하기는 역
   f.complete()
   assert.equal(f.props('CreationScreen').screen.stage, 'previewError')
   let tree = f.render(false)
-  const edit = find(tree, 'button', props => props.children === '수정하기')
-  edit.props.onClick()
+  const edit = f.props('CreationResultStep').onEdit
+  edit()
   f.render(false)
   assert.equal(f.props('CreationScreen').screen.stage, 'previewError')
   f.complete()
-  edit.props.onClick()
+  edit()
   tree = f.render(false)
   assert.equal(f.props('CreationScreen').screen.direction, -1)
   assert.equal(f.props('CreationDetailsStep').place, place)
@@ -712,4 +729,163 @@ test('최종 등록은 미리보기 화면을 유지하고 편집·중복 제출
   assert.equal(f.props('CreationScreen').isTransitioning, true)
   f.complete()
   f.unmount()
+})
+
+test('결과 화면은 완료·생성 실패·등록 실패·등록 미확인의 문구와 복구 동작을 구분한다', () => {
+  for (const outcome of ['done', 'previewError', 'registerError']) {
+    const actions = []
+    const tree = Result({ outcome, error: '서버 안내', uncertain: false, active: true, reducedMotion: false,
+      onEdit: () => actions.push('edit'), onRetry: () => actions.push('retry') })
+    assert.equal(tree.props['data-failed'], outcome !== 'done')
+    assert.equal(find(tree, 'FloatingEnvelope').props.failed, outcome !== 'done')
+    if (outcome === 'done') {
+      assert.match(textOf(tree), /등록 완료/)
+      assert.equal(find(tree, 'Link').props.to, '/')
+      assert.equal(find(tree, 'p', props => props.role === 'alert'), null)
+    } else {
+      assert.match(textOf(tree), /만들지 못했어요/)
+      assert.match(textOf(find(tree, 'p', props => props.role === 'alert')), /서버 안내/)
+      const edit = find(tree, 'button', props => props.className === 'creation-secondary')
+      const retry = find(tree, 'button', props => props.className === 'creation-primary')
+      assert.equal(textOf(retry), outcome === 'previewError' ? '다시 만들기' : '다시 등록하기')
+      edit.props.onClick()
+      retry.props.onClick()
+      assert.deepEqual(actions, ['edit', 'retry'])
+    }
+  }
+  const tree = Result({ outcome: 'registerError', uncertain: true, error: '', active: true, reducedMotion: false })
+  assert.match(textOf(tree), /등록 결과를확인해 주세요/)
+  assert.doesNotMatch(textOf(tree), /만들지 못했어요|다시 등록하기/)
+  assert.equal(find(tree, 'Link').props.to, '/me')
+  assert.equal(find(tree, 'FloatingEnvelope').props.uncertain, true)
+})
+
+test('편지 레이어만 4초 주기로 8px 부유하고 전환 중·퇴장·애니메이션 줄이기에서는 멈춘다', () => {
+  let present = true
+  const Envelope = load('components/creation/FloatingEnvelope.tsx', {
+    'motion/react': { motion: { svg: 'motion.svg' }, useIsPresent: () => present },
+  })
+  const props = { failed: false, uncertain: false, active: true, reducedMotion: false }
+  let tree = Envelope(props)
+  assert.equal(tree.type, 'motion.svg')
+  assert.deepEqual(Array.from(tree.props.animate.y), [0, -8, 0])
+  assert.equal(tree.props.transition.duration, 4)
+  assert.equal(tree.props.transition.repeat, Infinity)
+  assert.equal(textOf(tree), '완료')
+  assert.equal(textOf(Envelope({ ...props, failed: true })), '반송')
+  assert.equal(textOf(Envelope({ ...props, failed: true, uncertain: true })), '확인')
+  for (const next of [{ active: false }, { reducedMotion: true }]) {
+    tree = Envelope({ ...props, ...next })
+    assert.equal(tree.props.animate.y, 0)
+    assert.equal(tree.props.transition.repeat, 0)
+  }
+  present = false
+  assert.equal(Envelope(props).props.transition.repeat, 0)
+})
+
+test('등록 불명확 시 입력을 읽기 전용으로 보존하고 생성·등록 재시도 대신 등록 내역을 안내한다', async () => {
+  let invalidResponse
+  try { await registrationApi.registerQuest({ ...place, questType: 'GENERAL', longingText: '그리운 이유' }, preview, null, new AbortController().signal) }
+  catch (cause) { invalidResponse = cause }
+  assert.ok(invalidResponse)
+  for (const cause of [new axios.AxiosError('Network', 'ERR_NETWORK'), invalidResponse, { isAxiosError: true, response: { status: 504 } }]) {
+    const f = pageFixture()
+    f.fill()
+    f.props('CreationPhotoStep').onGenerate()
+    await tick()
+    f.render()
+    f.props('CreationPreviewStep').onChange({ ...preview, questTitle: '보존할 제목', questDescription: '보존할 설명' })
+    f.render()
+    f.register = async () => { throw cause }
+    f.props('CreationPreviewStep').onRegister()
+    await tick()
+    f.render()
+    const result = f.props('CreationResultStep')
+    assert.equal(result.outcome, 'registerError')
+    assert.equal(result.uncertain, true)
+    assert.match(result.error, /등록 내역을 먼저 확인/)
+    assert.equal(find(Result(result), 'Link').props.to, '/me')
+    result.onRetry()
+    assert.equal(f.calls.length, 2)
+    result.onEdit()
+    f.render()
+    const preserved = f.props('CreationPreviewStep')
+    assert.equal(preserved.preview.questTitle, '보존할 제목')
+    assert.equal(preserved.preview.questDescription, '보존할 설명')
+    assert.equal(preserved.registrationUncertain, true)
+    assert.equal(find(Preview(preserved), 'input').props.readOnly, true)
+    preserved.onRegister()
+    assert.equal(f.calls.length, 2)
+    f.props('CreationHeader').onBack()
+    f.render()
+    assert.equal(f.props('CreationResultStep').uncertain, true)
+    assert.deepEqual(f.invalidations.map(item => item.queryKey[0]), ['my-quests', 'quests'])
+    f.unmount()
+  }
+})
+
+test('확정된 등록 거절은 편집한 문구·사진을 그대로 재등록하며 AI 생성은 반복하지 않는다', async () => {
+  const f = pageFixture()
+  f.fill('IMAGE')
+  const file = new File(['photo'], 'memory.jpg', { type: 'image/jpeg' })
+  f.props('CreationPhotoStep').onChoose(file)
+  await tick()
+  f.render()
+  f.props('CreationPhotoStep').onGenerate()
+  await tick()
+  f.render()
+  f.props('CreationPreviewStep').onChange({ ...preview, questTitle: '편집한 제목' })
+  f.render()
+  f.register = async () => { throw { isAxiosError: true, response: { status: 400, data: { message: '요청을 확인해 주세요.' } } } }
+  f.props('CreationPreviewStep').onRegister()
+  await tick()
+  f.render()
+  assert.equal(f.props('CreationResultStep').uncertain, false)
+  assert.equal(f.invalidations.length, 0)
+  f.register = async () => ({ questId: 701 })
+  const retry = f.props('CreationResultStep').onRetry
+  retry()
+  retry()
+  await tick()
+  f.render()
+  assert.equal(f.props('CreationResultStep').outcome, 'done')
+  assert.deepEqual(f.calls.map(item => item.action), ['preview', 'register', 'register'])
+  assert.equal(f.calls[2].file, file)
+  assert.equal(f.calls[2].preview.questTitle, '편집한 제목')
+  f.unmount()
+})
+
+test('등록 성공은 내 목록·주변 목록·추천 캐시를 갱신하고 페이지 종료 뒤 늦은 응답은 캐시를 건드리지 않는다', async () => {
+  const client = new QueryClient({ defaultOptions: { queries: { gcTime: Infinity } } })
+  const keys = [['my-quests', 1], ['quests', 'nearby', 1], ['quests', 'nearest', 1]]
+  for (const key of [...keys, ['unrelated']]) client.setQueryData(key, {})
+  const f = pageFixture()
+  f.client = client
+  try {
+    f.fill()
+    f.props('CreationPhotoStep').onGenerate()
+    await tick()
+    f.render()
+    f.props('CreationPreviewStep').onRegister()
+    await tick()
+    f.render()
+    assert.equal(f.props('CreationResultStep').outcome, 'done')
+    for (const key of keys) assert.equal(client.getQueryState(key).isInvalidated, true)
+    assert.equal(client.getQueryState(['unrelated']).isInvalidated, false)
+  } finally {
+    f.unmount()
+    client.clear()
+  }
+  const closed = pageFixture()
+  closed.fill()
+  closed.props('CreationPhotoStep').onGenerate()
+  await tick()
+  closed.render()
+  let resolve
+  closed.register = () => new Promise(done => { resolve = done })
+  closed.props('CreationPreviewStep').onRegister()
+  closed.unmount()
+  resolve({ questId: 701 })
+  await tick()
+  assert.equal(closed.invalidations.length, 0)
 })

@@ -1,20 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router'
 import { useQueryClient } from '@tanstack/react-query'
-import { MailOpen } from 'lucide-react'
 import { AnimatePresence, useReducedMotion } from 'motion/react'
 import CreationHeader from '../components/creation/CreationHeader'
 import CreationDetailsStep from '../components/creation/CreationDetailsStep'
 import CreationPhotoStep from '../components/creation/CreationPhotoStep'
 import CreationPreviewStep from '../components/creation/CreationPreviewStep'
 import CreationGeneratingStep from '../components/creation/CreationGeneratingStep'
+import CreationResultStep from '../components/creation/CreationResultStep'
 import CreationScreen from '../components/creation/CreationScreen'
 import { useCreationTransition } from '../components/creation/useCreationTransition'
 import type { CreationDirection, CreationStage } from '../components/creation/questCreationMotion'
 import { creationScreenKey } from '../components/creation/questCreationMotion'
 import '../components/creation/questCreation.css'
 import {
-  previewQuest, registerQuest, registrationError,
+  previewQuest, registerQuest, registrationError, isRegistrationUncertain,
   type RegistrationPlace, type RegistrationPreview,
 } from '../api/questRegistration'
 import { decodeQuestPhoto } from '../lib/questPhoto'
@@ -33,6 +32,7 @@ export default function QuestCreatePage() {
   const [readingPhoto, setReadingPhoto] = useState(false)
   const [preview, setPreview] = useState<RegistrationPreview | null>(null)
   const [error, setError] = useState('')
+  const [registrationUncertain, setRegistrationUncertain] = useState(false)
   const request = useRef<AbortController | null>(null)
   const generating = useRef(false)
   const photoRequest = useRef(0)
@@ -40,6 +40,12 @@ export default function QuestCreatePage() {
   const busy = stage === 'generating' || stage === 'registering'
   const step = stage === 'details' ? 1 : stage === 'photo' || stage === 'generating' ? 2 : 3
   const general = questType === 'GENERAL'
+  const failed = stage === 'previewError' || stage === 'registerError'
+
+  function invalidateQuestLists() {
+    void queryClient.invalidateQueries({ queryKey: ['my-quests'] })
+    void queryClient.invalidateQueries({ queryKey: ['quests'] })
+  }
 
   useEffect(() => () => { if (photoUrl) URL.revokeObjectURL(photoUrl) }, [photoUrl])
   useEffect(() => () => {
@@ -58,6 +64,13 @@ export default function QuestCreatePage() {
     if (!moveScreen(next, direction)) return false
     setError('')
     return true
+  }
+
+  function goBack() {
+    if (stage === 'photo') move('details', -1)
+    else if (stage === 'registerError') move('preview', -1)
+    else if (stage === 'preview' && registrationUncertain) move('registerError', -1)
+    else move('photo', -1)
   }
 
   async function choosePhoto(file: File) {
@@ -81,7 +94,7 @@ export default function QuestCreatePage() {
   }
 
   async function generate() {
-    if (!place || !reason.trim() || (!general && !photo) || readingPhoto || request.current || generating.current) return
+    if (registrationUncertain || !place || !reason.trim() || (!general && !photo) || readingPhoto || request.current || generating.current) return
     if (!move('generating')) return
     generating.current = true
     setPreview(null)
@@ -103,16 +116,20 @@ export default function QuestCreatePage() {
   }
 
   async function register() {
-    if (!place || !preview || !preview.questTitle.trim() || !preview.questDescription.trim() || request.current) return
+    if (registrationUncertain || !place || !preview || !preview.questTitle.trim() || !preview.questDescription.trim() || request.current) return
     if (!move('registering')) return
     const controller = new AbortController()
     request.current = controller
     try {
       await registerQuest({ ...place, questType, longingText: reason.trim() }, preview, photo?.file ?? null, controller.signal)
-      void queryClient.invalidateQueries({ queryKey: ['my-quests'] })
-      if (!controller.signal.aborted) show('done')
+      if (controller.signal.aborted) return
+      invalidateQuestLists()
+      show('done')
     } catch (cause) {
       if (controller.signal.aborted) return
+      const uncertain = isRegistrationUncertain(cause)
+      setRegistrationUncertain(uncertain)
+      if (uncertain) invalidateQuestLists()
       setError(registrationError(cause, 'register'))
       show('registerError')
     } finally {
@@ -124,9 +141,11 @@ export default function QuestCreatePage() {
     <section
       aria-label="그리움 등록"
       className="quest-create-page"
-      data-result={stage === 'generating' || stage === 'done' || stage === 'previewError'}
+      data-result={stage === 'generating' || stage === 'done' || failed}
+      data-failed={failed}
       data-generating={stage === 'generating'}
     >
+      <div className="creation-failure-backdrop" aria-hidden="true" />
       <CreationHeader
         step={step}
         backToHome={stage === 'details'}
@@ -134,7 +153,7 @@ export default function QuestCreatePage() {
         hidden={stage === 'done'}
         isTransitioning={isTransitioning}
         reducedMotion={reducedMotion}
-        onBack={() => move(stage === 'photo' ? 'details' : stage === 'registerError' ? 'preview' : 'photo', -1)}
+        onBack={goBack}
       />
 
       <div className="creation-content" aria-busy={isTransitioning}>
@@ -181,41 +200,29 @@ export default function QuestCreatePage() {
               />
             )}
 
-            {stage === 'previewError' && (
-              <div className="creation-step">
-                <MailOpen className="mx-auto mt-10 size-32 text-[#6794a3]" strokeWidth={1} aria-hidden="true" />
-                <h1 className="creation-title">퀘스트를<br />만들지 못했어요</h1>
-                <p role="alert" className="creation-description">{error}</p>
-                <div className="creation-actions">
-                  <button type="button" className="creation-secondary" onClick={() => move('details', -1)}>수정하기</button>
-                  <button type="button" className="creation-primary" onClick={() => void generate()}>다시 만들기</button>
-                </div>
-              </div>
-            )}
-
-            {(stage === 'preview' || stage === 'registering' || stage === 'registerError') && preview && (
+            {(stage === 'preview' || stage === 'registering') && preview && (
               <CreationPreviewStep
                 preview={preview}
                 photoUrl={photoUrl ?? null}
                 placeName={place?.placeName ?? ''}
-                registrationFailed={stage === 'registerError'}
                 registering={stage === 'registering'}
+                registrationUncertain={registrationUncertain}
                 error={error}
                 onChange={setPreview}
-                onEdit={() => move('preview', -1)}
                 onRegister={() => { void register() }}
               />
             )}
 
-            {stage === 'done' && (
-              <div className="creation-step">
-                <MailOpen className="mx-auto mt-24 size-40 text-[#6794a3]" strokeWidth={1} aria-hidden="true" />
-                <h1 className="creation-title">등록 완료</h1>
-                <p className="creation-description">누군가 다녀오면 안부가 도착해요.</p>
-                <div className="creation-actions">
-                  <Link to="/" className="creation-primary">지도에서 보기</Link>
-                </div>
-              </div>
+            {(stage === 'done' || stage === 'previewError' || stage === 'registerError') && (
+              <CreationResultStep
+                outcome={stage}
+                error={error}
+                uncertain={registrationUncertain}
+                active={!isTransitioning}
+                reducedMotion={reducedMotion}
+                onEdit={() => move(stage === 'previewError' ? 'details' : 'preview', -1)}
+                onRetry={() => { if (stage === 'previewError') void generate(); else void register() }}
+              />
             )}
           </CreationScreen>
         </AnimatePresence>

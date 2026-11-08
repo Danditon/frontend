@@ -59,7 +59,7 @@ export function RootLayout() {
       </div>
 
       <p className="text-[#ccc] text-[11px] p-[14px] max-[500px]:hidden group-data-[history=true]:hidden">
-        그리움 퀘스트 · UI 미리보기
+        그립데이 · UI 미리보기
       </p>
     </div>
   );

@@ -83,7 +83,7 @@ export default function OnboardingScreen() {
         className="flex h-dvh w-full max-w-[500px] flex-col overflow-y-auto overscroll-contain bg-[#FCFDFB] text-[#242624] min-[501px]:h-[calc(100dvh-3rem)] min-[501px]:max-w-[390px] min-[501px]:rounded-[28px] min-[501px]:shadow-lg"
       >
         <header className="flex shrink-0 items-center justify-between px-7 pt-[max(1rem,env(safe-area-inset-top,0px))]">
-          <span className="text-xl font-bold tracking-[-0.05em]">그리움</span>
+          <span className="text-xl font-bold tracking-[-0.05em]">그립데이</span>
           <button
             type="button"
             onClick={finishOnboarding}

@@ -134,7 +134,6 @@
 .designed-screen { font-family: Arial, 'Malgun Gothic', sans-serif; overflow:hidden; }
 .memory-page { background:linear-gradient(180deg,#fff 38%,#dff2f6 100%); }
 .memory-page:has(.message-envelope),.memory-page:has(>div>h1) {background:#fff;}
-.memory-page>header>span {background:#ff49bb;}
 .memory-page>div.grid>a {background:#f3f3f3;}
 .memory-page>div.grid>a.selected {background:#c9eaf5;}
 .memory-page>div.grid>a>span {background:#242624;color:#fff;}

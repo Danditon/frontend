@@ -8,7 +8,7 @@ export function useQuestDetail(questId: number | null) {
   const userId = status === 'authenticated' ? user.userId : null
 
   return useQuery({
-    // 카드·Drawer·navbar는 같은 상세를 공유하고, 다른 사용자의 캐시는 분리합니다.
+    // 추천 바와 Drawer는 같은 상세를 공유하고, 다른 사용자의 캐시는 분리합니다.
     queryKey: ['quests', 'detail', userId, questId],
 
     queryFn: ({ signal }) => {
@@ -19,7 +19,7 @@ export function useQuestDetail(questId: number | null) {
       return getQuestDetail(questId, signal)
     },
 
-    // 목록 전체가 아니라 선택한 ID와 가까운 카드 등 필요한 상세만 조회합니다.
+    // 목록 전체가 아니라 선택한 ID 등 필요한 상세만 조회합니다.
     enabled: userId !== null && questId !== null,
 
     staleTime: 30_000,

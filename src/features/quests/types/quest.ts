@@ -20,7 +20,7 @@ export type NearbyQuestParams = {
   difficulty?: NearbyQuest['difficulty']
 }
 
-// 퀘스트 상세 화면과 수행 중 카드에서 사용하는 상세 데이터입니다.
+// 퀘스트 상세 화면과 가까운 퀘스트 추천에서 사용하는 상세 데이터입니다.
 export type QuestDetail = {
   questId: number
   questType: NearbyQuest['questType']

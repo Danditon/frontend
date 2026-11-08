@@ -1,7 +1,8 @@
 import { Link } from "react-router";
 import { ChevronLeft, ChevronsRight, LogOut, MailPlus, House, UserRound } from "lucide-react";
 import type { ReactNode } from "react";
-import QuestVerifyNavItem from "@/features/quests/components/QuestVerifyNavItem";
+import NearbyQuestNavItem from "@/features/quests/components/NearbyQuestNavItem";
+import type { NearbyNavigation } from "@/features/quests/types/nearbyNavigation";
 export function Back({ to = "/me/memories" }: { to?: string }) {
   return (
     <Link
@@ -33,13 +34,13 @@ export function Profile({ nickname, email }: { nickname?: string; email?: string
   );
 }
 // 모든 화면에서 같은 크기와 간격으로 사용하는 공용 하단 navbar입니다.
-export function Bottom() {
+export function Bottom({ nearbyNavigation = null }: { nearbyNavigation?: NearbyNavigation | null }) {
   return (
     <nav
       className="absolute bottom-[26px] left-[15px] right-[15px] h-[62px] rounded-[36px] bg-[#242624] text-white grid grid-cols-3 place-items-center px-4 text-[14px] max-[500px]:[bottom:max(26px,_env(safe-area-inset-bottom))]"
       aria-label="주 메뉴"
     >
-      <QuestVerifyNavItem />
+      <NearbyQuestNavItem count={nearbyNavigation?.count ?? null} isLoading={nearbyNavigation?.isLoading ?? false} />
       <Link
         to="/"
         className="relative -translate-y-[22px] h-[60px] w-[60px] bg-white text-[#242624] rounded-full grid place-items-center text-[18px]"

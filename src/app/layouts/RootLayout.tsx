@@ -1,9 +1,12 @@
 import { Outlet, useLocation, useSearchParams } from "react-router";
 import { Bottom } from "@/shared/components/WireUI";
+import { useState } from "react";
+import type { NearbyNavigation, QuestMapOutletContext } from "@/features/quests/types/nearbyNavigation";
 
 export function RootLayout() {
   const { pathname } = useLocation();
   const [params] = useSearchParams();
+  const [nearbyNavigation, setNearbyNavigation] = useState<NearbyNavigation | null>(null);
 
   const greetingScreen =
     pathname.startsWith("/me") &&
@@ -42,7 +45,7 @@ export function RootLayout() {
           data-home={pathname === "/" || pathname === "/me/history"}
           data-mypage={pathname === "/me"}
         >
-          <Outlet />
+          <Outlet context={{ onNearbyNavigationChange: setNearbyNavigation } satisfies QuestMapOutletContext} />
         </main>
 
         {!greetingScreen && !isAuthPage && !isQuestRegistration && !isQuestVerificationFlow && (
@@ -53,7 +56,7 @@ export function RootLayout() {
                 : ""
             }`}
           >
-            <Bottom />
+            <Bottom nearbyNavigation={pathname === "/" ? nearbyNavigation : null} />
           </div>
         )}
       </div>

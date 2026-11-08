@@ -521,29 +521,65 @@ test('오류 안내는 조회 중 중복 클릭을 막고 401에서 로그인 �
   assert.doesNotMatch(textOf(unauthorized), /이전에 불러온 결과/)
 })
 
-test('상세 Drawer는 재시도를 연결하고 일시적 오류의 기존 내용만 유지한다', () => {
+test('접힌 상세 미리보기는 사진이 있으면 사진만, 없으면 그리움과 수행 내용을 표시한다', () => {
+  const { default: Preview } = loadSource('features/quests/pages/home/components/QuestDetailPreview.tsx', {
+    '@/shared/components/RemotePhoto': { RemotePhoto: 'RemotePhoto' },
+  })
+  const quest = {
+    ...quests[0], photoUrl: 'https://example.com/quest.jpg',
+    longingText: '학교가 끝나면 들르던 서점이에요.',
+    questDescription: '서점이 그대로 있는지 확인해주세요.',
+  }
+  // GENERAL에도 사진이 있으면 사진을 쓰고, 본문은 확장하기 전에는 노출하지 않습니다.
+  const photo = Preview({ quest })
+  assert.equal(findNode(photo, 'RemotePhoto').props.photoUrl, quest.photoUrl)
+  assert.doesNotMatch(textOf(photo), /학교가 끝나면|서점이 그대로/)
+  for (const photoUrl of [null, '', '   ']) {
+    const noPhoto = Preview({ quest: { ...quest, questType: 'IMAGE', photoUrl } })
+    assert.equal(findNode(noPhoto, 'RemotePhoto'), null)
+    assert.match(textOf(noPhoto), /학교가 끝나면 들르던 서점/)
+    assert.match(textOf(noPhoto), /전해줄 안부 · 서점이 그대로/)
+  }
+})
+
+test('상세 Drawer는 미리보기·확장·고정 수행 버튼과 오류 재시도를 연결한다', () => {
   const retries = []
   let viewerPosition = position
+  let snapPoint = 0.4
   const query = {
     data: quests[0], isError: true, isPending: false, isFetching: false,
     error: new axios.AxiosError('Network', 'ERR_NETWORK'),
     refetch: (options) => { retries.push(options); return Promise.resolve() },
   }
   const { default: Drawer } = loadSource('features/quests/pages/home/components/QuestDetailDrawer.tsx', {
-    react: { useCallback: (fn) => fn, useRef: () => ({ current: null }), useState: (initial) => [initial, () => {}] },
-    'lucide-react': { X: 'X' },
+    react: { useCallback: (fn) => fn, useRef: () => ({ current: null }), useState: () => [snapPoint, (next) => { snapPoint = next }] },
+    'lucide-react': { ChevronUp: 'ChevronUp', X: 'X' },
     '@/shared/components/ui/button': { Button: 'Button' },
     '@/shared/components/RemotePhoto': { RemotePhoto: 'RemotePhoto' },
     '@/features/quests/hooks/useQuestDetail': { useQuestDetail: () => query },
     './QuestStartButton': { __esModule: true, default: 'QuestStartButton' },
+    './QuestDetailPreview': { __esModule: true, default: 'QuestDetailPreview' },
     './QuestQueryErrorNotice': { __esModule: true, default: 'QuestQueryErrorNotice' },
     '../utils/getQuestQueryError': queryErrorUtils,
     '../utils/getDistanceMeters': distanceUtils,
-    '@/shared/components/ui/drawer': Object.fromEntries(['Drawer', 'DrawerClose', 'DrawerContent', 'DrawerDescription', 'DrawerHeader', 'DrawerTitle'].map((name) => [name, name])),
+    '@/shared/components/ui/drawer': Object.fromEntries(['Drawer', 'DrawerClose', 'DrawerContent', 'DrawerDescription', 'DrawerFooter', 'DrawerHeader', 'DrawerTitle'].map((name) => [name, name])),
   })
   const render = () => Drawer({ questId: 701, position: viewerPosition, onPositionChange() {}, onClose() {} })
   let tree = render()
   assert.match(textOf(tree), /내 위치에서 약 0m/)
+  assert.equal(findNode(tree, 'QuestDetailPreview').props.quest, query.data)
+  assert.ok(findNode(findNode(tree, 'DrawerFooter'), 'QuestStartButton'))
+  assert.equal(findNode(tree, 'RemotePhoto'), null)
+  const expand = findNode(tree, 'Button')
+  assert.equal(expand.props['aria-expanded'], false)
+  expand.props.onClick()
+  const expanded = render()
+  assert.equal(findNode(expanded, 'QuestDetailPreview'), null)
+  assert.ok(findNode(expanded, 'RemotePhoto'))
+  assert.ok(findNode(findNode(expanded, 'DrawerFooter'), 'QuestStartButton'))
+  assert.equal(findNode(expanded, 'Button').props['aria-expanded'], true)
+  findNode(expanded, 'Button').props.onClick()
+  assert.ok(findNode(render(), 'QuestDetailPreview'))
   viewerPosition = { ...position, lat: position.lat - 0.001 }
   assert.match(textOf(render()), /내 위치에서 약 111m/)
   viewerPosition = { ...position, lng: position.lng - 0.1 }
@@ -559,6 +595,7 @@ test('상세 Drawer는 재시도를 연결하고 일시적 오류의 기존 내�
     query.error = httpError(status)
     tree = render()
     assert.equal(findNode(tree, 'QuestStartButton'), null)
+    assert.equal(findNode(tree, 'QuestDetailPreview'), null)
     assert.equal(findNode(tree, 'QuestQueryErrorNotice').props.info.keepPreviousData, false)
   }
 })

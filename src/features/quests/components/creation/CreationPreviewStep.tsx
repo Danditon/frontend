@@ -6,6 +6,7 @@ type Props = {
   photoUrl: string | null
   placeName: string
   registrationFailed: boolean
+  registering?: boolean
   error: string
   onChange: (preview: RegistrationPreview) => void
   onEdit: () => void
@@ -13,7 +14,7 @@ type Props = {
 }
 
 export default function CreationPreviewStep({
-  preview, photoUrl, placeName, registrationFailed, error, onChange, onEdit, onRegister,
+  preview, photoUrl, placeName, registrationFailed, registering = false, error, onChange, onEdit, onRegister,
 }: Props) {
   return (
     <div className="creation-step creation-preview">
@@ -46,6 +47,7 @@ export default function CreationPreviewStep({
             <span>퀘스트 제목</span>
             <input
               value={preview.questTitle}
+              disabled={registering}
               onChange={event => onChange({ ...preview, questTitle: event.target.value })}
             />
           </label>
@@ -54,6 +56,7 @@ export default function CreationPreviewStep({
             <textarea
               value={preview.questDescription}
               rows={4}
+              disabled={registering}
               onChange={event => onChange({ ...preview, questDescription: event.target.value })}
             />
           </label>
@@ -61,14 +64,15 @@ export default function CreationPreviewStep({
       )}
 
       <div className="creation-actions">
-        {registrationFailed && <button type="button" className="creation-secondary" onClick={onEdit}>문구 수정</button>}
+        {registrationFailed && <button type="button" className="creation-secondary" disabled={registering} onClick={onEdit}>문구 수정</button>}
         <button
           type="button"
           className="creation-primary"
-          disabled={!preview.questTitle.trim() || !preview.questDescription.trim()}
+          disabled={registering || !preview.questTitle.trim() || !preview.questDescription.trim()}
+          aria-busy={registering}
           onClick={onRegister}
         >
-          {registrationFailed ? '다시 등록하기' : '이대로 등록하기'}
+          {registering ? '등록 중…' : registrationFailed ? '다시 등록하기' : '이대로 등록하기'}
         </button>
       </div>
     </div>

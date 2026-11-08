@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CreationDirection, CreationNavigation, CreationStage, CreationTransitionKind } from './questCreationMotion'
+import { creationScreenKey } from './questCreationMotion'
 
 type Destination = Omit<CreationNavigation, 'id'>
 
@@ -22,10 +23,11 @@ export function useCreationTransition() {
 
   const start = useCallback((destination: Destination) => {
     if (!mounted.current || active.current.stage === destination.stage) return false
-    moving.current = true
+    // 최종 등록 중에는 같은 미리보기를 유지해 새 진입 애니메이션을 기다리지 않습니다.
+    moving.current = creationScreenKey(active.current.stage) !== creationScreenKey(destination.stage)
     active.current = { ...destination, id: active.current.id + 1 }
     setScreen(active.current)
-    setIsTransitioning(true)
+    setIsTransitioning(moving.current)
     return true
   }, [])
 

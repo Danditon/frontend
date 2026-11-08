@@ -1,15 +1,17 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import { useQueryClient } from '@tanstack/react-query'
-import { LoaderCircle, MailOpen } from 'lucide-react'
+import { MailOpen } from 'lucide-react'
 import { AnimatePresence, useReducedMotion } from 'motion/react'
 import CreationHeader from '../components/creation/CreationHeader'
 import CreationDetailsStep from '../components/creation/CreationDetailsStep'
 import CreationPhotoStep from '../components/creation/CreationPhotoStep'
 import CreationPreviewStep from '../components/creation/CreationPreviewStep'
+import CreationGeneratingStep from '../components/creation/CreationGeneratingStep'
 import CreationScreen from '../components/creation/CreationScreen'
 import { useCreationTransition } from '../components/creation/useCreationTransition'
 import type { CreationDirection, CreationStage } from '../components/creation/questCreationMotion'
+import { creationScreenKey } from '../components/creation/questCreationMotion'
 import '../components/creation/questCreation.css'
 import {
   previewQuest, registerQuest, registrationError,
@@ -32,6 +34,7 @@ export default function QuestCreatePage() {
   const [preview, setPreview] = useState<RegistrationPreview | null>(null)
   const [error, setError] = useState('')
   const request = useRef<AbortController | null>(null)
+  const generating = useRef(false)
   const photoRequest = useRef(0)
   const photoUrl = photo?.url
   const busy = stage === 'generating' || stage === 'registering'
@@ -40,9 +43,16 @@ export default function QuestCreatePage() {
 
   useEffect(() => () => { if (photoUrl) URL.revokeObjectURL(photoUrl) }, [photoUrl])
   useEffect(() => () => {
+    generating.current = false
     request.current?.abort()
     photoRequest.current += 1
   }, [])
+
+  const finishGeneration = useCallback(() => {
+    if (!generating.current || !preview || request.current) return
+    generating.current = false
+    show('preview', 'fade')
+  }, [preview, show])
 
   function move(next: CreationStage, direction: CreationDirection = 1) {
     if (!moveScreen(next, direction)) return false
@@ -71,20 +81,23 @@ export default function QuestCreatePage() {
   }
 
   async function generate() {
-    if (!place || !reason.trim() || (!general && !photo) || readingPhoto || request.current) return
+    if (!place || !reason.trim() || (!general && !photo) || readingPhoto || request.current || generating.current) return
     if (!move('generating')) return
+    generating.current = true
+    setPreview(null)
     const controller = new AbortController()
     request.current = controller
     try {
       const result = await previewQuest({ ...place, questType, longingText: reason.trim() }, controller.signal)
       if (controller.signal.aborted) return
       setPreview(result)
-      show('preview', 'fade')
     } catch (cause) {
+      generating.current = false
       if (controller.signal.aborted) return
       setError(registrationError(cause, 'preview'))
       show('previewError')
     } finally {
+      if (controller.signal.aborted) generating.current = false
       if (request.current === controller) request.current = null
     }
   }
@@ -111,7 +124,8 @@ export default function QuestCreatePage() {
     <section
       aria-label="그리움 등록"
       className="quest-create-page"
-      data-result={busy || stage === 'done' || stage === 'previewError'}
+      data-result={stage === 'generating' || stage === 'done' || stage === 'previewError'}
+      data-generating={stage === 'generating'}
     >
       <CreationHeader
         step={step}
@@ -126,7 +140,7 @@ export default function QuestCreatePage() {
       <div className="creation-content" aria-busy={isTransitioning}>
         <AnimatePresence initial={false} mode="sync" custom={{ direction: screen.direction, kind: screen.kind, reducedMotion }}>
           <CreationScreen
-            key={stage}
+            key={creationScreenKey(stage)}
             screen={screen}
             isTransitioning={isTransitioning}
             reducedMotion={reducedMotion}
@@ -157,14 +171,14 @@ export default function QuestCreatePage() {
               />
             )}
 
-            {busy && (
-              <div className="flex flex-1 flex-col items-center justify-center gap-8 py-10 text-center" role="status">
-                <h1 className="creation-title">{stage === 'generating' ? <>그리움을 퀘스트로<br />바꾸는 중…</> : '그리움을 등록하는 중…'}</h1>
-                {photoUrl ? <img src={photoUrl} alt="선택한 사진" className="size-44 rounded-full border-4 border-white object-cover" />
-                  : <MailOpen className="size-28 text-[#6794a3]" strokeWidth={1} />}
-                <LoaderCircle className="animate-spin text-[#9d781e]" aria-hidden="true" />
-                <p className="creation-description">잠시만 기다려 주세요.</p>
-              </div>
+            {stage === 'generating' && (
+              <CreationGeneratingStep
+                photoUrl={photoUrl ?? null}
+                ready={preview !== null}
+                active={!isTransitioning}
+                reducedMotion={reducedMotion}
+                onComplete={finishGeneration}
+              />
             )}
 
             {stage === 'previewError' && (
@@ -179,12 +193,13 @@ export default function QuestCreatePage() {
               </div>
             )}
 
-            {(stage === 'preview' || stage === 'registerError') && preview && (
+            {(stage === 'preview' || stage === 'registering' || stage === 'registerError') && preview && (
               <CreationPreviewStep
                 preview={preview}
                 photoUrl={photoUrl ?? null}
                 placeName={place?.placeName ?? ''}
                 registrationFailed={stage === 'registerError'}
+                registering={stage === 'registering'}
                 error={error}
                 onChange={setPreview}
                 onEdit={() => move('preview', -1)}

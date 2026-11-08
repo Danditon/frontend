@@ -46,6 +46,7 @@ const Photo = load('components/creation/CreationPhotoStep.tsx', {
   react: { useRef: () => ({ current: null }) }, 'lucide-react': { Plus: 'Plus', X: 'X' },
 })
 const Preview = load('components/creation/CreationPreviewStep.tsx', { 'lucide-react': { MapPin: 'MapPin' } })
+const creationMotion = load('components/creation/questCreationMotion.ts')
 const place = { placeName: '그리운 카페', address: '대구 중구', lat: 35.87, lng: 128.6 }
 const preview = { questTitle: '카페에 안부 남기기', questDescription: '방문하고 안부를 남겨주세요.', difficulty: 1, difficultyReason: '방문하기 쉬워요.' }
 const tick = () => new Promise(resolve => setImmediate(resolve))
@@ -81,11 +82,12 @@ function pageFixture() {
   }
   const Page = load('pages/QuestCreatePage.tsx', {
     react: hooks,
-    '../components/creation/useCreationTransition': load('components/creation/useCreationTransition.ts', { react: hooks }),
+    '../components/creation/useCreationTransition': load('components/creation/useCreationTransition.ts', { react: hooks, './questCreationMotion': creationMotion }),
+    '../components/creation/questCreationMotion': creationMotion,
     'motion/react': { AnimatePresence: 'AnimatePresence', useReducedMotion: () => f.reducedMotion },
     'react-router': { Link: 'Link' },
     '@tanstack/react-query': { useQueryClient: () => ({ invalidateQueries: options => f.invalidations.push(options) }) },
-    'lucide-react': { LoaderCircle: 'LoaderCircle', MailOpen: 'MailOpen' },
+    'lucide-react': { MailOpen: 'MailOpen' },
     '../lib/questPhoto': { decodeQuestPhoto: file => f.decode(file) },
     '../api/questRegistration': {
       previewQuest: (draft, signal) => { f.calls.push({ action: 'preview', draft, signal }); return f.generate() },
@@ -104,8 +106,12 @@ function pageFixture() {
       draw()
       // 기존 흐름 검사는 완료 이벤트를 전달하고, 전환 검사는 직접 완료 시점을 제어합니다.
       if (finishTransition) {
-        for (let i = 0; i < 10 && this.props('CreationScreen').isTransitioning; i++) {
-          this.props('CreationScreen').onComplete(this.props('CreationScreen').screen.id)
+        for (let i = 0; i < 10; i++) {
+          const screen = this.props('CreationScreen')
+          const generating = find(tree, 'CreationGeneratingStep')
+          if (screen.isTransitioning) screen.onComplete(screen.screen.id)
+          else if (generating?.props.ready) generating.props.onComplete()
+          else break
           draw()
         }
       }
@@ -283,7 +289,7 @@ test('생성 실패 후 수정하기는 입력을 보존하고 재시도 중 중
   generate()
   generate()
   tree = f.render()
-  assert.match(textOf(tree), /바꾸는 중/)
+  assert.equal(f.props('CreationGeneratingStep').ready, false)
   assert.equal(f.props('CreationHeader').busy, true)
   assert.equal(f.calls.length, 2)
   resolvePreview(preview)
@@ -358,6 +364,11 @@ test('빠른 생성 응답도 생성 화면의 진입 완료를 기다리고 미
   assert.equal(f.props('CreationScreen').screen.stage, 'generating')
   assert.equal(f.props('CreationHeader').step, 2)
   f.complete(generatingId)
+  assert.equal(f.props('CreationScreen').screen.stage, 'generating')
+  assert.equal(f.props('CreationGeneratingStep').active, true)
+  assert.equal(f.props('CreationGeneratingStep').ready, true)
+  f.props('CreationGeneratingStep').onComplete()
+  f.render(false)
   const arrival = f.props('CreationScreen')
   assert.equal(arrival.screen.stage, 'preview')
   assert.equal(arrival.screen.kind, 'fade')
@@ -371,8 +382,6 @@ test('빠른 생성 응답도 생성 화면의 진입 완료를 기다리고 미
   f.props('CreationPreviewStep').onRegister()
   await tick()
   f.render(false)
-  assert.equal(f.props('CreationScreen').screen.stage, 'registering')
-  f.complete()
   assert.equal(f.props('CreationScreen').screen.stage, 'done')
   assert.equal(f.props('CreationHeader').hidden, true)
   f.complete()
@@ -482,4 +491,225 @@ test('화면 종료 후 대기 중인 결과와 오래된 전환 완료 이벤�
   finish(id)
   generate()
   assert.equal(f.calls.length, 1)
+})
+
+function generationFixture() {
+  const effects = [], animations = [], timers = new Map()
+  let cursor = 0, pending = [], now = 0, timerId = 0, slow = false
+  const progress = { value: 0, get() { return this.value }, set(value) { this.value = value } }
+  const f = { present: true, completed: 0, animations, progress }
+  const props = { photoUrl: null, ready: false, active: true, reducedMotion: false, onComplete: () => { f.completed++ } }
+  const Generate = load('components/creation/CreationGeneratingStep.tsx', {
+    react: {
+      useState: () => [slow, value => { slow = value }],
+      useEffect(run, deps) {
+        const index = cursor++
+        if (!effects[index] || deps.some((value, i) => !Object.is(value, effects[index].deps[i]))) {
+          pending.push(() => {
+            effects[index]?.cleanup?.()
+            effects[index] = { deps, cleanup: run() }
+          })
+        }
+      },
+    },
+    'lucide-react': { MailOpen: 'MailOpen' },
+    'motion/react': {
+      motion: { circle: 'motion.circle' },
+      useIsPresent: () => f.present,
+      useMotionValue: () => progress,
+      useTransform: (value, transform) => ({ get: () => transform(value.get()) }),
+      animate(value, target, options) {
+        const animation = { value, from: value.get(), target, options, start: now, running: true }
+        animations.push(animation)
+        return { stop() { animation.running = false } }
+      },
+    },
+  }, {
+    setTimeout: (run, delay) => { const id = ++timerId; timers.set(id, { run, at: now + delay }); return id },
+    clearTimeout: id => timers.delete(id),
+  })
+  return Object.assign(f, {
+    render(next = {}) {
+      Object.assign(props, next)
+      cursor = 0; pending = []
+      const tree = Generate(props)
+      for (const run of pending) run()
+      return tree
+    },
+    advance(ms) {
+      now += ms
+      for (const animation of animations) {
+        if (!animation.running) continue
+        const fraction = Math.min(1, (now - animation.start) / (animation.options.duration * 1000))
+        animation.value.set(animation.from + (animation.target - animation.from) * fraction)
+        if (fraction === 1) {
+          animation.running = false
+          animation.options.onComplete()
+        }
+      }
+      for (const [id, timer] of timers) {
+        if (timer.at > now) continue
+        timers.delete(id)
+        timer.run()
+      }
+    },
+    unmount() { for (const effect of effects) effect.cleanup?.() },
+  })
+}
+
+test('대기 링은 10초에 88%까지 채우고 응답이 없으면 90초 뒤에도 완료하지 않는다', () => {
+  const f = generationFixture()
+  let tree = f.render({ photoUrl: 'blob:memory' })
+  assert.equal(find(tree, 'img').props.src, 'blob:memory')
+  assert.equal(find(tree, 'LoaderCircle'), null)
+  assert.equal(find(tree, 'svg').props['aria-hidden'], 'true')
+  f.advance(5000)
+  assert.ok(Math.abs(f.progress.get() - 0.44) < 0.0001)
+  f.render()
+  assert.equal(f.animations.length, 1)
+  f.advance(5000)
+  assert.equal(f.progress.get(), 0.88)
+  assert.equal(f.completed, 0)
+  f.advance(80000)
+  tree = f.render()
+  assert.equal(f.progress.get(), 0.88)
+  assert.equal(f.completed, 0)
+  assert.match(textOf(tree), /처리가 조금 더 걸리고/)
+  assert.ok(Math.abs(find(tree, 'motion.circle').props.style.strokeDashoffset.get() - 0.12) < 0.0001)
+  f.unmount()
+})
+
+test('부분 진행 중 응답이 오면 현재 위치에서 100%를 채운 뒤 한 번만 완료한다', () => {
+  const f = generationFixture()
+  f.render()
+  f.advance(2000)
+  const before = f.progress.get()
+  f.render({ ready: true })
+  assert.equal(f.progress.get(), before)
+  assert.equal(f.animations[0].running, false)
+  assert.equal(f.animations[1].options.duration, 0.45)
+  f.advance(449)
+  assert.ok(f.progress.get() > before && f.progress.get() < 1)
+  assert.equal(f.completed, 0)
+  f.advance(1)
+  assert.equal(f.progress.get(), 1)
+  assert.equal(f.completed, 1)
+  f.advance(10000)
+  assert.equal(f.completed, 1)
+  f.unmount()
+})
+
+test('빠른 응답은 진입 완료 후 곧바로 완료 링을 채우고 사진 없는 일반 퀘스트는 편지로 표시한다', () => {
+  const f = generationFixture()
+  let tree = f.render({ active: false })
+  assert.equal(find(tree, 'img'), null)
+  assert.ok(find(tree, 'MailOpen'))
+  f.render({ ready: true })
+  f.advance(10000)
+  assert.equal(f.animations.length, 0)
+  assert.equal(f.completed, 0)
+  tree = f.render({ active: true })
+  assert.match(textOf(tree), /내용을 준비했어요/)
+  assert.equal(f.animations[0].target, 1)
+  assert.equal(f.animations[0].options.duration, 0.45)
+  f.advance(450)
+  assert.equal(f.completed, 1)
+  f.unmount()
+})
+
+test('오류로 나가거나 페이지를 종료하면 링·안내 타이머·늦은 완료 콜백을 중지한다', () => {
+  for (const exit of [true, false]) {
+    const f = generationFixture()
+    f.render()
+    f.advance(1000)
+    f.render({ ready: true })
+    const late = f.animations.at(-1).options.onComplete
+    if (exit) {
+      f.present = false
+      f.render()
+    } else f.unmount()
+    const stoppedAt = f.progress.get()
+    f.advance(90000)
+    late()
+    assert.equal(f.completed, 0)
+    assert.equal(f.progress.get(), stoppedAt)
+    assert.ok(f.animations.every(animation => !animation.running))
+    f.unmount()
+  }
+})
+
+test('애니메이션 줄이기에서도 성공 응답 전에는 88%까지만 채운다', () => {
+  const f = generationFixture()
+  f.render({ reducedMotion: true })
+  f.advance(120)
+  assert.equal(f.progress.get(), 0.88)
+  assert.equal(f.completed, 0)
+  f.render({ ready: true })
+  f.advance(120)
+  assert.equal(f.progress.get(), 1)
+  assert.equal(f.completed, 1)
+  f.unmount()
+})
+
+test('재생성은 이전 결과를 초기화하고 링 완료 전의 중복 생성·등록을 막는다', async () => {
+  const f = pageFixture()
+  f.fill()
+  const generate = f.props('CreationPhotoStep').onGenerate
+  generate()
+  await tick()
+  f.render(false)
+  f.complete()
+  generate()
+  assert.equal(f.calls.length, 1)
+  assert.equal(f.props('CreationGeneratingStep').ready, true)
+  f.props('CreationGeneratingStep').onComplete()
+  f.render()
+  f.props('CreationHeader').onBack()
+  f.render()
+  let resolvePreview
+  f.generate = () => new Promise(resolve => { resolvePreview = resolve })
+  f.props('CreationPhotoStep').onGenerate()
+  f.render()
+  assert.equal(f.props('CreationGeneratingStep').ready, false)
+  assert.equal(f.calls.length, 2)
+  resolvePreview({ ...preview, questTitle: '다시 생성한 제목' })
+  await tick()
+  f.render()
+  assert.equal(f.props('CreationPreviewStep').preview.questTitle, '다시 생성한 제목')
+  f.unmount()
+})
+
+test('최종 등록은 미리보기 화면을 유지하고 편집·중복 제출을 잠그며 응답 후 결과로 전환한다', async () => {
+  const f = pageFixture()
+  f.fill()
+  f.props('CreationPhotoStep').onGenerate()
+  await tick()
+  f.render()
+  let resolveRegister
+  f.register = () => new Promise(resolve => { resolveRegister = resolve })
+  const register = f.props('CreationPreviewStep').onRegister
+  register()
+  f.render(false)
+  assert.equal(f.props('CreationScreen').screen.stage, 'registering')
+  assert.equal(f.props('CreationScreen').isTransitioning, false)
+  assert.equal(creationMotion.creationScreenKey('preview'), creationMotion.creationScreenKey('registering'))
+  assert.equal(f.props('CreationPreviewStep').registering, true)
+  assert.equal(f.props('CreationHeader').busy, true)
+  const previewTree = Preview(f.props('CreationPreviewStep'))
+  assert.equal(find(previewTree, 'input').props.disabled, true)
+  assert.equal(find(previewTree, 'textarea').props.disabled, true)
+  const button = find(previewTree, 'button', props => props.className === 'creation-primary')
+  assert.equal(button.props.disabled, true)
+  assert.equal(button.props['aria-busy'], true)
+  assert.equal(textOf(button), '등록 중…')
+  assert.equal(f.props('CreationPreviewStep').preview.questTitle, preview.questTitle)
+  register()
+  assert.equal(f.calls.filter(call => call.action === 'register').length, 1)
+  resolveRegister({ questId: 701 })
+  await tick()
+  f.render(false)
+  assert.equal(f.props('CreationScreen').screen.stage, 'done')
+  assert.equal(f.props('CreationScreen').isTransitioning, true)
+  f.complete()
+  f.unmount()
 })

@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 520" fill="none">
+  <path d="M0 0H480V520H0Z" fill="#E3F1F5"/>
+  <g fill="#F2F8F8" stroke="#D4E6EA" stroke-width="1.5">
+    <path d="M-20 25L126 0L97 95L-10 120Z"/>
+    <path d="M150 -10L262 0L230 119L122 100Z"/>
+    <path d="M285 -10L470 10L419 105L255 123Z"/>
+    <path d="M-10 149L92 126L60 231L-10 218Z"/>
+    <path d="M117 131L216 148L184 247L84 234Z"/>
+    <path d="M242 147L406 131L350 245L210 251Z"/>
+    <path d="M442 130L500 137L490 277L377 251Z"/>
+    <path d="M-10 248L170 280L142 384L-10 357Z"/>
+    <path d="M199 280L341 276L312 384L168 387Z"/>
+    <path d="M367 278L490 305L480 414L338 389Z"/>
+    <path d="M-10 389L132 414L100 530H-10Z"/>
+    <path d="M157 418L306 413L281 530H124Z"/>
+    <path d="M331 417L490 445V530H307Z"/>
+  </g>
+  <path d="M-30 331C99 305 113 350 215 322S369 262 510 300" stroke="#C5E4EE" stroke-width="25"/>
+  <g stroke="#FFFDF3" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M155 -30L105 113L64 252L29 382L-8 530" stroke-width="14"/>
+    <path d="M286 -20L244 137L192 266L151 405L120 540" stroke-width="13"/>
+    <path d="M469 -20L421 118L361 260L322 404L295 540" stroke-width="16"/>
+    <path d="M-20 137L108 109L236 135L420 117L510 139" stroke-width="14"/>
+    <path d="M-20 232L77 252L191 266L359 260L510 295" stroke-width="13"/>
+    <path d="M-20 371L149 402L322 403L510 438" stroke-width="16"/>
+  </g>
+  <g fill="#D5EADF">
+    <path d="M275 165L359 155L320 230L247 233Z"/>
+    <path d="M31 37L101 22L81 82L12 99Z"/>
+  </g>
+</svg>

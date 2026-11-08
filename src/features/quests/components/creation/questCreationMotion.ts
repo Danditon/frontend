@@ -13,6 +13,10 @@ export type CreationNavigation = {
 
 type MotionData = Pick<CreationNavigation, 'direction' | 'kind'> & { reducedMotion: boolean }
 
+export function creationScreenKey(stage: CreationStage) {
+  return stage === 'registering' ? 'preview' : stage
+}
+
 export function creationTransition(reducedMotion: boolean): Transition {
   return { duration: reducedMotion ? 0.12 : 0.36, ease: [0.22, 1, 0.36, 1] }
 }

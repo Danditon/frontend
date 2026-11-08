@@ -1,22 +1,34 @@
 import { ChevronLeft } from 'lucide-react'
 import { Link } from 'react-router'
+import { motion } from 'motion/react'
+import { creationTransition } from './questCreationMotion'
 
 type Props = {
   step: 1 | 2 | 3
   backToHome: boolean
   busy: boolean
+  isTransitioning: boolean
+  reducedMotion: boolean
+  hidden: boolean
   onBack: () => void
 }
 
-export default function CreationHeader({ step, backToHome, busy, onBack }: Props) {
+export default function CreationHeader({ step, backToHome, busy, isTransitioning, reducedMotion, hidden, onBack }: Props) {
   return (
-    <header className="creation-header">
+    <motion.header
+      className="creation-header"
+      initial={false}
+      animate={{ opacity: hidden ? 0 : 1 }}
+      transition={creationTransition(reducedMotion)}
+      aria-hidden={hidden}
+      inert={hidden || isTransitioning}
+    >
       {backToHome ? (
         <Link to="/" aria-label="홈으로 돌아가기" className="creation-back">
           <ChevronLeft size={20} aria-hidden="true" />
         </Link>
       ) : !busy && (
-        <button type="button" aria-label="이전 단계" className="creation-back" onClick={onBack}>
+        <button type="button" aria-label="이전 단계" className="creation-back" disabled={isTransitioning} onClick={onBack}>
           <ChevronLeft size={20} aria-hidden="true" />
         </button>
       )}
@@ -30,9 +42,15 @@ export default function CreationHeader({ step, backToHome, busy, onBack }: Props
         aria-valuenow={step}
       >
         {[1, 2, 3].map(index => (
-          <span key={index} data-active={index <= step} aria-hidden="true" />
+          <span key={index} aria-hidden="true">
+            <motion.span
+              initial={false}
+              animate={{ scaleX: index <= step ? 1 : 0 }}
+              transition={creationTransition(reducedMotion)}
+            />
+          </span>
         ))}
       </div>
-    </header>
+    </motion.header>
   )
 }

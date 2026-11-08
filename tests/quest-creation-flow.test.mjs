@@ -21,7 +21,7 @@ function load(path, dependencies = {}, globals = {}) {
       throw new Error(`Unexpected dependency: ${id}`)
     },
   })
-  return module.exports.default
+  return module.exports.default ?? module.exports
 }
 
 function find(tree, type, matches = () => true) {
@@ -55,29 +55,34 @@ function pageFixture() {
   let stateIndex = 0, refIndex = 0, effectIndex = 0, pending = [], tree, mounted = true
   const f = {
     calls: [], invalidations: [], revoked: [],
+    reducedMotion: false,
     decode: async () => 'blob:memory',
     generate: async () => ({ ...preview }),
     register: async () => ({ questId: 701 }),
   }
-  const Page = load('pages/QuestCreatePage.tsx', {
-    react: {
-      useRef(initial) { return refs[refIndex++] ??= { current: initial } },
-      useState(initial) {
-        const index = stateIndex++
-        if (!(index in states)) states[index] = initial
-        setters[index] ??= next => { if (mounted) states[index] = typeof next === 'function' ? next(states[index]) : next }
-        return [states[index], setters[index]]
-      },
-      useEffect(run, deps) {
-        const index = effectIndex++
-        if (!effects[index] || deps.some((value, i) => !Object.is(value, effects[index].deps[i]))) {
-          pending.push(() => {
-            effects[index]?.cleanup?.()
-            effects[index] = { deps, cleanup: run() }
-          })
-        }
-      },
+  const hooks = {
+    useCallback: callback => callback,
+    useRef(initial) { return refs[refIndex++] ??= { current: initial } },
+    useState(initial) {
+      const index = stateIndex++
+      if (!(index in states)) states[index] = initial
+      setters[index] ??= next => { if (mounted) states[index] = typeof next === 'function' ? next(states[index]) : next }
+      return [states[index], setters[index]]
     },
+    useEffect(run, deps) {
+      const index = effectIndex++
+      if (!effects[index] || deps.some((value, i) => !Object.is(value, effects[index].deps[i]))) {
+        pending.push(() => {
+          effects[index]?.cleanup?.()
+          effects[index] = { deps, cleanup: run() }
+        })
+      }
+    },
+  }
+  const Page = load('pages/QuestCreatePage.tsx', {
+    react: hooks,
+    '../components/creation/useCreationTransition': load('components/creation/useCreationTransition.ts', { react: hooks }),
+    'motion/react': { AnimatePresence: 'AnimatePresence', useReducedMotion: () => f.reducedMotion },
     'react-router': { Link: 'Link' },
     '@tanstack/react-query': { useQueryClient: () => ({ invalidateQueries: options => f.invalidations.push(options) }) },
     'lucide-react': { LoaderCircle: 'LoaderCircle', MailOpen: 'MailOpen' },
@@ -90,11 +95,25 @@ function pageFixture() {
   }, { AbortController, URL: { revokeObjectURL: url => f.revoked.push(url) } })
 
   return Object.assign(f, {
-    render() {
-      stateIndex = 0; refIndex = 0; effectIndex = 0; pending = []
-      tree = Page()
-      for (const run of pending) run()
+    render(finishTransition = true) {
+      const draw = () => {
+        stateIndex = 0; refIndex = 0; effectIndex = 0; pending = []
+        tree = Page()
+        for (const run of pending) run()
+      }
+      draw()
+      // 기존 흐름 검사는 완료 이벤트를 전달하고, 전환 검사는 직접 완료 시점을 제어합니다.
+      if (finishTransition) {
+        for (let i = 0; i < 10 && this.props('CreationScreen').isTransitioning; i++) {
+          this.props('CreationScreen').onComplete(this.props('CreationScreen').screen.id)
+          draw()
+        }
+      }
       return tree
+    },
+    complete(id = this.props('CreationScreen').screen.id) {
+      this.props('CreationScreen').onComplete(id)
+      return this.render(false)
     },
     props(name) { return find(tree, name).props },
     fill(type = 'GENERAL') {
@@ -295,4 +314,172 @@ test('페이지 종료 시 생성 요청을 취소하고 뒤늦게 읽은 사진
   resolvePhoto('blob:late')
   await tick()
   assert.deepEqual(photo.revoked, ['blob:late'])
+})
+
+test('다음은 오른쪽 진입, 뒤로는 왼쪽 진입이며 전환 중 연속 이동과 이전 완료 이벤트를 차단한다', () => {
+  const f = pageFixture()
+  f.render()
+  const initial = f.props('CreationDetailsStep')
+  initial.onPlaceChange(place)
+  initial.onReasonChange('그리운 이유')
+  initial.onNext()
+  f.render(false)
+  const arrival = f.props('CreationScreen')
+  assert.equal(arrival.screen.stage, 'photo')
+  assert.equal(arrival.screen.direction, 1)
+  assert.equal(arrival.isTransitioning, true)
+  assert.equal(f.props('CreationHeader').isTransitioning, true)
+  assert.equal(f.props('CreationHeader').step, 2)
+  f.props('CreationHeader').onBack()
+  initial.onNext()
+  f.render(false)
+  assert.equal(f.props('CreationScreen').screen.id, arrival.screen.id)
+  f.complete(arrival.screen.id - 1)
+  assert.equal(f.props('CreationScreen').isTransitioning, true)
+  f.complete()
+  assert.equal(f.props('CreationScreen').isTransitioning, false)
+  f.props('CreationHeader').onBack()
+  f.render(false)
+  assert.equal(f.props('CreationScreen').screen.stage, 'details')
+  assert.equal(f.props('CreationScreen').screen.direction, -1)
+  assert.equal(f.props('CreationHeader').step, 1)
+  assert.equal(f.props('CreationDetailsStep').reason, '그리운 이유')
+  f.complete()
+  f.unmount()
+})
+
+test('빠른 생성 응답도 생성 화면의 진입 완료를 기다리고 미리보기 페이드가 끝나기 전 등록을 막는다', async () => {
+  const f = pageFixture()
+  f.fill()
+  f.props('CreationPhotoStep').onGenerate()
+  await tick()
+  f.render(false)
+  const generatingId = f.props('CreationScreen').screen.id
+  assert.equal(f.props('CreationScreen').screen.stage, 'generating')
+  assert.equal(f.props('CreationHeader').step, 2)
+  f.complete(generatingId)
+  const arrival = f.props('CreationScreen')
+  assert.equal(arrival.screen.stage, 'preview')
+  assert.equal(arrival.screen.kind, 'fade')
+  assert.equal(arrival.isTransitioning, true)
+  assert.equal(f.props('CreationHeader').step, 3)
+  f.props('CreationPreviewStep').onRegister()
+  assert.equal(f.calls.length, 1)
+  f.complete(generatingId)
+  assert.equal(f.props('CreationScreen').isTransitioning, true)
+  f.complete()
+  f.props('CreationPreviewStep').onRegister()
+  await tick()
+  f.render(false)
+  assert.equal(f.props('CreationScreen').screen.stage, 'registering')
+  f.complete()
+  assert.equal(f.props('CreationScreen').screen.stage, 'done')
+  assert.equal(f.props('CreationHeader').hidden, true)
+  f.complete()
+  assert.deepEqual(f.calls.map(call => call.action), ['preview', 'register'])
+  f.unmount()
+})
+
+test('빠른 생성 오류도 진입 완료 뒤 표시하며 수정하기는 역방향으로 입력 화면에 돌아간다', async () => {
+  const f = pageFixture()
+  f.fill()
+  f.generate = async () => { throw new Error('AI 처리 실패') }
+  f.props('CreationPhotoStep').onGenerate()
+  await tick()
+  f.render(false)
+  assert.equal(f.props('CreationScreen').screen.stage, 'generating')
+  f.complete()
+  assert.equal(f.props('CreationScreen').screen.stage, 'previewError')
+  let tree = f.render(false)
+  const edit = find(tree, 'button', props => props.children === '수정하기')
+  edit.props.onClick()
+  f.render(false)
+  assert.equal(f.props('CreationScreen').screen.stage, 'previewError')
+  f.complete()
+  edit.props.onClick()
+  tree = f.render(false)
+  assert.equal(f.props('CreationScreen').screen.direction, -1)
+  assert.equal(f.props('CreationDetailsStep').place, place)
+  assert.match(f.props('CreationDetailsStep').reason, /친구들과/)
+  f.complete()
+  f.unmount()
+})
+
+test('본문과 단계 표시는 같은 시간·곡선을 사용하고 애니메이션 줄이기에서도 페이드 전환을 유지한다', () => {
+  const config = load('components/creation/questCreationMotion.ts')
+  const { creationVariants: variants, creationTransition: transition } = config
+  for (const direction of [1, -1]) {
+    const data = { direction, kind: 'slide', reducedMotion: false }
+    assert.equal(variants.enter(data).x, `${direction * 100}%`)
+    assert.equal(variants.exit(data).x, `${direction * -100}%`)
+    const reduced = variants.enter({ ...data, reducedMotion: true })
+    assert.equal(reduced.x, 0)
+    assert.equal(reduced.opacity, 0)
+  }
+  assert.equal(variants.enter({ direction: 1, kind: 'fade', reducedMotion: false }).x, 0)
+  assert.equal(transition(false).duration, 0.36)
+  assert.equal(transition(true).duration, 0.12)
+  const Header = load('components/creation/CreationHeader.tsx', {
+    'lucide-react': { ChevronLeft: 'ChevronLeft' }, 'react-router': { Link: 'Link' },
+    'motion/react': { motion: { header: 'motion.header', span: 'motion.span' } },
+    './questCreationMotion': config,
+  })
+  for (const reducedMotion of [false, true]) {
+    const tree = Header({ step: 2, backToHome: false, busy: false, isTransitioning: true, reducedMotion, hidden: false })
+    assert.equal(tree.props.inert, true)
+    assert.equal(find(tree, 'button').props.disabled, true)
+    const progress = find(tree, 'div', props => props.role === 'progressbar')
+    const bars = progress.props.children.map(bar => bar.props.children)
+    assert.deepEqual(Array.from(bars, bar => bar.props.animate.scaleX), [1, 1, 0])
+    for (const bar of bars) assert.equal(bar.props.transition.duration, transition(reducedMotion).duration)
+    assert.deepEqual(bars[0].props.transition.ease, transition(reducedMotion).ease)
+  }
+})
+
+test('나가는 화면은 입력·접근성에서 제외하고 도착 완료 후에만 제목으로 포커스를 옮긴다', () => {
+  let present = true
+  const completed = [], focus = []
+  const Screen = load('components/creation/CreationScreen.tsx', {
+    react: {
+      useRef: () => ({ current: { querySelector: () => ({ setAttribute: (...args) => focus.push(args), focus: options => focus.push(options) }) } }),
+      useEffect: run => run(),
+    },
+    'motion/react': { motion: { div: 'motion.div' }, useIsPresent: () => present },
+    './questCreationMotion': load('components/creation/questCreationMotion.ts'),
+  })
+  const props = { screen: { stage: 'photo', id: 1, direction: 1, kind: 'slide' }, isTransitioning: true, reducedMotion: false, onComplete: id => completed.push(id) }
+  let tree = Screen(props)
+  assert.equal(tree.props.inert, true)
+  assert.equal(focus.length, 0)
+  tree.props.onAnimationComplete('exit')
+  assert.equal(completed.length, 0)
+  tree.props.onAnimationComplete('center')
+  assert.deepEqual(completed, [1])
+  present = false
+  tree = Screen({ ...props, isTransitioning: false })
+  assert.equal(tree.props.inert, true)
+  assert.equal(tree.props['aria-hidden'], true)
+  tree.props.onAnimationComplete('center')
+  assert.deepEqual(completed, [1])
+  assert.equal(focus.length, 0)
+  present = true
+  tree = Screen({ ...props, isTransitioning: false })
+  assert.equal(tree.props.inert, false)
+  assert.deepEqual(focus[0], ['tabindex', '-1'])
+  assert.equal(focus[1].preventScroll, true)
+})
+
+test('화면 종료 후 대기 중인 결과와 오래된 전환 완료 이벤트가 다음 요청을 시작하지 않는다', async () => {
+  const f = pageFixture()
+  f.fill()
+  const generate = f.props('CreationPhotoStep').onGenerate
+  generate()
+  await tick()
+  f.render(false)
+  const finish = f.props('CreationScreen').onComplete
+  const id = f.props('CreationScreen').screen.id
+  f.unmount()
+  finish(id)
+  generate()
+  assert.equal(f.calls.length, 1)
 })

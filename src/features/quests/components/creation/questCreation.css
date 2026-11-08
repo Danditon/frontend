@@ -1,5 +1,7 @@
 /* 등록 화면에만 적용해 다른 화면의 폰트와 레이아웃을 유지합니다. */
 .quest-create-page {
+  position: relative;
+  isolation: isolate;
   height: 100%;
   min-height: 0;
   display: flex;
@@ -17,17 +19,21 @@
 
 .quest-create-page :where(button, input, textarea, select) { font-family: inherit; }
 .quest-create-page :where(button, a) { touch-action: manipulation; }
-.quest-create-page[data-result="true"] { background: linear-gradient(#dceef5, #fff); }
+.quest-create-page::before { content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(#dceef5, #fff); opacity: 0; transition: opacity 360ms cubic-bezier(0.22, 1, 0.36, 1); pointer-events: none; }
+.quest-create-page[data-result="true"]::before { opacity: 1; }
 .quest-create-page :where(input, textarea)::placeholder { color: #939895; opacity: 1; }
 
 .creation-header { position: relative; display: flex; align-items: center; flex: none; height: 40px; }
 .creation-back { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; color: #fff; background: #242624; }
 .creation-steps { position: absolute; left: 50%; display: flex; gap: 8px; transform: translateX(-50%); pointer-events: none; }
-.creation-steps>span { width: 32px; height: 5px; border-radius: 999px; background: #f2f3f2; }
-.creation-steps>span[data-active="true"] { background: #cde7f2; }
+.creation-steps>span { width: 32px; height: 5px; overflow: hidden; border-radius: 999px; background: #f2f3f2; }
+.creation-steps>span>span { display: block; height: 100%; border-radius: inherit; background: #cde7f2; transform-origin: left; }
 
 /* 헤더를 남기고 본문만 스크롤해 작은 화면에서도 마지막 버튼에 접근합니다. */
-.creation-content { display: flex; flex: 1; flex-direction: column; min-height: 0; overflow-y: auto; overscroll-behavior-y: contain; scroll-padding-block: 12px; }
+.creation-content { display: grid; flex: 1; min-height: 0; min-width: 0; overflow: hidden; }
+.creation-screen { grid-area: 1 / 1; display: flex; flex-direction: column; min-height: 0; min-width: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior-y: contain; scroll-padding-block: 12px; }
+.creation-screen[inert] { pointer-events: none; }
+.creation-title:focus { outline: none; }
 .creation-step { display: flex; flex: 1 0 auto; flex-direction: column; gap: 24px; min-width: 0; }
 .creation-title { flex: none; margin: 0; font-size: 28px; font-weight: 600; line-height: 1.28; letter-spacing: -0.045em; }
 .creation-description { margin: 0; color: #555d59; font-size: 14px; line-height: 1.6; }
@@ -88,4 +94,8 @@
   .creation-title { font-size: 26px; }
   .creation-type-option { min-height: 116px; padding: 14px; }
   .creation-photo-upload { max-height: 310px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .quest-create-page::before { transition-duration: 120ms; }
 }

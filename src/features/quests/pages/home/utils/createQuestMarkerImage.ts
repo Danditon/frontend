@@ -5,7 +5,7 @@ import type { KakaoMarkerImage } from '../types/kakaoMaps'
 // 이미지 생성에 필요한 SDK 기능만 전달받습니다.
 type MarkerImageSdk = Pick<
   NonNullable<Window['kakao']>['maps'],
-  'MarkerImage' | 'Size'
+  'MarkerImage' | 'Size' | 'Point'
 >
 
 const colors = {
@@ -28,6 +28,7 @@ export function createQuestMarkerImage(
   questType: NearbyQuest['questType'],
   difficulty: NearbyQuest['difficulty'],
   isSelected = false, // Drawer에서 보고 있는 퀘스트인지 여부
+  horizontalOffset = 0,
 ): KakaoMarkerImage {
   const color = colors[questType]
 
@@ -55,5 +56,6 @@ export function createQuestMarkerImage(
   return new maps.MarkerImage(
     `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
     new maps.Size(56, 64),
+    horizontalOffset ? { offset: new maps.Point(28 - horizontalOffset, 64) } : undefined,
   )
 }

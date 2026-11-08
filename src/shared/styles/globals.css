@@ -134,7 +134,6 @@
 .designed-screen { font-family: Arial, 'Malgun Gothic', sans-serif; overflow:hidden; }
 .memory-page { background:linear-gradient(180deg,#fff 38%,#dff2f6 100%); }
 .memory-page:has(.message-envelope),.memory-page:has(>div>h1) {background:#fff;}
-.memory-page>header>span {background:#ff49bb;}
 .memory-page>div.grid>a {background:#f3f3f3;}
 .memory-page>div.grid>a.selected {background:#c9eaf5;}
 .memory-page>div.grid>a>span {background:#242624;color:#fff;}
@@ -213,8 +212,7 @@
 .verify-failure>div:last-of-type {padding-top:24px;}
 .verify-checking>.checking-card {bottom:28px;left:15px;padding:20px 22px;}
 .checking-card h1 {font-size:27px;margin-top:14px;}
-.memory-page>div.grid {gap:12px;margin-bottom:24px;}
-.memory-page>div.grid>a {height:126px;padding:24px 16px 16px;}
+.memory-page>div.grid {margin-bottom:24px;}
 .memory-page>div.flex {gap:10px;}
 .memory-page>div.flex>button {height:116px;border-radius:18px;padding:20px 16px;}
 .memory-page .memory-thumbnail {width:65px;height:85px;top:15px;right:18px;}

@@ -1,5 +1,5 @@
 import { Link } from "react-router";
-import { ChevronLeft, ChevronsRight, LogOut, MailPlus, House } from "lucide-react";
+import { ChevronLeft, ChevronsRight, LogOut, MailPlus, House, UserRound } from "lucide-react";
 import type { ReactNode } from "react";
 import NearbyQuestNavItem from "@/features/quests/components/NearbyQuestNavItem";
 import type { NearbyNavigation } from "@/features/quests/types/nearbyNavigation";
@@ -17,7 +17,9 @@ export function Back({ to = "/me/memories" }: { to?: string }) {
 export function Profile({ nickname, email }: { nickname?: string; email?: string }) {
   return (
     <header className="flex gap-[10px] items-center h-[60px] mb-[14px] text-[15px] [&_small]:block [&_small]:text-[10px] [&_:is(a,button)]:ml-auto">
-      <span className="h-[54px] w-[54px] rounded-full bg-[#ff49bb]" />
+      <span aria-hidden="true" className="grid size-[54px] shrink-0 place-items-center rounded-full bg-[#c9eaf5] text-[#375963]">
+        <UserRound size={26} />
+      </span>
       <div>
         {nickname ? `${nickname} 님` : "내 프로필"}<small>{email}</small>
       </div>

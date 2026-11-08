@@ -78,11 +78,11 @@ function componentFixture(path, dependencies, globals = {}) {
   }
 }
 
-function findNode(tree, type) {
+function findNode(tree, type, matches = () => true) {
   if (!tree || typeof tree !== 'object') return null
-  if (tree.type === type) return tree
+  if (tree.type === type && matches(tree.props)) return tree
   for (const child of [tree.props?.children].flat()) {
-    const result = findNode(child, type)
+    const result = findNode(child, type, matches)
     if (result) return result
   }
   return null
@@ -108,11 +108,9 @@ function homeFixture() {
   const fixture = {
     position,
     query: { data: undefined, isPending: true, isError: false },
-    activeQuestId: null,
-    detailIds: [],
-    navigations: [],
+    nearestInputs: [],
     refetchCalls: [],
-    detailQuery: {},
+    nearestQuery: {},
     locationRequests: 0,
     isLocating: false,
     locationError: null,
@@ -141,7 +139,6 @@ function homeFixture() {
         return [states[index], (next) => { states[index] = next }]
       },
     },
-    'react-router': { useNavigate: () => (path) => fixture.navigations.push(path) },
     '@/features/quests/hooks/useGeolocation': { useGeolocation: () => ({
       position: fixture.position,
       isLocating: fixture.isLocating,
@@ -154,27 +151,27 @@ function homeFixture() {
       ...fixture.query,
     }) },
     '@/features/quests/hooks/useRegionName': { useRegionName: () => 'Daegu' },
-    '@/features/quests/hooks/useActiveQuest': { useActiveQuest: () => ({ activeQuestId: fixture.activeQuestId }) },
-    '@/features/quests/hooks/useQuestDetail': {
-      useQuestDetail: (id) => {
-        fixture.detailIds.push(id)
+    '@/features/quests/hooks/useNearestQuest': {
+      useNearestQuest: (nearby, coordinates) => {
+        fixture.nearestInputs.push({ quests: nearby, position: coordinates })
+        const candidate = nearby?.[0]
         return {
-          data: id === null ? undefined : { ...quests[0], questId: id },
-          isPending: false,
+          data: !coordinates || nearby === undefined ? undefined : candidate ? { ...candidate, myStatus: 'NONE' } : null,
+          isPending: nearby === undefined,
           isError: false,
           isFetching: false,
-          refetch: (options) => { fixture.refetchCalls.push({ target: 'detail', options }); return Promise.resolve() },
-          ...fixture.detailQuery,
+          refetch: (options) => { fixture.refetchCalls.push({ target: 'nearest', options }); return Promise.resolve() },
+          ...fixture.nearestQuery,
         }
       },
     },
-    './utils/getNearestQuest': loadSource('features/quests/pages/home/utils/getNearestQuest.ts', { './getDistanceMeters': distanceUtils }),
-    './utils/getQuestVerifyPath': loadSource('features/quests/pages/home/utils/getQuestVerifyPath.ts'),
+    './utils/getDistanceMeters': distanceUtils,
     './utils/getQuestQueryError': queryErrorUtils,
   }, { queueMicrotask: (callback) => microtasks.push(callback) })
   return Object.assign(fixture, {
     render() { cursor = 0; memoCursor = 0; effectCursor = 0; tree = page.default(); return tree },
     node(type) { return findNode(tree, type) },
+    listButton() { return findNode(tree, 'button', props => props['aria-label']?.startsWith('주변 퀘스트')) },
     flushMicrotasks() { while (microtasks.length) microtasks.shift()() },
     strictReplay() {
       for (const effect of effects) effect.cleanup?.()
@@ -217,7 +214,7 @@ test('위치 조회 실패 시 안내와 수동 재시도를 유지하고 자동
   assert.match(textOf(f.render()), /위치 권한을 허용/)
   f.flushMicrotasks()
   assert.equal(f.locationRequests, 1)
-  f.node('LocationPromptCard').props.onRequestLocation()
+  findNode(f.render(), 'button', props => props['aria-label'] === '현재 위치를 확인하고 가까운 퀘스트 보기').props.onClick()
   assert.equal(f.locationRequests, 2)
   f.isLocating = true
   f.render()
@@ -317,37 +314,39 @@ test('위치 미확인·조회 중·실패·성공 0개를 구분하고 mock 마
   const f = homeFixture()
   f.position = null
   f.render()
-  assert.ok(f.node('LocationPromptCard'))
+  assert.match(textOf(f.render()), /위치를 확인하고 가까운 퀘스트/)
   assert.equal(f.node('QuestMap').props.quests.length, 0)
-  assert.equal(f.node('NearbyQuestCountCard').props.status, 'location-required')
+  assert.equal(f.listButton().props.disabled, true)
   f.position = position
   assert.match(textOf(f.render()), /불러오는 중/)
-  assert.equal(f.node('NearbyQuestCountCard').props.status, 'loading')
+  assert.equal(f.listButton().props['aria-busy'], true)
   f.query = { data: undefined, isPending: false, isError: true }
   f.render()
   assert.match(f.node('QuestQueryErrorNotice').props.info.message, /불러오지 못/)
-  assert.equal(f.node('NearbyQuestCountCard').props.status, 'error')
+  assert.equal(f.listButton().props.disabled, true)
   f.query = { data: [], isPending: false, isError: false }
-  assert.match(textOf(f.render()), /주변에 수행할 수 있는 퀘스트가 없어요/)
+  assert.match(textOf(f.render()), /주변에 새로 수행할 퀘스트가 없어요/)
   f.node('QuestMap').props.onVisibleQuestsChange([])
   f.render()
-  assert.equal(f.node('NearbyQuestCountCard').props.count, 0)
-  f.node('NearbyQuestCountCard').props.onClick()
+  assert.match(textOf(f.listButton()), /0개/)
+  assert.equal(f.listButton().props.disabled, false)
+  f.listButton().props.onClick()
   f.render()
   assert.equal(f.node('QuestListDrawer').props.open, true)
   assert.equal(f.node('QuestListDrawer').props.quests.length, 0)
 })
 
-test('서버 목록으로 마커·가까운 카드·목록을 연결하고 모두 같은 ID의 상세를 연다', () => {
+test('서버 목록으로 마커·추천 바·목록을 연결하고 모두 같은 ID의 상세를 연다', () => {
   const f = homeFixture()
   f.query = { data: quests, isPending: false, isError: false }
   f.render()
   assert.deepEqual(f.node('QuestMap').props.quests, quests)
-  assert.equal(f.detailIds.at(-1), 701)
+  assert.deepEqual(f.nearestInputs.at(-1).quests, quests)
+  assert.equal(f.nearestInputs.at(-1).position, position)
   f.node('QuestMap').props.onVisibleQuestsChange([quests[1]])
   f.render()
-  assert.equal(f.node('NearbyQuestCountCard').props.count, 1)
-  f.node('NearbyQuestCountCard').props.onClick()
+  assert.match(textOf(f.listButton()), /1개/)
+  f.listButton().props.onClick()
   f.render()
   assert.equal(f.node('QuestListDrawer').props.quests[0], quests[1])
   f.node('QuestListDrawer').props.onSelect(702)
@@ -356,7 +355,7 @@ test('서버 목록으로 마커·가까운 카드·목록을 연결하고 모�
   assert.equal(f.node('QuestDetailDrawer').props.questId, 702)
   f.node('QuestDetailDrawer').props.onClose()
   f.render()
-  f.node('ActiveQuestCard').props.onSelect(701)
+  f.node('NearestQuestBar').props.onSelect(701)
   f.render()
   assert.equal(f.node('QuestDetailDrawer').props.questId, 701)
   f.node('QuestMap').props.onQuestSelect(702)
@@ -364,7 +363,7 @@ test('서버 목록으로 마커·가까운 카드·목록을 연결하고 모�
   assert.equal(f.node('QuestDetailDrawer').props.questId, 702)
 })
 
-test('본인 퀘스트를 마커·개수·목록·가까운 카드에서 함께 제외하고 API 배열을 보존한다', () => {
+test('본인 퀘스트를 마커·개수·목록·추천 후보에서 함께 제외하고 API 배열을 보존한다', () => {
   const f = homeFixture()
   const mine = { ...quests[0], questId: 700, isMine: true }
   const other = { ...quests[0], lat: 35.8724, distance: 100 }
@@ -373,13 +372,13 @@ test('본인 퀘스트를 마커·개수·목록·가까운 카드에서 함께 
   f.render()
   const displayed = f.node('QuestMap').props.quests
   assert.deepEqual(displayed.map((quest) => quest.questId), [701, 702])
-  assert.equal(f.detailIds.at(-1), 701)
-  assert.equal(f.node('ActiveQuestCard').props.quest.questId, 701)
+  assert.deepEqual(f.nearestInputs.at(-1).quests, displayed)
+  assert.equal(f.node('NearestQuestBar').props.quest.questId, 701)
   f.node('QuestMap').props.onVisibleQuestsChange(displayed)
   f.render()
   assert.equal(f.node('QuestMap').props.quests, displayed)
-  assert.equal(f.node('NearbyQuestCountCard').props.count, 2)
-  f.node('NearbyQuestCountCard').props.onClick()
+  assert.match(textOf(f.listButton()), /2개/)
+  f.listButton().props.onClick()
   f.render()
   assert.deepEqual(Array.from(f.node('QuestListDrawer').props.quests, (quest) => quest.questId), [701, 702])
   assert.equal(f.query.data, response)
@@ -390,14 +389,14 @@ test('본인 퀘스트를 마커·개수·목록·가까운 카드에서 함께 
 test('주변에 본인 퀘스트만 있으면 성공 0개와 수행할 퀘스트 없음 안내를 표시한다', () => {
   const f = homeFixture()
   f.query = { data: quests.map((quest) => ({ ...quest, isMine: true })), isPending: false, isError: false }
-  assert.match(textOf(f.render()), /주변에 수행할 수 있는 퀘스트가 없어요/)
+  assert.match(textOf(f.render()), /주변에 새로 수행할 퀘스트가 없어요/)
   assert.equal(f.node('QuestMap').props.quests.length, 0)
-  assert.equal(f.detailIds.at(-1), null)
-  assert.equal(f.node('ActiveQuestCard'), null)
+  assert.equal(f.nearestInputs.at(-1).quests.length, 0)
+  assert.equal(f.node('NearestQuestBar'), null)
   f.node('QuestMap').props.onVisibleQuestsChange([])
   f.render()
-  assert.equal(f.node('NearbyQuestCountCard').props.status, 'ready')
-  assert.equal(f.node('NearbyQuestCountCard').props.count, 0)
+  assert.equal(f.listButton().props.disabled, false)
+  assert.match(textOf(f.listButton()), /0개/)
 })
 
 test('내 위치 점은 18px 이미지의 중심을 좌표에 맞추고 위치 변경 시 기존 마커를 재사용한다', () => {
@@ -458,45 +457,99 @@ test('목록 응답 교체 후 이전 범위 계산값으로 개수나 목록을
   const oldCallback = f.node('QuestMap').props.onVisibleQuestsChange
   oldCallback(quests)
   f.render()
-  assert.equal(f.node('NearbyQuestCountCard').props.count, 2)
+  assert.match(textOf(f.listButton()), /2개/)
   const updated = [{ ...quests[0], questId: 801 }]
   f.query = { data: updated, isPending: false, isError: false }
   f.render()
   oldCallback(quests)
   f.render()
-  assert.equal(f.node('NearbyQuestCountCard').props.count, null)
-  f.node('NearbyQuestCountCard').props.onClick()
+  assert.equal(f.listButton().props.disabled, true)
+  assert.doesNotMatch(textOf(f.listButton()), /2개/)
+  f.listButton().props.onClick()
   f.render()
   assert.equal(f.node('QuestListDrawer').props.open, false)
   f.node('QuestMap').props.onVisibleQuestsChange(updated)
   f.render()
-  assert.equal(f.node('NearbyQuestCountCard').props.count, 1)
+  assert.match(textOf(f.listButton()), /1개/)
 })
 
-test('기존 수행 중 카드의 우선 표시와 인증 화면 이동은 유지한다', () => {
+test('추천 결과의 ID로 상세를 열고 추천 변경·위치 갱신에도 클릭한 ID를 유지한다', () => {
   const f = homeFixture()
   f.query = { data: quests, isPending: false, isError: false }
-  f.activeQuestId = 900
+  f.nearestQuery = { data: { ...quests[1], myStatus: 'FAILED' }, isPending: false }
   f.render()
-  const card = f.node('ActiveQuestCard')
-  assert.equal(card.props.mode, 'active')
-  assert.equal(card.props.quest.questId, 900)
-  card.props.onSelect(900)
-  assert.deepEqual(f.navigations, ['/quests/900/verify?type=general'])
+  const bar = f.node('NearestQuestBar')
+  assert.equal(bar.props.quest.questId, 702)
+  assert.ok(Math.abs(bar.props.distance - distanceUtils.getDistanceMeters(position, quests[1])) < 1)
+  bar.props.onSelect(702)
+  f.render()
+  assert.equal(f.node('QuestDetailDrawer').props.questId, 702)
+  assert.equal(f.node('NearestQuestBar'), null)
+  f.nearestQuery.data = { ...quests[0], myStatus: 'NONE' }
+  f.position = { ...position, lat: 35.88 }
+  f.render()
+  assert.equal(f.node('QuestDetailDrawer').props.questId, 702)
+  f.node('QuestDetailDrawer').props.onClose()
+  f.render()
+  assert.equal(f.node('NearestQuestBar').props.quest.questId, 701)
 })
 
-test('개수 카드의 비활성·로딩 표시와 성공 0개 동작을 구분한다', () => {
-  const { default: CountCard } = loadSource('features/quests/pages/home/components/NearbyQuestCountCard.tsx', { 'lucide-react': { ChevronUp: 'ChevronUp' } })
-  for (const [status, count, disabled, busy] of [
-    ['location-required', null, true, false], ['loading', null, true, true],
-    ['error', 9, true, false], ['ready', null, true, true], ['ready', 0, false, false],
-  ]) {
-    const button = CountCard({ status, count, onClick() {} })
-    assert.equal(button.props.disabled, disabled)
-    assert.equal(button.props['aria-busy'], busy)
-    if (status === 'error') assert.doesNotMatch(textOf(button), /9/)
-    if (status === 'ready' && count === 0) assert.match(button.props['aria-label'], /0개/)
+test('상단 바는 사진·진행 상태 없이 상세 제목·거리·심볼을 표시하고 선택 ID를 전달한다', () => {
+  const { default: Bar } = loadSource('features/quests/pages/home/components/NearestQuestBar.tsx')
+  const selected = []
+  const quest = { ...quests[0], questTitle: '길어도 전체 제목을 읽을 수 있는 퀘스트', photoUrl: 'https://example.com/unused.jpg' }
+  for (const [distance, expected] of [[180.4, '180m'], [1250, '1.3km']]) {
+    const tree = Bar({ quest, distance, onSelect: id => selected.push(id) })
+    assert.match(textOf(tree), /가장 가까운 퀘스트/)
+    assert.ok(textOf(tree).includes(expected))
+    assert.ok(tree.props['aria-label'].includes(quest.questTitle))
+    assert.equal(tree.props.title, quest.questTitle)
+    assert.equal(findNode(tree, 'img'), null)
+    assert.equal(findNode(tree, 'svg').props['aria-hidden'], 'true')
+    assert.doesNotMatch(textOf(tree), /수행 중|이어서 하기/)
+    tree.props.onClick()
   }
+  assert.deepEqual(selected, [701, 701])
+})
+
+test('미완료 후보 확인 중·모두 완료·첫 상세 조회 실패를 구분하고 재시도를 연결한다', () => {
+  const f = homeFixture()
+  f.query = { data: quests, isPending: false, isError: false }
+  f.nearestQuery = { data: undefined, isPending: true }
+  assert.match(textOf(f.render()), /가까운 미완료 퀘스트를 확인하는 중/)
+  assert.equal(f.node('NearestQuestBar'), null)
+  assert.doesNotMatch(textOf(f.render()), /새로 수행할 퀘스트가 없어요/)
+  f.nearestQuery = { data: null, isPending: false }
+  assert.match(textOf(f.render()), /주변에 새로 수행할 퀘스트가 없어요/)
+  assert.equal(f.node('QuestMap').props.quests.length, 2)
+  f.nearestQuery = { data: undefined, isPending: false, isError: true, error: httpError(503) }
+  f.render()
+  assert.equal(f.node('NearestQuestBar'), null)
+  f.node('QuestQueryErrorNotice').props.onRetry()
+  assert.equal(f.refetchCalls[0].target, 'nearest')
+  assert.equal(f.refetchCalls[0].options.cancelRefetch, false)
+  for (const status of [401, 403, 404]) {
+    f.nearestQuery = { data: quests[0], isPending: false, isError: true, error: httpError(status) }
+    f.render()
+    assert.equal(f.node('NearestQuestBar'), null)
+    assert.equal(f.node('QuestQueryErrorNotice').props.info.keepPreviousData, false)
+  }
+})
+
+test('목록을 열면 상단 추천을 숨기고 닫으면 복원한다', () => {
+  const f = homeFixture()
+  f.query = { data: quests, isPending: false, isError: false }
+  f.render()
+  assert.ok(f.node('NearestQuestBar'))
+  f.node('QuestMap').props.onVisibleQuestsChange(quests)
+  f.render()
+  f.listButton().props.onClick()
+  f.render()
+  assert.equal(f.node('NearestQuestBar'), null)
+  assert.equal(f.node('QuestListDrawer').props.open, true)
+  f.node('QuestListDrawer').props.onClose()
+  f.render()
+  assert.ok(f.node('NearestQuestBar'))
 })
 
 test('실제 상세 훅은 인증·선택을 검사하고 같은 사용자·ID의 요청과 캐시를 공유한다', async () => {
@@ -577,7 +630,7 @@ test('첫 목록 실패에서 재시도하고 갱신 실패에서는 기존 마�
   f.query.data = quests
   f.render()
   assert.deepEqual(f.node('QuestMap').props.quests, quests)
-  assert.ok(f.node('ActiveQuestCard'))
+  assert.ok(f.node('NearestQuestBar'))
   assert.equal(f.node('QuestQueryErrorNotice').props.showingPreviousData, true)
   f.query.isFetching = true
   f.render()
@@ -585,23 +638,23 @@ test('첫 목록 실패에서 재시도하고 갱신 실패에서는 기존 마�
   f.query.error = httpError(401)
   f.render()
   assert.equal(f.node('QuestMap').props.quests.length, 0)
-  assert.equal(f.node('NearbyQuestCountCard').props.status, 'error')
+  assert.equal(f.listButton().props.disabled, true)
   assert.equal(f.node('QuestQueryErrorNotice').props.info.requiresLogin, true)
   assert.equal(f.query.data, quests)
 })
 
-test('카드 갱신 실패는 기존 카드를 유지하지만 404 상세로 수행 버튼을 제공하지 않는다', () => {
+test('추천 갱신 실패는 기존 결과를 유지하지만 404 상세를 추천하지 않는다', () => {
   const f = homeFixture()
   f.query = { data: quests, isError: false, isPending: false }
-  f.detailQuery = { isError: true, error: new axios.AxiosError('Network', 'ERR_NETWORK') }
+  f.nearestQuery = { isError: true, error: new axios.AxiosError('Network', 'ERR_NETWORK') }
   f.render()
-  assert.ok(f.node('ActiveQuestCard'))
+  assert.ok(f.node('NearestQuestBar'))
   assert.equal(f.node('QuestQueryErrorNotice').props.showingPreviousData, true)
   f.node('QuestQueryErrorNotice').props.onRetry()
-  assert.equal(f.refetchCalls[0].target, 'detail')
-  f.detailQuery.error = httpError(404)
+  assert.equal(f.refetchCalls[0].target, 'nearest')
+  f.nearestQuery.error = httpError(404)
   f.render()
-  assert.equal(f.node('ActiveQuestCard'), null)
+  assert.equal(f.node('NearestQuestBar'), null)
   assert.match(f.node('QuestQueryErrorNotice').props.info.message, /찾을 수 없어요/)
 })
 

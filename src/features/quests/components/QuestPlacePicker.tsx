@@ -71,11 +71,10 @@ export function QuestPlacePicker({ value, onChange }: {
   }
 
   return (
-    <div className="space-y-2">
-      <label htmlFor="longing-place" className="block text-sm font-semibold">그리운 장소</label>
-      <div className="flex gap-2">
+    <div className="creation-place-picker">
+      <label htmlFor="longing-place">그리운 장소</label>
+      <div className="creation-place-search">
         <input id="longing-place" value={keyword} placeholder="장소 이름이나 주소로 검색"
-          className="min-w-0 flex-1 rounded-full bg-neutral-100 px-4 py-3 text-sm"
           onChange={event => {
             requestId.current += 1
             clearTimeout(timer.current)
@@ -93,8 +92,8 @@ export function QuestPlacePicker({ value, onChange }: {
           }}
         />
         <button type="button" aria-label="장소 검색" disabled={!keyword.trim() || searching}
-          onClick={search} className="grid size-11 shrink-0 place-items-center rounded-full bg-neutral-100 disabled:opacity-50">
-          <Search size={18} />
+          onClick={search}>
+          <Search size={19} aria-hidden="true" />
         </button>
       </div>
       {value && <p className="flex items-center gap-1 text-xs text-neutral-600"><MapPin size={14} />{value.address}</p>}

@@ -2,6 +2,10 @@
 import type { NearbyQuest } from '@/features/quests/types/quest'
 import { getDistanceMeters, type Coordinates } from './getDistanceMeters'
 
+
+export { getDistanceMeters }
+
+
 export function getNearestQuest(
   quests: readonly NearbyQuest[],
   position: Coordinates | null,

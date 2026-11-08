@@ -7,8 +7,8 @@ export default function LoginHeader() {
         id="login-heading"
         className="text-2xl font-semibold tracking-tight"
       >
-        <span aria-hidden="true">서비스 로고</span>
-        <span className="sr-only">그리움 퀘스트 로그인</span>
+        <span aria-hidden="true">그립데이</span>
+        <span className="sr-only">그립데이 로그인</span>
       </h1>
     </header>
   )

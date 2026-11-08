@@ -63,7 +63,23 @@ export async function getQuestGreetings(id: string, signal?: AbortSignal) {
   const response = await apiClient.get(`/quests/${id}/submissions`, { headers: headers(), signal, timeout: 15000 })
   return greetingsSchema.parse(response.data)
 }
-export function verificationError(error: unknown): string {
+const submissionLikeSchema = z.object({
+  submissionId: z.number().int().positive(),
+  isLiked: z.boolean(),
+})
+
+export async function toggleSubmissionLike(submissionId: number) {
+  const response = await apiClient.patch(`/submissions/${submissionId}/like`, undefined, {
+    headers: headers(),
+    timeout: 15000,
+  })
+  return submissionLikeSchema.parse(response.data)
+}
+
+export function verificationError(
+  error: unknown,
+  location?: { distance: number },
+): string {
   if (axios.isAxiosError(error)) {
     const code = error.response?.data?.code
     const messages: Record<string, string> = {
@@ -75,6 +91,12 @@ export function verificationError(error: unknown): string {
       AI_ERROR: 'AI 검증 서버에 연결하지 못했어요. 안부와 사진은 유지되니 잠시 후 다시 시도해 주세요.',
       FORBIDDEN: '이 안부를 볼 권한이 없어요.',
       INVALID_INPUT: '입력한 안부와 사진 형식을 확인해 주세요.',
+    }
+    if (code === 'OUT_OF_RANGE' && location) {
+      const { distance } = location
+      return distance <= 200
+        ? '서버가 인증 가능 범위를 벗어났다고 응답했어요.'
+        : '퀘스트 장소에 조금 더 가까이 이동한 뒤 다시 시도해 주세요.'
     }
     if (typeof code === 'string' && messages[code]) return messages[code]
     if (error.response?.status === 401) return messages.UNAUTHORIZED

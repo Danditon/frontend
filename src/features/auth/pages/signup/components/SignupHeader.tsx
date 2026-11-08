@@ -25,7 +25,7 @@ export default function SignupHeader({ onBack, disabled }: Props) {
         id="signup-heading"
         className="text-center text-xl font-semibold tracking-tight"
       >
-        회원가입
+        그립데이 회원가입
       </h1>
 
       {/* 뒤로가기 버튼과 같은 폭을 확보해 제목을 가운데에 둡니다. */}

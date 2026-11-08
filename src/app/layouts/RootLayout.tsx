@@ -18,7 +18,8 @@ export function RootLayout() {
   );
 
   const isQuestRegistration = pathname.replace(/\/+$/, "") === "/quests/new";
-  const scoped = isQuestRegistration || pathname.startsWith("/me") || pathname.endsWith("/verify");
+  const isQuestVerificationFlow = /^\/quests\/[^/]+\/(verify|greetings)\/?$/i.test(pathname);
+  const scoped = isQuestRegistration || pathname.startsWith("/me") || isQuestVerificationFlow;
 
   return (
     <div
@@ -44,7 +45,7 @@ export function RootLayout() {
           <Outlet />
         </main>
 
-        {!greetingScreen && !isAuthPage && !isQuestRegistration && (
+        {!greetingScreen && !isAuthPage && !isQuestRegistration && !isQuestVerificationFlow && (
           <div
             className={`app-navigation ${
               floatingMemoriesNav

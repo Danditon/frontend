@@ -37,6 +37,47 @@ const queryErrorUtils = loadSource('features/quests/pages/home/utils/getQuestQue
 
 const distanceUtils = loadSource('features/quests/pages/home/utils/getDistanceMeters.ts')
 
+// 상세·사진 컴포넌트의 Effect 정리와 이벤트 후 재렌더링을 서버 없이 확인합니다.
+function componentFixture(path, dependencies, globals = {}) {
+  const states = [], setters = [], refs = [], effects = []
+  let stateIndex = 0, refIndex = 0, effectIndex = 0, pending = [], mounted = true
+  const { default: Component } = loadSource(path, {
+    ...dependencies,
+    react: {
+      useCallback: (fn) => fn,
+      useRef: (initial) => {
+        const index = refIndex++
+        return refs[index] ??= { current: initial }
+      },
+      useState: (initial) => {
+        const index = stateIndex++
+        if (!(index in states)) states[index] = initial
+        setters[index] ??= (next) => { if (mounted) states[index] = typeof next === 'function' ? next(states[index]) : next }
+        return [states[index], setters[index]]
+      },
+      useEffect: (run, deps) => {
+        const index = effectIndex++
+        if (!effects[index] || deps.some((value, i) => !Object.is(value, effects[index].deps[i]))) {
+          pending.push(() => {
+            effects[index]?.cleanup?.()
+            effects[index] = { deps, cleanup: run() }
+          })
+        }
+      },
+    },
+  }, globals)
+  return {
+    refs,
+    render(props) {
+      stateIndex = 0; refIndex = 0; effectIndex = 0; pending = []
+      const tree = Component(props)
+      for (const run of pending) run()
+      return tree
+    },
+    unmount() { mounted = false; for (const effect of effects) effect.cleanup?.() },
+  }
+}
+
 function findNode(tree, type) {
   if (!tree || typeof tree !== 'object') return null
   if (tree.type === type) return tree
@@ -202,6 +243,74 @@ test('공통 직선거리는 미터 단위이며 동일 좌표·대칭·날짜�
   assert.ok(getDistanceMeters({ lat: 0, lng: 179.9999 }, { lat: 0, lng: -179.9999 }) < 23)
   const opposite = getDistanceMeters(a, { lat: 0, lng: 180 })
   assert.ok(Number.isFinite(opposite) && opposite > 20_000_000 && opposite < 20_020_000)
+})
+
+test('확장 사진이 실제 표시될 때만 상단 UI를 숨기고 닫기·접기·다른 퀘스트 선택 시 복원한다', () => {
+  const f = homeFixture()
+  f.query = { data: quests, isPending: false, isError: false }
+  f.render()
+  f.node('QuestMap').props.onQuestSelect(701)
+  f.render()
+  const photo = { questId: 701, photoUrl: 'https://example.com/701.jpg', placeName: 'Cafe' }
+  f.node('QuestDetailDrawer').props.onExpandedPhotoChange(photo)
+  f.node('QuestDetailDrawer').props.onPositionChange(200)
+  f.render()
+  assert.ok(f.node('HomeHeader'))
+  const layer = f.node('QuestDetailMapPhoto')
+  assert.equal(layer.props.top, 200)
+  layer.props.onVisibilityChange(photo)
+  f.render()
+  assert.equal(f.node('HomeHeader'), null)
+  assert.ok(f.node('QuestMap'))
+  f.node('QuestDetailDrawer').props.onExpandedPhotoChange(null)
+  f.render()
+  assert.ok(f.node('HomeHeader'))
+  assert.equal(f.node('QuestDetailMapPhoto'), null)
+
+  f.node('QuestDetailDrawer').props.onExpandedPhotoChange(photo)
+  f.render()
+  f.node('QuestDetailMapPhoto').props.onVisibilityChange(photo)
+  f.node('QuestMap').props.onQuestSelect(702)
+  f.render()
+  assert.ok(f.node('HomeHeader'))
+  assert.equal(f.node('QuestDetailMapPhoto'), null)
+  // 이전 사진의 늦은 이벤트가 와도 새로 선택한 퀘스트의 상단 UI는 숨기지 않습니다.
+  layer.props.onVisibilityChange(photo)
+  f.render()
+  assert.ok(f.node('HomeHeader'))
+  f.node('QuestDetailDrawer').props.onClose()
+  f.render()
+  assert.ok(f.node('HomeHeader'))
+  assert.equal(f.node('QuestDetailMapPhoto'), null)
+})
+
+test('지도 사진은 로드 성공 후 표시하고 실패·잘못된 URL·해제 시 지도와 상단 UI를 복원한다', () => {
+  let visible = null
+  const onVisibilityChange = (photo) => { visible = photo }
+  const photo = { questId: 701, photoUrl: 'https://example.com/701.jpg', placeName: 'Cafe' }
+  const props = { photo, top: 200, onVisibilityChange }
+  const f = componentFixture('features/quests/pages/home/components/QuestDetailMapPhoto.tsx', {})
+  let tree = f.render(props)
+  assert.equal(tree.props['aria-hidden'], true)
+  assert.equal(visible, null)
+  const image = findNode(tree, 'img')
+  image.props.onLoad()
+  tree = f.render(props)
+  assert.equal(tree.props['aria-hidden'], false)
+  assert.equal(visible, photo)
+  assert.equal(tree.props.style.height, 'calc(200px + 2rem)')
+  tree = f.render({ ...props, top: 240 })
+  assert.equal(tree.props.style.height, 'calc(240px + 2rem)')
+  image.props.onError()
+  tree = f.render(props)
+  assert.equal(tree.props['aria-hidden'], true)
+  assert.equal(visible, null)
+  assert.equal(f.render({ ...props, photo: { ...photo, photoUrl: 'javascript:alert(1)' } }), null)
+  assert.equal(visible, null)
+  assert.equal(f.render({ ...props, top: null }), null)
+  f.unmount()
+  image.props.onLoad()
+  assert.equal(visible, null)
 })
 
 test('위치 미확인·조회 중·실패·성공 0개를 구분하고 mock 마커로 대체하지 않는다', () => {
@@ -569,14 +678,16 @@ test('펼친 상세 본문은 수행 내용·그리움 전문·작성자·위치
 test('상세 Drawer는 미리보기·확장·고정 수행 버튼과 오류 재시도를 연결한다', () => {
   const retries = []
   let viewerPosition = position
-  let snapPoint = 0.4
+  let expandedPhoto = null, hostTop = 200, resized, observed = false, disconnected = 0
+  const positions = []
+  const onPositionChange = (top) => positions.push(top)
+  const onExpandedPhotoChange = (photo) => { expandedPhoto = photo }
   const query = {
-    data: quests[0], isError: true, isPending: false, isFetching: false,
+    data: { ...quests[0], photoUrl: 'https://example.com/701.jpg' }, isError: true, isPending: false, isFetching: false,
     error: new axios.AxiosError('Network', 'ERR_NETWORK'),
     refetch: (options) => { retries.push(options); return Promise.resolve() },
   }
-  const { default: Drawer } = loadSource('features/quests/pages/home/components/QuestDetailDrawer.tsx', {
-    react: { useCallback: (fn) => fn, useRef: () => ({ current: null }), useState: () => [snapPoint, (next) => { snapPoint = next }] },
+  const drawer = componentFixture('features/quests/pages/home/components/QuestDetailDrawer.tsx', {
     'lucide-react': { ChevronUp: 'ChevronUp', X: 'X' },
     '@/shared/components/ui/button': { Button: 'Button' },
     '@/features/quests/hooks/useQuestDetail': { useQuestDetail: () => query },
@@ -587,9 +698,18 @@ test('상세 Drawer는 미리보기·확장·고정 수행 버튼과 오류 재�
     '../utils/getQuestQueryError': queryErrorUtils,
     '../utils/getDistanceMeters': distanceUtils,
     '@/shared/components/ui/drawer': Object.fromEntries(['Drawer', 'DrawerClose', 'DrawerContent', 'DrawerDescription', 'DrawerFooter', 'DrawerHeader', 'DrawerTitle'].map((name) => [name, name])),
+  }, {
+    ResizeObserver: class {
+      constructor(callback) { resized = callback }
+      observe() { observed = true }
+      disconnect() { disconnected++ }
+    },
+    window: { addEventListener() {}, removeEventListener() {} },
   })
-  const render = () => Drawer({ questId: 701, position: viewerPosition, onPositionChange() {}, onClose() {} })
+  const render = () => drawer.render({ questId: 701, position: viewerPosition, onPositionChange, onExpandedPhotoChange, onClose() {} })
   let tree = render()
+  const host = { getBoundingClientRect: () => ({ top: hostTop }) }
+  drawer.refs[0].current = host
   assert.match(textOf(tree), /내 위치에서 약 0m/)
   assert.equal(findNode(tree, 'QuestDetailPreview').props.quest, query.data)
   assert.ok(findNode(findNode(tree, 'DrawerFooter'), 'QuestStartButton'))
@@ -597,8 +717,27 @@ test('상세 Drawer는 미리보기·확장·고정 수행 버튼과 오류 재�
   const expand = findNode(tree, 'Button')
   assert.equal(expand.props['aria-expanded'], false)
   expand.props.onClick()
-  assert.equal(snapPoint, 0.75)
-  const expanded = render()
+  let expanded = render()
+  assert.equal(findNode(expanded, 'Drawer').props.snapPoint, 0.75)
+  assert.equal(expandedPhoto, null)
+  const transition = findNode(expanded, 'DrawerContent').props.onTransitionEnd
+  transition({ target: {}, currentTarget: host, propertyName: 'transform' })
+  assert.equal(positions.length, 0)
+  transition({ target: host, currentTarget: host, propertyName: 'transform' })
+  render()
+  assert.equal(positions.at(-1), 200)
+  assert.equal(expandedPhoto.photoUrl, query.data.photoUrl)
+  assert.equal(observed, true)
+  hostTop = 180
+  resized()
+  assert.equal(positions.at(-1), 180)
+  // 이미 펼친 상태에서 상세가 나중에 갱신돼도 사진 없음·있음을 다시 반영합니다.
+  query.data = { ...query.data, photoUrl: null }
+  render()
+  assert.equal(expandedPhoto, null)
+  query.data = { ...query.data, photoUrl: 'https://example.com/new.jpg' }
+  expanded = render()
+  assert.equal(expandedPhoto.photoUrl, query.data.photoUrl)
   assert.equal(findNode(expanded, 'QuestDetailPreview'), null)
   assert.equal(findNode(expanded, 'QuestDetailContent').props.quest, query.data)
   assert.equal(findNode(expanded, 'RemotePhoto'), null)
@@ -606,6 +745,7 @@ test('상세 Drawer는 미리보기·확장·고정 수행 버튼과 오류 재�
   assert.equal(findNode(expanded, 'Button').props['aria-expanded'], true)
   findNode(expanded, 'Button').props.onClick()
   assert.ok(findNode(render(), 'QuestDetailPreview'))
+  assert.equal(expandedPhoto, null)
   viewerPosition = { ...position, lat: position.lat - 0.001 }
   assert.match(textOf(render()), /내 위치에서 약 111m/)
   viewerPosition = { ...position, lng: position.lng - 0.1 }
@@ -617,14 +757,23 @@ test('상세 Drawer는 미리보기·확장·고정 수행 버튼과 오류 재�
   assert.equal(notice.props.showingPreviousData, true)
   notice.props.onRetry()
   assert.equal(retries[0].cancelRefetch, false)
+  findNode(render(), 'Button').props.onClick()
+  tree = render()
+  findNode(tree, 'DrawerContent').props.onTransitionEnd({ target: host, currentTarget: host, propertyName: 'transform' })
+  render()
+  assert.ok(expandedPhoto)
   for (const status of [401, 403, 404]) {
     query.error = httpError(status)
     tree = render()
     assert.equal(findNode(tree, 'QuestStartButton'), null)
     assert.equal(findNode(tree, 'QuestDetailPreview'), null)
     assert.equal(findNode(tree, 'QuestDetailContent'), null)
+    assert.equal(expandedPhoto, null)
     assert.equal(findNode(tree, 'QuestQueryErrorNotice').props.info.keepPreviousData, false)
   }
+  drawer.unmount()
+  assert.ok(disconnected > 0)
+  assert.equal(expandedPhoto, null)
 })
 
 test('같은 상세 캐시를 쓰는 navbar도 접근 거절·404의 오래된 데이터로 이동하지 않는다', () => {

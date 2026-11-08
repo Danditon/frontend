@@ -1,5 +1,5 @@
 // 선택한 실제 퀘스트의 상세 정보와 수행 시작 버튼을 표시하며 지도 조작을 유지하는 Drawer입니다.
-import { useCallback, useRef, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 import { ChevronUp, X } from 'lucide-react'
 import { Button } from '@/shared/components/ui/button'
 import { useQuestDetail } from '@/features/quests/hooks/useQuestDetail'
@@ -7,6 +7,7 @@ import type { UserPosition } from '@/features/quests/hooks/useGeolocation'
 import QuestStartButton from './QuestStartButton'
 import QuestDetailPreview from './QuestDetailPreview'
 import QuestDetailContent from './QuestDetailContent'
+import type { QuestDetailMapPhotoData } from './QuestDetailMapPhoto'
 import QuestQueryErrorNotice from './QuestQueryErrorNotice'
 import { getQuestQueryError } from '../utils/getQuestQueryError'
 import { getDistanceMeters } from '../utils/getDistanceMeters'
@@ -22,6 +23,7 @@ import {
 
 type QuestDetailDrawerProps = {
   onPositionChange: (top: number) => void // 보이는 지도 높이를 계산하도록 Drawer 상단 위치를 전달합니다.
+  onExpandedPhotoChange: (photo: QuestDetailMapPhotoData | null) => void // 사진 레이어는 홈에서 표시합니다.
   questId: number | null // null이면 닫히고, ID가 있으면 해당 퀘스트로 열립니다.
   position: UserPosition | null // 홈에서 확인한 GPS를 재사용하며 여기서 위치를 요청하지 않습니다.
   onClose: () => void // 닫힐 때 부모의 선택 상태를 해제합니다.
@@ -32,9 +34,11 @@ export default function QuestDetailDrawer({
   position,
   onClose,
   onPositionChange,
+  onExpandedPhotoChange,
 }: QuestDetailDrawerProps) {
   // 기본 40%, 확장 75%로 두어 펼친 뒤에도 위쪽 지도가 보이게 합니다.
   const [snapPoint, setSnapPoint] = useState(0.4)
+  const [isExpandedSettled, setIsExpandedSettled] = useState(false)
   const isExpanded = snapPoint === 0.75
   const drawerRef = useRef<HTMLDivElement>(null)
   // 마커·목록·가까운 카드에서 선택한 ID로 실제 상세 API와 캐시를 공유합니다.
@@ -58,6 +62,36 @@ export default function QuestDetailDrawer({
     onPositionChange(drawer.getBoundingClientRect().top)
   }, [questId, onPositionChange])
 
+  useEffect(() => {
+    const photoUrl = quest?.photoUrl?.trim()
+    // 확장 애니메이션이 끝나고 현재 ID의 상세가 준비됐을 때만 사진을 전달합니다.
+    onExpandedPhotoChange(
+      questId !== null && quest?.questId === questId && isExpanded && isExpandedSettled && photoUrl
+        ? { questId, photoUrl, placeName: quest.placeName }
+        : null,
+    )
+    return () => onExpandedPhotoChange(null)
+  }, [questId, quest?.questId, quest?.photoUrl, quest?.placeName, isExpanded, isExpandedSettled, onExpandedPhotoChange])
+
+  useEffect(() => {
+    if (questId === null) return
+
+    // 화면 회전·주소창 크기 변경 후에도 사진 높이와 마커 이동 기준을 실제 Drawer 위치로 맞춥니다.
+    const observer = new ResizeObserver(reportPosition)
+    if (drawerRef.current) observer.observe(drawerRef.current)
+    window.addEventListener('resize', reportPosition)
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('resize', reportPosition)
+    }
+  }, [questId, reportPosition])
+
+  function changeSnapPoint(nextPoint: number) {
+    if (nextPoint === snapPoint) return
+    setIsExpandedSettled(false)
+    setSnapPoint(nextPoint)
+  }
+
   return (
     <Drawer
       open={questId !== null}
@@ -69,15 +103,16 @@ export default function QuestDetailDrawer({
         if (open) {
           // 열기 애니메이션 완료 후 선택한 마커의 위치를 보정합니다.
           reportPosition()
+          setIsExpandedSettled(isExpanded)
         } else {
-          setSnapPoint(0.4)
+          changeSnapPoint(0.4)
         }
       }}
       // 드래그 시 두 높이 사이를 이동하도록 공용 Drawer에 맡깁니다.
       snapPoints={[0.4, 0.75]}
       snapPoint={snapPoint}
       onSnapPointChange={(nextPoint) => {
-        if (typeof nextPoint === 'number') setSnapPoint(nextPoint)
+        if (typeof nextPoint === 'number') changeSnapPoint(nextPoint)
       }}
       // 배경을 막지 않아 Drawer 위로 보이는 지도를 계속 조작할 수 있습니다.
       modal={false}
@@ -94,6 +129,7 @@ export default function QuestDetailDrawer({
 
           // 기본·확장 높이 전환이 끝난 뒤 보이는 영역을 갱신합니다.
           reportPosition()
+          setIsExpandedSettled(isExpanded)
         }}
         // 하단은 공용 Drawer의 bottom: 0을 사용해 향후 navbar를 덮습니다.
         // 고정 높이 대신 확장 시 최대 높이만 제한하고, 이동은 snapPoints로 처리합니다.
@@ -164,7 +200,7 @@ export default function QuestDetailDrawer({
                 size="sm"
                 className="min-h-9 text-xs text-neutral-500"
                 aria-expanded={isExpanded}
-                onClick={() => setSnapPoint(isExpanded ? 0.4 : 0.75)}
+                onClick={() => changeSnapPoint(isExpanded ? 0.4 : 0.75)}
               >
                 <ChevronUp className={`size-4 ${isExpanded ? 'rotate-180' : ''}`} aria-hidden="true" />
                 {isExpanded ? '접기' : '위로 올려 자세히 보기'}

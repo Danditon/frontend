@@ -6,6 +6,7 @@ import QuestMap from './components/QuestMap.tsx'
 import NearbyQuestCountCard from './components/NearbyQuestCountCard'
 import QuestListDrawer from './components/QuestListDrawer'
 import QuestDetailDrawer from './components/QuestDetailDrawer'
+import QuestDetailMapPhoto, { type QuestDetailMapPhotoData } from './components/QuestDetailMapPhoto'
 import QuestQueryErrorNotice from './components/QuestQueryErrorNotice'
 import ActiveQuestCard from './components/ActiveQuestCard'
 import LocationPromptCard from './components/LocationPromptCard'
@@ -79,6 +80,11 @@ export default function QuestMapPage() {
   const [listSnapshot, setListSnapshot] = useState<NearbyQuest[]>([])
   const [selectedQuestId, setSelectedQuestId] = useState<number | null>(null)
   const [drawerTop, setDrawerTop] = useState<number | null>(null)
+  const [expandedPhoto, setExpandedPhoto] = useState<QuestDetailMapPhotoData | null>(null)
+  const [visiblePhoto, setVisiblePhoto] = useState<QuestDetailMapPhotoData | null>(null)
+  // 선택이 바뀐 직후에도 다른 ID의 이전 사진으로 지도나 상단 UI를 가리지 않습니다.
+  const detailPhoto = !isListOpen && expandedPhoto?.questId === selectedQuestId ? expandedPhoto : null
+  const isDetailPhotoVisible = detailPhoto !== null && visiblePhoto === detailPhoto
 
   const handleVisibleQuestsChange = useCallback((quests: NearbyQuest[]) => {
     setVisibleResult({ source: nearbyQuests, quests })
@@ -97,6 +103,8 @@ export default function QuestMapPage() {
 
     setSelectedQuestId(null)
     setDrawerTop(null)
+    setExpandedPhoto(null)
+    setVisiblePhoto(null)
     // 열린 목록은 지도를 옮겨도 행이 바뀌지 않게 현재 배열을 저장합니다.
     setListSnapshot([...visibleQuests])
     setIsListOpen(true)
@@ -197,6 +205,16 @@ export default function QuestMapPage() {
         onVisibleQuestsChange={handleVisibleQuestsChange}
       />
 
+      {/* 지도 자체는 유지하고, 펼친 Drawer 위쪽만 사진으로 덮습니다. */}
+      {detailPhoto && (
+        <QuestDetailMapPhoto
+          key={`${detailPhoto.questId}:${detailPhoto.photoUrl}`}
+          photo={detailPhoto}
+          top={drawerTop}
+          onVisibilityChange={setVisiblePhoto}
+        />
+      )}
+
       {/* 위치 오류와 갱신 오류를 한 영역에 쌓아 서로 겹치지 않게 안내합니다. */}
       <div className="pointer-events-none absolute inset-x-4 top-20 z-20 space-y-2">
         {error && (
@@ -227,9 +245,11 @@ export default function QuestMapPage() {
       </div>
 
       {/* 지도 위 상단 UI */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 px-4 pt-[calc(0.75rem+env(safe-area-inset-top,0px))]">
-        <HomeHeader regionLabel={isLocating ? '위치 확인 중' : regionLabel} />
-      </div>
+      {!isDetailPhotoVisible && (
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-10 px-4 pt-[calc(0.75rem+env(safe-area-inset-top,0px))]">
+          <HomeHeader regionLabel={isLocating ? '위치 확인 중' : regionLabel} />
+        </div>
+      )}
 
       {/* Drawer가 닫혀 있을 때 현재 상태의 카드·개수 카드·현위치 버튼을 보여줍니다. */}
       {!isListOpen && selectedQuestId === null && (
@@ -269,9 +289,12 @@ export default function QuestMapPage() {
         questId={selectedQuestId}
         position={position}
         onPositionChange={setDrawerTop}
+        onExpandedPhotoChange={setExpandedPhoto}
         onClose={() => {
           setSelectedQuestId(null)
           setDrawerTop(null)
+          setExpandedPhoto(null)
+          setVisiblePhoto(null)
         }}
       />
     </section>

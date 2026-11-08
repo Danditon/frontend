@@ -12,6 +12,9 @@ import { newestFirst } from "../lib/performances";
 import type { Memory } from "../types";
 import { getQuestGreetings, getVerificationQuest, toggleSubmissionLike, type QuestGreetings } from "@/features/quests/api/verification";
 
+const profileTabsClass =
+  "grid [grid-template-columns:1fr_1fr] gap-[6px] [&_>_a]:h-[96px] [&_>_a]:rounded-[23px] [&_>_a]:flex [&_>_a]:flex-col [&_>_a]:[padding:16px_14px_12px] [&_>_a]:relative [&_>_a]:justify-end [&_strong]:font-normal [&_strong]:text-[38px] [&_strong]:leading-[1.05] [&_small]:text-[12px] [&_small]:mt-[4px]";
+
 function MemoryThumbnail({ memory, token }: { memory: Memory; token: string | null }) {
   const detail = useQuery({
     queryKey: ["verification-quest", memory.id, token],
@@ -318,7 +321,33 @@ export default function MyPage() {
         </footer>
       </section>
     );
-  if (history)
+  if (history) {
+    const peerRecords = showOthers
+      ? newestFirst(peerQuestIds.flatMap((questId, index) => {
+          const record = visibleRecords.find((item) => item.questId === questId);
+          if (!record) return [];
+          return (greetingQueries[index]?.data?.submissions ?? [])
+            .filter((item) => item.verifyStatus === "PASSED" && item.performer.userId !== user?.userId)
+            .map((item) => ({
+              record,
+              submissionId: item.submissionId,
+              photoUrl: item.photoUrl,
+              createdAt: item.createdAt,
+              performerName: item.performer.nickname,
+            }));
+        }))
+      : [];
+    const historyCards = showOthers
+      ? peerRecords.map((peer) => ({ ...peer, key: `peer-${peer.submissionId}` }))
+      : visibleRecords.map((record) => ({
+          key: record.id,
+          record,
+          photoUrl: record.photoUrl,
+          submissionId: undefined,
+          performerName: undefined,
+        }));
+    const peerStatus = greetingQueries.find((query) => query.isError)
+      ?? greetingQueries.find((query) => query.isPending);
     return (
       <section
         aria-label="내 수행 기록 지도 화면"
@@ -326,7 +355,7 @@ export default function MyPage() {
       >
         <div className="relative z-10 shrink-0 bg-white px-[15px] pb-3 pt-3">
           <Profile nickname={token ? user?.nickname : undefined} email={token ? user?.email : undefined} />
-          <div className="grid [grid-template-columns:1fr_1fr] gap-[6px] mb-0 [&_>_a]:h-[96px] [&_>_a]:rounded-[23px] [&_>_a]:bg-white/95 [&_>_a]:flex [&_>_a]:flex-col [&_>_a]:[padding:16px_14px_12px] [&_>_a]:relative [&_>_a]:justify-end [&_>_a.selected]:bg-[#c9eaf5] [&_strong]:font-normal [&_strong]:text-[38px] [&_strong]:leading-[1.05] [&_small]:text-[12px] [&_small]:mt-[4px]">
+          <div className={profileTabsClass + " [&_>_a]:bg-white/95 [&_>_a.selected]:bg-[#c9eaf5]"}>
             <Link to="/me/memories" className="bg-[#e5e5e5]! text-[#242624]">
               <span className="text-[10px] absolute right-[12px] top-[14px] rounded-[15px] [padding:4px_7px] bg-[#dedede]">
                 도착한 안부
@@ -344,46 +373,17 @@ export default function MyPage() {
           <HistoryMap records={visibleRecords} source="records" token={token} />
           <div
             ref={historyPanel}
-            className="absolute inset-x-4 bottom-[124px] z-10 max-h-[max(120px,calc(100%_-_190px))] overflow-y-auto overscroll-contain rounded-2xl bg-white/95 p-3 shadow-lg backdrop-blur-sm"
+            className="absolute inset-x-4 bottom-[124px] z-10 max-h-[min(max(120px,calc(100%_-_190px)),max(0px,calc(100%_-_136px)))] overflow-x-hidden overflow-y-auto overscroll-y-contain rounded-2xl bg-white/95 p-3 shadow-lg backdrop-blur-sm"
           >
             {historyQuestId && (
               <Link to="/me/history" className="block py-2 text-sm underline">
                 내 기록 전체 보기
               </Link>
             )}
-            <div
-              aria-label="내 수행 퀘스트 사진"
-              className="flex gap-2 overflow-x-auto overscroll-x-contain pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-            >
-              {visibleRecords.map((record) => (
-                <Link
-                  key={record.id}
-                  className="w-[86px] shrink-0 text-center text-[#242624]"
-                  to={`/me/memories?${new URLSearchParams({ source: "records", record: record.id, quest: record.questId ?? record.id, message: "0", returnOthers: showOthers ? "1" : "0" })}`}
-                >
-                  <RemotePhoto
-                    className="aspect-square w-full rounded-lg!"
-                    photoUrl={record.photoUrl}
-                    alt={record.title}
-                  />
-                  <h3 className="line-clamp-2 pt-1 text-[10px] font-normal leading-snug">
-                    {record.title}
-                  </h3>
-                  <span className="sr-only">나와 다른 수행자의 안부 보기</span>
-                </Link>
-              ))}
-              <Link
-                className="grid h-[86px] w-[86px] shrink-0 place-items-center rounded-lg border border-dotted border-neutral-400 bg-white/80 p-2 text-center text-[10px]"
-                to="/"
-              >
-                다음 퀘스트 찾기
-              </Link>
-            </div>
-            <header className="mt-2 flex items-center justify-between gap-3">
-              <h2 className="text-[11px] font-medium">수행 기록 · 최신순</h2>
+            <header className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-[11px] font-medium">{showOthers ? "다른 수행자 기록" : "수행 기록"} · 최신순</h2>
               <button
-                aria-expanded={showOthers}
-                aria-controls="other-performance-list"
+                aria-controls="history-record-list"
                 className="rounded-full bg-[#242624] px-3 py-2 text-xs text-white"
                 onClick={() =>
                   setParams((previous) => {
@@ -395,63 +395,52 @@ export default function MyPage() {
                 }
               >
                 {showOthers
-                  ? "다른 수행자 기록 숨기기"
+                  ? "내 기록 보기"
                   : "다른 수행자 기록 보기"}
               </button>
             </header>
-            <p className="sr-only">
-              {showOthers
-                ? "내가 수행한 퀘스트의 다른 수행 기록도 함께 보여요."
-                : "내가 수행한 퀘스트만 보여요. 안부를 열면 다른 수행자의 글도 함께 볼 수 있어요."}
-            </p>
-            {showOthers && (
-              <div
-                id="other-performance-list"
-                className="mt-2 flex max-h-[160px] flex-col gap-3 overflow-y-auto overscroll-contain"
-              >
-                {visibleRecords.map((record) => {
-                  const peerQuery = greetingQueries[peerQuestIds.indexOf(record.questId ?? record.id)];
-                  const peers = newestFirst((peerQuery?.data?.submissions ?? []).filter(
-                    (item) => item.verifyStatus === "PASSED" && item.performer.userId !== user?.userId,
-                  ));
-                  return (
-                    <section
-                      key={record.id}
-                      aria-label={`${record.title} 다른 수행자 기록`}
-                      className="rounded-xl bg-white p-3 text-[#242624]"
-                    >
-                      <h3 className="mb-2 text-xs font-semibold">
-                        {record.title}{peerQuery?.data && ` · 다른 수행 기록 ${peers.length}건`}
-                      </h3>
-                      {peers.length ? (
-                        <ul className="flex flex-col gap-2">
-                          {peers.map((peer) => (
-                            <li key={peer.submissionId}>
-                              <Link
-                                className="block rounded-lg bg-[#edf4f6] p-3 text-xs"
-                                to={`/me/memories?${new URLSearchParams({ source: "records", record: record.id, quest: record.questId ?? record.id, message: "0", submission: String(peer.submissionId), returnOthers: "1" })}`}
-                              >
-                                <span>
-                                  {peer.performer.nickname} · {peer.greeting}
-                                </span>
-                                <time
-                                  className="mt-1 block text-[10px] text-neutral-500"
-                                  dateTime={peer.createdAt}
-                                >
-                                  {peer.createdAt?.slice(0, 10) ??
-                                    "등록일 정보 없음"}
-                                </time>
-                              </Link>
-                            </li>
-                          ))}
-                        </ul>
-                      ) : (
-                        peerQuery && <ListStatus query={peerQuery} enabled={Boolean(token)} label="다른 수행 기록을" empty="다른 수행자의 기록이 아직 없어요." />
-                      )}
-                    </section>
-                  );
-                })}
-              </div>
+            <div
+              key={String(showOthers)}
+              id="history-record-list"
+              role="region"
+              tabIndex={0}
+              aria-label={showOthers ? "다른 수행자 기록 목록" : "내 수행 퀘스트 목록"}
+              className="relative grid w-full min-w-0 grid-flow-col auto-cols-[calc((100%_-_1rem)/3)] snap-x snap-proximity gap-2 overflow-x-auto overscroll-x-contain pb-2 [scrollbar-width:thin]"
+            >
+              {historyCards.map(({ key, record, photoUrl, submissionId, performerName }) => (
+                <Link
+                  key={key}
+                  className="min-w-0 snap-start rounded-xl bg-[#edf4f6] p-2 text-[#242624]"
+                  to={`/me/memories?${new URLSearchParams({
+                    source: "records",
+                    record: record.id,
+                    quest: record.questId ?? record.id,
+                    message: "0",
+                    returnOthers: showOthers ? "1" : "0",
+                    ...(submissionId === undefined ? {} : { submission: String(submissionId) }),
+                  })}`}
+                >
+                  <RemotePhoto className="h-16 w-full rounded-lg!" photoUrl={photoUrl} alt={record.title} />
+                  <h3 className="mt-1 text-xs font-medium leading-snug [overflow-wrap:anywhere]">
+                    {record.title}
+                  </h3>
+                  {performerName && <p className="truncate text-[10px] text-neutral-600">{performerName} 님</p>}
+                  <span className="sr-only">안부 보기</span>
+                </Link>
+              ))}
+              {!showOthers && (
+                <Link
+                  className="grid min-w-0 snap-start place-items-center rounded-lg border border-dotted border-neutral-400 bg-white/80 p-2 text-center text-xs"
+                  to="/"
+                >
+                  다음 퀘스트 찾기
+                </Link>
+              )}
+            </div>
+            {showOthers && visibleRecords.length > 0 && (
+              peerStatus
+                ? <ListStatus query={peerStatus} enabled={Boolean(token)} label="다른 수행 기록을" empty="" />
+                : historyCards.length === 0 && <p role="status" className="py-2 text-xs">다른 수행자의 기록이 아직 없어요.</p>
             )}
             {visibleRecords.length === 0 && (
               <ListStatus query={recordsQuery} enabled={Boolean(token)} label="수행 기록을" empty="아직 수행한 기록이 없어요." />
@@ -460,10 +449,11 @@ export default function MyPage() {
         </div>
       </section>
     );
+  }
   return (
     <section className="memory-page [padding:12px_15px_100px] min-h-[790px] relative flex-1 max-[500px]:[min-height:calc(100dvh_-_54px)]">
       <Profile nickname={token ? user?.nickname : undefined} email={token ? user?.email : undefined} />
-      <div className="grid [grid-template-columns:1fr_1fr] gap-[6px] mb-[16px] [&_>_a]:h-[115px] [&_>_a]:rounded-[23px] [&_>_a]:bg-[#c9eaf5] [&_>_a]:flex [&_>_a]:flex-col [&_>_a]:[padding:25px_14px_13px] [&_>_a]:relative [&_>_a]:justify-end [&_>_a.selected]:bg-[#242624] [&_strong]:font-normal [&_strong]:text-[45px] [&_strong]:leading-[1.05] [&_small]:text-[12px] [&_small]:mt-[4px]">
+      <div className={profileTabsClass + " mb-[16px] [&_>_a]:bg-[#c9eaf5] [&_>_a.selected]:bg-[#242624]"}>
         <Link to="/me/memories" className={!history ? "selected" : ""}>
           <span className="text-[10px] absolute right-[12px] top-[14px] rounded-[15px] [padding:4px_7px] bg-[#dedede]">
             도착한 안부

@@ -11,7 +11,7 @@ export default function LoginSplash({ visible, reducedMotion }: LoginSplashProps
   return (
     <motion.section
       role="status"
-      aria-label="그리움 퀘스트를 시작합니다."
+      aria-label="그립데이를 시작합니다."
       className="absolute inset-0 z-10 overflow-hidden bg-[#DBEEF5] text-[#242624]"
       style={{ fontFamily: '"Pretendard", system-ui, sans-serif' }}
       initial={{ opacity: 0 }}
@@ -22,7 +22,7 @@ export default function LoginSplash({ visible, reducedMotion }: LoginSplashProps
       <header className="absolute inset-x-0 top-[clamp(5rem,20%,11rem)] z-10 px-6 text-center">
         {/* 실제 서비스 로고가 준비되면 이 제목 영역을 로고 에셋으로 교체합니다. */}
         <h2 className="text-[clamp(1.25rem,5vw,1.5rem)] font-semibold tracking-tight">
-          서비스 로고
+          그립데이
         </h2>
         <p className="mt-3 text-sm font-medium text-[#619497]">
           그리운 곳으로 가는 안부

@@ -10,10 +10,11 @@ type Props = {
   isTransitioning: boolean
   reducedMotion: boolean
   hidden: boolean
+  hideSteps?: boolean
   onBack: () => void
 }
 
-export default function CreationHeader({ step, backToHome, busy, isTransitioning, reducedMotion, hidden, onBack }: Props) {
+export default function CreationHeader({ step, backToHome, busy, isTransitioning, reducedMotion, hidden, hideSteps = false, onBack }: Props) {
   return (
     <motion.header
       className="creation-header"
@@ -33,8 +34,12 @@ export default function CreationHeader({ step, backToHome, busy, isTransitioning
         </button>
       )}
 
-      <div
+      <motion.div
         className="creation-steps"
+        initial={false}
+        animate={{ opacity: hideSteps ? 0 : 1 }}
+        transition={creationTransition(reducedMotion)}
+        aria-hidden={hideSteps}
         role="progressbar"
         aria-label="그리움 등록 단계"
         aria-valuemin={1}
@@ -50,7 +55,7 @@ export default function CreationHeader({ step, backToHome, busy, isTransitioning
             />
           </span>
         ))}
-      </div>
+      </motion.div>
     </motion.header>
   )
 }

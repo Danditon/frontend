@@ -151,6 +151,7 @@ export default function QuestCreatePage() {
         backToHome={stage === 'details'}
         busy={busy}
         hidden={stage === 'done'}
+        hideSteps={failed}
         isTransitioning={isTransitioning}
         reducedMotion={reducedMotion}
         onBack={goBack}

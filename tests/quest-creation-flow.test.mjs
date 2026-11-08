@@ -276,6 +276,7 @@ test('미리보기는 사진 없는 장소 카드·편집·공백 검증을 유�
 test('입력 상태를 보존하며 일반 퀘스트는 사진 없이 생성하고 등록 재시도에서 AI를 다시 호출하지 않는다', async () => {
   const f = pageFixture()
   f.fill()
+  assert.equal(f.props('CreationHeader').hideSteps, false)
   f.props('CreationHeader').onBack()
   f.render()
   assert.equal(f.props('CreationDetailsStep').reason, '  친구들과 자주 가던 카페예요.  ')
@@ -294,10 +295,13 @@ test('입력 상태를 보존하며 일반 퀘스트는 사진 없이 생성하�
   await tick()
   f.render()
   assert.equal(f.props('CreationResultStep').outcome, 'registerError')
+  assert.equal(f.props('CreationHeader').hideSteps, true)
+  assert.equal(f.props('CreationHeader').hidden, false)
   assert.match(f.props('CreationResultStep').error, /등록 요청/)
   f.props('CreationResultStep').onEdit()
   f.render()
   assert.equal(f.props('CreationPreviewStep').preview.questTitle, '수정한 제목')
+  assert.equal(f.props('CreationHeader').hideSteps, false)
   f.register = async () => ({ questId: 701 })
   f.props('CreationPreviewStep').onRegister()
   await tick()
@@ -480,6 +484,8 @@ test('빠른 생성 오류도 진입 완료 뒤 표시하며 수정하기는 역
   assert.equal(f.props('CreationScreen').screen.stage, 'generating')
   f.complete()
   assert.equal(f.props('CreationScreen').screen.stage, 'previewError')
+  assert.equal(f.props('CreationHeader').hideSteps, true)
+  assert.equal(f.props('CreationHeader').hidden, false)
   let tree = f.render(false)
   const edit = f.props('CreationResultStep').onEdit
   edit()
@@ -491,6 +497,7 @@ test('빠른 생성 오류도 진입 완료 뒤 표시하며 수정하기는 역
   assert.equal(f.props('CreationScreen').screen.direction, -1)
   assert.equal(f.props('CreationDetailsStep').place, place)
   assert.match(f.props('CreationDetailsStep').reason, /친구들과/)
+  assert.equal(f.props('CreationHeader').hideSteps, false)
   f.complete()
   f.unmount()
 })
@@ -511,18 +518,28 @@ test('본문과 단계 표시는 같은 시간·곡선을 사용하고 애니메
   assert.equal(transition(true).duration, 0.12)
   const Header = load('components/creation/CreationHeader.tsx', {
     'lucide-react': { ChevronLeft: 'ChevronLeft' }, 'react-router': { Link: 'Link' },
-    'motion/react': { motion: { header: 'motion.header', span: 'motion.span' } },
+    'motion/react': { motion: { header: 'motion.header', div: 'motion.div', span: 'motion.span' } },
     './questCreationMotion': config,
   })
   for (const reducedMotion of [false, true]) {
     const tree = Header({ step: 2, backToHome: false, busy: false, isTransitioning: true, reducedMotion, hidden: false })
     assert.equal(tree.props.inert, true)
     assert.equal(find(tree, 'button').props.disabled, true)
-    const progress = find(tree, 'div', props => props.role === 'progressbar')
+    const progress = find(tree, 'motion.div', props => props.role === 'progressbar')
+    assert.equal(progress.props.animate.opacity, 1)
+    assert.equal(progress.props['aria-hidden'], false)
     const bars = progress.props.children.map(bar => bar.props.children)
     assert.deepEqual(Array.from(bars, bar => bar.props.animate.scaleX), [1, 1, 0])
     for (const bar of bars) assert.equal(bar.props.transition.duration, transition(reducedMotion).duration)
     assert.deepEqual(bars[0].props.transition.ease, transition(reducedMotion).ease)
+    const failed = Header({ step: 3, backToHome: false, busy: false, isTransitioning: false, reducedMotion, hidden: false, hideSteps: true })
+    const hiddenProgress = find(failed, 'motion.div', props => props.role === 'progressbar')
+    assert.equal(hiddenProgress.props.animate.opacity, 0)
+    assert.equal(hiddenProgress.props['aria-hidden'], true)
+    assert.equal(hiddenProgress.props.transition.duration, transition(reducedMotion).duration)
+    assert.equal(failed.props.animate.opacity, 1)
+    assert.equal(failed.props['aria-hidden'], false)
+    assert.equal(find(failed, 'button').props.disabled, false)
   }
 })
 
@@ -909,6 +926,8 @@ test('등록 불명확 시 입력을 읽기 전용으로 보존하고 생성·�
     const result = f.props('CreationResultStep')
     assert.equal(result.outcome, 'registerError')
     assert.equal(result.uncertain, true)
+    assert.equal(f.props('CreationHeader').hideSteps, true)
+    assert.equal(f.props('CreationHeader').hidden, false)
     assert.match(result.error, /등록 내역을 먼저 확인/)
     assert.equal(find(Result(result), 'Link').props.to, '/me')
     result.onRetry()

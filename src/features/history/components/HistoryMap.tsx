@@ -1,5 +1,7 @@
 import { createQuestMarkerImage } from "@/features/quests/pages/home/utils/createQuestMarkerImage";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
+import { useQueries } from "@tanstack/react-query";
+import { getVerificationQuest, isQuestId } from "@/features/quests/api/verification";
 import { Link } from "react-router";
 import { ExternalLink } from "lucide-react";
 import type { RecordItem } from "@/features/memories/types";
@@ -37,11 +39,26 @@ function focusLocation(
 export function HistoryMap({
   records,
   source,
+  token,
 }: {
   records: RecordItem[];
   source: "records" | "completed";
+  token: string | null;
 }) {
   const points = useMemo(() => locatedRecords(records), [records]);
+  const questIds = [...new Set(points.flatMap(({ questId, questType, difficulty }) =>
+    questId && isQuestId(questId) && (!questType || !difficulty) ? [questId] : [],
+  ))];
+  const questDetails = useQueries({
+    queries: questIds.map((questId) => ({
+      queryKey: ["verification-quest", questId, token],
+      queryFn: ({ signal }: { signal: AbortSignal }) => getVerificationQuest(questId, signal),
+      enabled: Boolean(token),
+      staleTime: 60_000,
+      retry: false,
+    })),
+    combine: (queries) => queries.map(({ data }) => data),
+  });
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<KakaoMap | null>(null);
   const markersRef = useRef(new Map<string, KakaoMarker>());
@@ -62,23 +79,31 @@ export function HistoryMap({
           point.location.lng,
           container.current,
         );
-        markersRef.current.forEach((marker, key) => {
-          marker.setZIndex(key === id ? 10 : 0);
-          const record = points.find((item) => item.id === key);
-          if (record?.questType && record.difficulty)
-            marker.setImage(
-              createQuestMarkerImage(
-                maps,
-                record.questType,
-                record.difficulty,
-                key === id,
-              ),
-            );
-        });
       }
     },
     [points],
   );
+
+  const updateMarkerImages = useEffectEvent(() => {
+    const maps = window.kakao?.maps;
+    if (!maps) return;
+    for (const record of points) {
+      const marker = markersRef.current.get(record.id);
+      if (!marker) continue;
+      const isSelected = record.id === selectedId;
+      marker.setZIndex(isSelected ? 10 : 0);
+      const detail = questDetails.find((quest) => String(quest?.questId) === record.questId);
+      const questType = record.questType ?? detail?.questType;
+      const difficulty = record.difficulty ?? detail?.difficulty;
+      if (questType && (difficulty === 1 || difficulty === 2 || difficulty === 3)) {
+        marker.setImage(createQuestMarkerImage(maps, questType, difficulty, isSelected));
+      }
+    }
+  });
+
+  useEffect(() => {
+    updateMarkerImages();
+  }, [points, questDetails, selectedId]);
 
   useEffect(() => {
     if (!points.length) return;
@@ -122,20 +147,13 @@ export function HistoryMap({
               position,
               title: record.location.placeName || record.title,
               clickable: true,
-              image:
-                record.questType && record.difficulty
-                  ? createQuestMarkerImage(
-                      maps,
-                      record.questType,
-                      record.difficulty,
-                    )
-                  : undefined,
             });
             const handler = () => select(record.id);
             maps.event.addListener(marker, "click", handler);
             markers.set(record.id, marker);
             listeners.push({ marker, handler });
           });
+          updateMarkerImages();
           const fit = () => {
             map.relayout();
             const panelHeight =
@@ -148,7 +166,7 @@ export function HistoryMap({
               element.clientHeight - 80,
               panelHeight + 136,
             );
-            if (points.length > 1) map.setBounds(bounds, 24, 40, bottom, 40);
+            if (points.length > 1) map.setBounds(bounds, 64, 40, bottom, 40);
             else focusLocation(map, first.lat, first.lng, element);
           };
           fit();

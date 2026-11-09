@@ -4,6 +4,7 @@ import { runInNewContext } from 'node:vm'
 import test from 'node:test'
 import ts from 'typescript'
 import { QueryClient } from '@tanstack/react-query'
+import { z } from 'zod'
 
 function load(path, dependencies = {}, globals = {}) {
   const code = ts.transpileModule(readFileSync(new URL(`../src/${path}`, import.meta.url), 'utf8'), {
@@ -24,12 +25,14 @@ function all(tree, type) {
   return [...(tree.type === type ? [tree] : []), ...[tree.props?.children].flat(Infinity).flatMap(child => all(child, type))]
 }
 const find = (tree, type, matches = () => true) => all(tree, type).find(node => matches(node.props))
+const nextButton = tree => find(tree, 'button', props => props.className === 'greeting-next')
+const likeButton = tree => find(tree, 'button', props => props.className === 'greeting-like')
 const text = tree => typeof tree === 'string' || typeof tree === 'number' ? String(tree)
   : tree ? [tree.props?.children].flat(Infinity).map(text).join('') : ''
 const wire = { Back: 'Back', Profile: 'Profile', Bottom: 'Bottom' }
 const router = { Link: 'Link' }
 const photo = { RemotePhoto: 'RemotePhoto' }
-const memory = { id: '22', title: '그리운 카페', sub: '일반 퀘스트', photoUrl: null, passedCount: 2 }
+const memory = { id: '22', questType: 'GENERAL', title: '그리운 카페', sub: '일반 퀘스트', photoUrl: null, passedCount: 2 }
 const record = { id: '101', questId: '22', title: '카페의 안부', photoUrl: '/record.jpg', location: { lat: 35, lng: 128, placeName: '카페' } }
 const submission = (id, createdAt, extra = {}) => ({ submissionId: id, createdAt, greeting: `안부 ${id}`, photoUrl: `/photo-${id}.jpg`,
   isLiked: false, verifyStatus: 'PASSED', performer: { userId: 8, nickname: '보낸 사람' }, ...extra })
@@ -41,7 +44,7 @@ function fixture(path = '/me', search = '') {
   ] })
   let params = new URLSearchParams(search), cursor = 0, refCursor = 0, effectCursor = 0, mutationOptions
   const states = [], refs = [], effects = []
-  const f = { pathname: path, client, memories: [memory], records: [record], likes: [], navigations: [], removed: [], scrolls: [], queries: [], questError: false, greetingError: false, pendingQueries: false }
+  const f = { pathname: path, client, memories: [memory], records: [record], likes: [], navigations: [], removed: [], scrolls: [], queries: [], questError: false, greetingError: false, pendingQueries: false, detailQuestType: 'IMAGE' }
   const mutation = { isPending: false, isError: false, variables: undefined, mutate(value) {
     f.likes.push(value); this.variables = value; this.isPending = true
   } }
@@ -56,19 +59,24 @@ function fixture(path = '/me', search = '') {
     'react-router': { ...router, useLocation: () => ({ pathname: f.pathname }), useSearchParams: () => [params, update => {
       params = typeof update === 'function' ? update(params) : new URLSearchParams(update)
     }], useNavigate: () => (...args) => f.navigations.push(args) },
-    'lucide-react': { LogOut: 'LogOut' }, '@/shared/components/WireUI': wire, '@/shared/components/RemotePhoto': photo,
+    'lucide-react': { Heart: 'Heart' }, '@/shared/components/WireUI': wire, '@/shared/components/RemotePhoto': photo,
     '@/features/history/components/HistoryMap': { HistoryMap: 'HistoryMap' },
     '@/features/auth/hooks/useAuth': { useAuth: () => ({ user: { userId: 7, nickname: '사용자', email: 'user@example.com' }, retrySession: async () => {} }) },
     '@/features/auth/utils/tokenStorage': { getAccessToken: () => 'token' },
     '@tanstack/react-query': {
       useQueryClient: () => client,
-      useQuery(options) { f.queries.push(options); return options.queryKey[0] === 'my-quests' ? query(f.memories, f.questError) : query(f.records) },
+      useQuery(options) {
+        f.queries.push(options)
+        if (options.queryKey[0] === 'my-quests') return query(f.memories, f.questError)
+        if (options.queryKey[0] === 'verification-quest') return query(f.detailQuestType ? { questType: f.detailQuestType } : undefined)
+        return query(f.records)
+      },
       useQueries: ({ queries }) => queries.map(options => query(client.getQueryData(options.queryKey), f.greetingError)),
       useMutation(options) { mutationOptions = options; return mutation },
     },
     '../api/myPage': { getMyQuests: () => {}, getMySubmissions: () => {} },
     '../lib/performances': load('features/memories/lib/performances.ts'),
-    '@/features/quests/api/verification': { getQuestGreetings: () => {}, toggleSubmissionLike: () => {} },
+    '@/features/quests/api/verification': { getQuestGreetings: () => {}, toggleSubmissionLike: () => {}, getVerificationQuest: (...args) => { f.requestedDetail = args } },
     '../components/MyPageSummary': { __esModule: true, default: 'MyPageSummary' },
     '../components/MemoryQuestCard': { __esModule: true, default: 'MemoryQuestCard' },
     '../components/GreetingLetter': { __esModule: true, default: 'GreetingLetter' },
@@ -96,15 +104,21 @@ test('안부 하단 목록 없이 다음 버튼으로 최신순 이동·순환�
   const f = fixture('/me/memories', 'source=records&record=101&quest=22&submission=1&message=0&returnOthers=1')
   let tree = f.render()
   assert.equal(find(tree, 'GreetingLetter').props.greeting.id, '1')
-  const backdrop = find(tree, 'div', props => props.className === 'greeting-envelope')
-  assert.ok(tree.props.children.includes(backdrop))
+  const bottom = find(tree, 'div', props => props.className === 'greeting-envelope-bottom')
+  const backdrop = find(bottom, 'div', props => props.className === 'greeting-envelope-front')
+  const back = find(bottom, 'div', props => props.className === 'greeting-envelope-back')
+  assert.ok(back)
+  assert.equal(back.props['aria-hidden'], 'true')
+  assert.ok(backdrop)
   assert.equal(backdrop.props['aria-hidden'], 'true')
-  assert.ok(find(tree, 'footer', props => props.className === 'greeting-footer'))
+  assert.ok(find(bottom, 'footer', props => props.className === 'greeting-footer'))
+  assert.ok(likeButton(bottom))
+  assert.equal(find(tree, 'Link', props => props['aria-label'] === '로그아웃'), undefined)
   assert.equal(find(tree, 'Back').props.to, '/me/history?showOthers=1')
   assert.equal(find(tree, 'section', props => props['aria-label'] === '수행 글 목록'), undefined)
   assert.equal(all(tree, 'ol').length, 0)
-  assert.equal(find(tree, 'button').props.disabled, false)
-  find(tree, 'button').props.onClick()
+  assert.equal(nextButton(tree).props.disabled, false)
+  nextButton(tree).props.onClick()
   tree = f.render()
   assert.equal(find(tree, 'GreetingLetter').props.greeting.id, '2')
   assert.equal(f.params.has('submission'), false)
@@ -112,7 +126,7 @@ test('안부 하단 목록 없이 다음 버튼으로 최신순 이동·순환�
   assert.equal(f.params.get('quest'), '22')
   assert.equal(f.params.get('source'), 'records')
   assert.equal(f.scrolls.length, 2)
-  find(tree, 'button').props.onClick()
+  nextButton(tree).props.onClick()
   assert.equal(find(f.render(), 'GreetingLetter').props.greeting.id, '1')
 })
 
@@ -120,7 +134,9 @@ test('안부 0·1개에서는 다음을 잠그며 조회 실패 안내와 재시
   const f = fixture('/me/memories', 'quest=22&message=0')
   for (const submissions of [[], [submission(1, '2026-11-01')]]) {
     f.client.setQueryData(['quest-greetings', '22', 'token'], { viewerRole: 'AUTHOR', submissions })
-    assert.equal(find(f.render(), 'button').props.disabled, true)
+    const tree = f.render()
+    assert.equal(nextButton(tree).props.disabled, true)
+    assert.equal(Boolean(find(tree, 'div', props => props.className === 'greeting-envelope-back')), submissions.length > 0)
   }
   f.client.setQueryData(['quest-greetings', '22', 'token'], { submissions: [] })
   f.greetingError = true
@@ -133,21 +149,19 @@ test('안부 0·1개에서는 다음을 잠그며 조회 실패 안내와 재시
 
 test('좋아요는 작성자에게만 허용하고 중복 요청을 막으며 해당 안부의 캐시만 갱신한다', () => {
   const f = fixture('/me/memories', 'quest=22&message=0')
-  let props = find(f.render(), 'GreetingLetter').props
-  assert.equal(props.canLike, true)
-  props.onLike()
-  props = find(f.render(), 'GreetingLetter').props
-  assert.equal(props.pending, true)
-  props.onLike()
+  let button = likeButton(f.render())
+  assert.ok(button)
+  button.props.onClick()
+  button = likeButton(f.render())
+  assert.equal(button.props.disabled, true)
+  button.props.onClick()
   assert.equal(f.likes.length, 1)
   assert.equal(f.likes[0].submissionId, 2)
   f.finishLike()
-  assert.equal(find(f.render(), 'GreetingLetter').props.liked, true)
+  assert.equal(likeButton(f.render()).props['aria-pressed'], true)
   assert.equal(f.client.getQueryData(['quest-greetings', '22', 'token']).submissions[0].isLiked, false)
   f.client.setQueryData(['quest-greetings', '22', 'token'], current => ({ ...current, viewerRole: 'PERFORMER' }))
-  props = find(f.render(), 'GreetingLetter').props
-  assert.equal(props.canLike, false)
-  props.onLike()
+  assert.equal(likeButton(f.render()), undefined)
   assert.equal(f.likes.length, 1)
 })
 
@@ -167,16 +181,16 @@ test('기록과 다른 수행자 링크는 퀘스트·기록·안부 ID와 돌�
   assert.equal(params.get('returnOthers'), '1')
 })
 
-test('편지는 사진 없는 안부·좋아요 잠금·실패 상태를 표시하고 실패 시 재시도할 수 있다', () => {
-  const Letter = load('features/memories/components/GreetingLetter.tsx', { 'lucide-react': { Heart: 'Heart' }, '@/shared/components/RemotePhoto': photo })
-  const props = { greeting: { greeting: '긴 안부\n둘째 줄', photoUrl: '/greeting.jpg', senderName: '보낸 사람', createdAt: '2026-11-01' }, canLike: true, liked: true, pending: true, likeError: true }
+test('편지지에는 사진·본문·작성자를 함께 표시하고 사진 없음·조회 실패를 처리한다', () => {
+  const Letter = load('features/memories/components/GreetingLetter.tsx', { '@/shared/components/RemotePhoto': photo })
+  const props = { greeting: { greeting: '긴 안부\n둘째 줄', photoUrl: '/greeting.jpg', senderName: '보낸 사람', createdAt: '2026-11-01' } }
   let tree = Letter(props)
   assert.equal(find(tree, 'div', props => props.className === 'greeting-envelope'), undefined)
   assert.equal(find(tree, 'RemotePhoto').props.photoUrl, '/greeting.jpg')
-  assert.equal(find(tree, 'button').props['aria-pressed'], true)
-  assert.equal(find(tree, 'button').props.disabled, true)
-  assert.match(text(find(tree, 'p', props => props.role === 'alert')), /좋아요를 변경하지 못했어요/)
-  tree = Letter({ ...props, greeting: { ...props.greeting, photoUrl: null }, canLike: false })
+  assert.match(text(tree), /From. 보낸 사람/)
+  assert.match(text(find(tree, 'time')), /2026-11-01/)
+  assert.equal(find(tree, 'button'), undefined)
+  tree = Letter({ ...props, greeting: { ...props.greeting, photoUrl: null } })
   assert.equal(find(tree, 'RemotePhoto'), undefined)
   assert.equal(find(tree, 'button'), undefined)
   assert.match(text(tree), /긴 안부\n둘째 줄/)
@@ -195,6 +209,37 @@ test('숫자 카드는 선택 상태·실제 개수·미조회 표시를 구분�
   assert.match(text(tree), /5내 기록/)
   assert.match(text(tree), /도착한 안부/)
   assert.doesNotMatch(text(tree), /새 안부/)
+})
+
+test('편지 테마는 선택한 퀘스트 유형을 따르며 기록 ID가 아닌 퀘스트 ID로 상세를 조회한다', async () => {
+  const f = fixture('/me/memories', 'quest=22&message=0')
+  const sceneType = tree => find(tree, 'div', props => props.className === 'greeting-scene').props['data-quest-type']
+  assert.equal(sceneType(f.render()), 'GENERAL')
+  assert.equal(f.queries.at(-1).enabled, false)
+  f.memories = [{ ...memory, questType: 'IMAGE' }]
+  assert.equal(sceneType(f.render()), 'IMAGE')
+
+  const recordPage = fixture('/me/memories', 'source=records&record=101&quest=22&message=0')
+  assert.equal(sceneType(recordPage.render()), 'IMAGE')
+  const detailQuery = recordPage.queries.find(query => query.queryKey[0] === 'verification-quest')
+  assert.equal(detailQuery.enabled, true)
+  const signal = new AbortController().signal
+  await detailQuery.queryFn({ signal })
+  assert.equal(recordPage.requestedDetail[0], '22')
+  assert.equal(recordPage.requestedDetail[1], signal)
+  recordPage.detailQuestType = undefined
+  assert.equal(sceneType(recordPage.render()), undefined)
+})
+
+test('내 그리움 API는 일반·이미지 유형을 버리지 않고 화면에 전달한다', async () => {
+  const api = load('features/memories/api/myPage.ts', {
+    zod: { z }, '@/shared/api/client': { apiClient: { get: async () => ({ data: [
+      { questId: 1, questTitle: '일반', questType: 'GENERAL', passedCount: 1 },
+      { questId: 2, questTitle: '이미지', questType: 'IMAGE', passedCount: 2 },
+    ] }) } },
+  })
+  const items = await api.getMyQuests('token', new AbortController().signal)
+  assert.deepEqual(Array.from(items, item => item.questType), ['GENERAL', 'IMAGE'])
 })
 
 test('그리움 카드는 자신의 퀘스트 ID로 상세 사진을 조회하고 선택한 항목을 전달한다', async () => {

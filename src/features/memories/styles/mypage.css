@@ -32,26 +32,62 @@
 .mypage-quest-photo .remote-photo > span { padding: 4px; font-size: 10px; }
 
 .memory-page.mypage-greeting { position: relative; isolation: isolate; display: flex; height: 100%; min-height: 0; flex-direction: column; overflow: hidden; background: white; }
-.greeting-header { flex: none; padding: 20px 20px 16px; }
+.greeting-header { flex: none; padding: 20px 20px 20px; }
 .greeting-tools { display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px; align-items: center; gap: 12px; }
 .greeting-tools > a { display: grid; width: 44px; height: 44px; place-items: center; border-radius: 50%; background: #242624; color: white; }
-.greeting-tools > p { color: #69716e; font-size: 12px; text-align: center; }
-.greeting-header h1 { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; margin-top: 16px; font-size: 18px; font-weight: 600; line-height: 1.4; text-align: center; overflow-wrap: anywhere; }
-.greeting-reader { display: flex; min-height: 0; flex: 1; flex-direction: column; overflow-y: auto; overscroll-behavior-y: contain; }
-.greeting-letter { position: relative; display: flex; flex: 1 0 auto; flex-direction: column; align-items: center; overflow: hidden; padding: 16px 32px 24px; }
-.greeting-photo { position: relative; z-index: 1; width: 100%; aspect-ratio: 16 / 10; flex: none; border-radius: 20px; }
-.greeting-text { position: relative; z-index: 1; width: 100%; flex: none; margin-top: 26px; font-size: 20px; font-weight: 500; line-height: 1.5; text-align: center; white-space: pre-wrap; overflow-wrap: anywhere; }
-.greeting-sender { position: relative; z-index: 1; flex: none; margin-top: 14px; color: #727875; font-size: 12px; text-align: center; overflow-wrap: anywhere; }
-/* 편지 배경은 화면 가장자리와 바닥까지 연결하고 콘텐츠만 안쪽 여백을 둡니다. */
-.greeting-envelope { position: absolute; inset: 48% 0 0; z-index: -1; background: #d1e7f2; clip-path: polygon(0 0, 50% 28%, 100% 0, 100% 100%, 0 100%); pointer-events: none; }
-.greeting-reaction { position: relative; z-index: 1; flex: none; margin-top: auto; padding-top: 32px; text-align: center; }
-.greeting-like { display: grid; width: 64px; height: 64px; margin-inline: auto; place-items: center; border-radius: 50%; background: #242624; color: white; }
+.greeting-tools > p { color: #737976; font-size: 12px; text-align: center; }
+.greeting-header h1 { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; margin-top: 12px; font-size: 18px; font-weight: 600; line-height: 1.4; text-align: center; overflow-wrap: anywhere; }
+.greeting-scene {
+  /* 유형을 확인하기 전에는 중립적인 색을 사용합니다. */
+  --envelope-top: #f0ede8;
+  --envelope-bottom: #e0dbd3;
+  --paper-top: #fffdf8;
+  --paper-bottom: #f5f1eb;
+  /* 봉투 폭에 비례해야 화면 크기가 달라도 접힘 각도가 유지됩니다. */
+  --envelope-fold-height: 28cqw;
+  --envelope-back-lift: 36cqw;
+  --greeting-heart-size: 58px;
+  position: relative;
+  isolation: isolate;
+  container-type: inline-size;
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+.greeting-scene[data-quest-type="GENERAL"] { --envelope-top: #fff2bd; --envelope-bottom: #f2d98e; --paper-top: #fffdf3; --paper-bottom: #fff4dc; }
+.greeting-scene[data-quest-type="IMAGE"] { --envelope-top: #ece2fa; --envelope-bottom: #cdb7e6; --paper-top: #fdfbff; --paper-bottom: #f1eaf9; }
+.greeting-reader { position: relative; z-index: 2; min-height: 0; flex: 1; overflow-y: auto; overscroll-behavior-y: contain; padding: 16px 20px 0; scroll-padding-bottom: calc(var(--envelope-fold-height) + 20px); }
+.greeting-letter { position: relative; display: flex; min-height: 100%; flex-direction: column; align-items: center; padding: 16px 16px calc(var(--envelope-fold-height) + 20px); border-radius: 12px 12px 0 0; background: radial-gradient(ellipse at 20% 5%, #ffffff70, transparent 65%), linear-gradient(var(--paper-top), var(--paper-bottom)); box-shadow: 0 2px 16px #2426240d; }
+.greeting-photo { width: 100%; aspect-ratio: 16 / 10; flex: none; border-radius: 14px; }
+.greeting-text { width: 100%; flex: none; margin-top: 26px; font-size: 20px; font-weight: 500; line-height: 1.5; text-align: center; white-space: pre-wrap; overflow-wrap: anywhere; }
+.greeting-sender { flex: none; margin-top: 16px; color: #727875; font-size: 12px; text-align: center; overflow-wrap: anywhere; }
+.greeting-envelope-bottom { position: relative; z-index: auto; display: flex; min-height: clamp(180px, 26dvh, 228px); flex: none; flex-direction: column; }
+/* 하단 전체를 앞쪽 레이어로 묶지 않아야 뒷면이 편지지 뒤로 들어갑니다. */
+.greeting-envelope-back {
+  position: absolute;
+  inset: calc(0px - var(--envelope-fold-height) - var(--envelope-back-lift)) 0 0;
+  z-index: 0;
+  background: #ffffffb3;
+  clip-path: polygon(0 var(--envelope-back-lift), 50% 0, 100% var(--envelope-back-lift), 100% 100%, 0 100%);
+  pointer-events: none;
+}
+.greeting-envelope-back::before { content: ""; position: absolute; inset: 3px 0 0; background: linear-gradient(135deg, var(--envelope-bottom), var(--envelope-top)); clip-path: inherit; }
+/* 앞면의 V자 꼭짓점은 하단 영역의 시작점이며, 하트 중심도 이 선에 놓입니다. */
+.greeting-envelope-front { position: absolute; inset: calc(0px - var(--envelope-fold-height)) 0 0; z-index: 3; background: linear-gradient(var(--envelope-top), var(--envelope-bottom)); clip-path: polygon(0 0, 50% var(--envelope-fold-height), 100% 0, 100% 100%, 0 100%); pointer-events: none; }
+/* 아래 덮개가 하트 뒤로 더 올라오도록 접힘선을 올려, V자와 한 점에서 교차하지 않게 합니다. */
+.greeting-envelope-front::before, .greeting-envelope-front::after { content: ""; position: absolute; inset: 0; transform: translateY(calc(var(--greeting-heart-size) / -3 - 2px)); }
+.greeting-envelope-front::before { clip-path: polygon(0 0, 50% var(--envelope-fold-height), 0 calc(var(--envelope-fold-height) * 2)); background: linear-gradient(110deg, #ffffff30, transparent); }
+.greeting-envelope-front::after { clip-path: polygon(100% 0, 50% var(--envelope-fold-height), 100% calc(var(--envelope-fold-height) * 2)); background: linear-gradient(250deg, #ffffff30, transparent); }
+.greeting-envelope-rim { position: absolute; inset: 0 0 auto; z-index: 1; width: 100%; height: var(--envelope-fold-height); overflow: visible; }
+.greeting-reaction { position: relative; z-index: 4; flex: none; text-align: center; }
+.greeting-like { display: grid; width: var(--greeting-heart-size); height: var(--greeting-heart-size); margin: calc(var(--greeting-heart-size) / -2) auto 0; place-items: center; border: 1px solid #f3cec5; border-radius: 50%; background: linear-gradient(#fff8f4, #fbe9e8); color: #e8838d; box-shadow: 0 2px 5px #9a5f5f12; }
 .greeting-like:disabled { opacity: 0.5; cursor: default; }
-.greeting-reaction p { margin-top: 12px; font-size: 12px; }
-.greeting-reaction [role="alert"] { color: #8a3441; }
-.greeting-empty { display: grid; flex: 1; align-content: center; justify-items: center; gap: 12px; min-height: 180px; text-align: center; font-size: 14px; }
+.greeting-reaction p { margin: 16px 20px 0; font-size: 12px; line-height: 1.5; }
+.greeting-reaction [role="alert"] { margin-top: 8px; color: #8a3441; }
+.greeting-empty { display: grid; height: 100%; align-content: center; justify-items: center; gap: 12px; min-height: 120px; text-align: center; font-size: 14px; }
 .greeting-empty button { min-height: 44px; padding: 8px 16px; text-decoration: underline; }
-.greeting-footer { flex: none; padding: 16px 20px max(20px, env(safe-area-inset-bottom, 0px)); }
+.greeting-footer { position: relative; z-index: 4; flex: none; margin-top: auto; padding: 24px 20px max(20px, env(safe-area-inset-bottom, 0px)); }
 .greeting-footer button { width: 100%; min-height: 52px; padding: 12px 18px; border-radius: 999px; background: #242624; color: white; font-size: 15px; }
 .greeting-footer button:disabled { opacity: 0.5; cursor: default; }
 

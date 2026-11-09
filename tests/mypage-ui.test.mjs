@@ -73,6 +73,7 @@ function fixture(path = '/me', search = '') {
   const states = [], refs = [], effects = []
   const f = { pathname: path, client, memories: [memory], records: [record], likes: [], navigations: [], removed: [], scrolls: [], queries: [], questError: false, greetingError: false, pendingQueries: false, detailQuestType: 'IMAGE' }
   const envelope = envelopeFixture(true)
+  const { HistoryRecordCard } = load('features/history/components/HistoryRecordCard.tsx', { '@/shared/components/RemotePhoto': photo })
   function expand(tree) {
     if (Array.isArray(tree)) return tree.map(expand)
     if (!tree || typeof tree !== 'object') return tree
@@ -80,6 +81,7 @@ function fixture(path = '/me', search = '') {
       f.envelopeKey = tree.key
       return envelope.render(tree.props)
     }
+    if (tree.type === 'HistoryRecordCard') return expand(HistoryRecordCard(tree.props))
     return { ...tree, props: { ...tree.props, children: expand(tree.props?.children) } }
   }
   const mutation = { isPending: false, isError: false, variables: undefined, mutate(value) {
@@ -96,8 +98,10 @@ function fixture(path = '/me', search = '') {
     'react-router': { ...router, useLocation: () => ({ pathname: f.pathname }), useSearchParams: () => [params, update => {
       params = typeof update === 'function' ? update(params) : new URLSearchParams(update)
     }], useNavigate: () => (...args) => f.navigations.push(args) },
-    'lucide-react': { Heart: 'Heart' }, '@/shared/components/WireUI': wire, '@/shared/components/RemotePhoto': photo,
+    'lucide-react': { Heart: 'Heart', ExternalLink: 'ExternalLink' }, '@/shared/components/WireUI': wire, '@/shared/components/RemotePhoto': photo,
     '@/features/history/components/HistoryMap': { HistoryMap: 'HistoryMap' },
+    '@/features/history/components/HistoryRecordCard': { HistoryRecordCard: 'HistoryRecordCard' },
+    '@/features/history/lib/locations': load('features/history/lib/locations.ts'),
     '@/features/auth/hooks/useAuth': { useAuth: () => ({ user: { userId: 7, nickname: '사용자', email: 'user@example.com' }, retrySession: async () => {} }) },
     '@/features/auth/utils/tokenStorage': { getAccessToken: () => 'token' },
     '@tanstack/react-query': {
@@ -327,15 +331,74 @@ test('기록과 다른 수행자 링크는 퀘스트·기록·안부 ID와 돌�
   let tree = f.render()
   assert.equal(find(tree, 'MyPageSummary').props.active, 'history')
   assert.equal(find(tree, 'HistoryMap').props.records[0].id, '101')
-  let link = find(tree, 'Link', props => props.className === 'mypage-record-card')
+  find(tree, 'button', props => props['data-history-key'] === '101').props.onClick()
+  tree = f.render()
+  let link = find(tree, 'Link', props => text({ props }) === '이곳의 안부 보기')
   assert.equal(new URL(link.props.to, 'https://example.com').searchParams.get('record'), '101')
+  assert.equal(new URL(link.props.to, 'https://example.com').searchParams.get('submission'), '101')
   find(tree, 'button').props.onClick()
   tree = f.render()
-  link = find(tree, 'Link', props => props.className === 'mypage-record-card')
+  assert.equal(find(tree, 'HistoryMap').props.selectedRecordId, null)
+  find(tree, 'button', props => props['data-history-key'] === 'peer-2').props.onClick()
+  tree = f.render()
+  link = find(tree, 'Link', props => text({ props }) === '이곳의 안부 보기')
   const params = new URL(link.props.to, 'https://example.com').searchParams
   assert.equal(params.get('quest'), '22')
   assert.equal(params.get('submission'), '2')
   assert.equal(params.get('returnOthers'), '1')
+})
+
+test('카드 클릭은 지도만 선택하고 재클릭·마커 클릭도 같은 선택 상태를 공유한다', () => {
+  const f = fixture('/me/history')
+  f.records.push({ ...record, id: '102', questId: '23', title: '다른 장소', createdAt: '2026-11-09', location: { lat: 36, lng: 129, placeName: '다른 장소' } })
+  let tree = f.render()
+  assert.equal(all(tree, 'button').find(node => node.props['data-history-key']).props['data-history-key'], '102')
+  const card = tree => find(tree, 'button', props => props['data-history-key'] === '101')
+  card(tree).props.onClick()
+  tree = f.render()
+  assert.equal(f.pathname, '/me/history')
+  assert.equal(f.params.has('message'), false)
+  assert.equal(card(tree).props['aria-pressed'], true)
+  assert.equal(find(tree, 'HistoryMap').props.selectedRecordId, '101')
+  const request = find(tree, 'HistoryMap').props.focusRequest
+  card(tree).props.onClick()
+  tree = f.render()
+  assert.equal(find(tree, 'HistoryMap').props.focusRequest, request + 1)
+  find(tree, 'HistoryMap').props.onSelectRecord('102')
+  tree = f.render()
+  assert.equal(card(tree).props['aria-pressed'], false)
+  assert.equal(find(tree, 'HistoryMap').props.selectedRecordId, '102')
+  assert.match(find(tree, 'a').props.href, /36,129$/)
+  f.records = [record]
+  tree = f.render()
+  assert.equal(find(tree, 'HistoryMap').props.selectedRecordId, null)
+  assert.equal(find(tree, 'a'), undefined)
+})
+
+test('좌표나 사진이 없어도 기록 선택과 안부 조회는 가능하며 외부 지도 링크는 만들지 않는다', () => {
+  const f = fixture('/me/history')
+  f.records = [{ ...record, location: { lat: NaN, lng: 128 }, photoUrl: null }]
+  let tree = f.render()
+  find(tree, 'button', props => props['data-history-key'] === '101').props.onClick()
+  tree = f.render()
+  assert.equal(find(tree, 'RemotePhoto').props.photoUrl, null)
+  assert.ok(find(tree, 'Link', props => props.to.includes('record=101')))
+  assert.equal(find(tree, 'a'), undefined)
+  assert.match(text(tree), /위치 정보가 없어요/)
+})
+
+test('같은 장소의 다른 수행자 여러 명은 각 안부 ID를 유지하고 마커는 최신 기록을 선택한다', () => {
+  const f = fixture('/me/history', 'showOthers=1')
+  let tree = f.render()
+  find(tree, 'button', props => props['data-history-key'] === 'peer-1').props.onClick()
+  tree = f.render()
+  let link = find(tree, 'Link', props => props.to.includes('submission='))
+  assert.match(link.props.to, /submission=1/)
+  find(tree, 'HistoryMap').props.onSelectRecord('101')
+  tree = f.render()
+  link = find(tree, 'Link', props => props.to.includes('submission='))
+  assert.match(link.props.to, /submission=2/)
+  assert.equal(all(tree, 'button').filter(node => node.props['aria-pressed']).length, 1)
 })
 
 test('편지지에는 사진·본문·작성자를 함께 표시하고 사진 없음·조회 실패를 처리한다', () => {

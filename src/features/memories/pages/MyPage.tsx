@@ -1,8 +1,10 @@
 import { HistoryMap } from "@/features/history/components/HistoryMap";
+import { HistoryRecordCard, type HistoryCardItem } from "@/features/history/components/HistoryRecordCard";
+import { locatedRecords } from "@/features/history/lib/locations";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router";
 import { Back } from "@/shared/components/WireUI";
-import { RemotePhoto } from "@/shared/components/RemotePhoto";
+import { ExternalLink } from "lucide-react";
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { getAccessToken } from "@/features/auth/utils/tokenStorage";
@@ -38,6 +40,8 @@ export default function MyPage() {
   const navigate = useNavigate();
   const messageTop = useRef<HTMLElement>(null);
   const historyPanel = useRef<HTMLDivElement>(null);
+  const historyList = useRef<HTMLDivElement>(null);
+  const [historySelection, setHistorySelection] = useState({ key: "", request: 0 });
   const [error, setError] = useState("");
   const queryClient = useQueryClient();
   const { user, retrySession } = useAuth();
@@ -92,6 +96,31 @@ export default function MyPage() {
     })),
   });
   const greetingQuery = message ? greetingQueries[0] : undefined;
+  const peerRecords = showOthers
+    ? newestFirst(peerQuestIds.flatMap((questId, index) => {
+        const record = visibleRecords.find((item) => item.questId === questId);
+        if (!record) return [];
+        return (greetingQueries[index]?.data?.submissions ?? [])
+          .filter((item) => item.verifyStatus === "PASSED" && item.performer.userId !== user?.userId)
+          .map((item) => ({
+            key: `peer-${item.submissionId}`, record,
+            submissionId: item.submissionId, photoUrl: item.photoUrl,
+            createdAt: item.createdAt, performerName: item.performer.nickname,
+          }));
+      }))
+    : [];
+  const historyCards: HistoryCardItem[] = showOthers ? peerRecords : newestFirst(visibleRecords).map((record) => ({
+    key: record.id, record, photoUrl: record.photoUrl, createdAt: record.createdAt,
+    // 내 기록 ID는 /users/me/submissions가 반환한 submissionId입니다.
+    submissionId: Number(record.id),
+  }));
+  const selectedHistoryCard = historyCards.find((item) => item.key === historySelection.key);
+  const selectedHistoryKey = selectedHistoryCard?.key;
+  const selectedLocation = selectedHistoryCard && locatedRecords([selectedHistoryCard.record])[0]?.location;
+  function selectHistoryCard(key: string) {
+    // 같은 카드를 다시 눌러도 드래그한 지도를 해당 장소로 되돌립니다.
+    setHistorySelection((previous) => ({ key, request: previous.request + 1 }));
+  }
   const greetings = newestFirst((greetingQuery?.data?.submissions ?? [])
     .filter((item) => item.verifyStatus === "PASSED")
     .map((item) => ({
@@ -155,6 +184,16 @@ export default function MyPage() {
     update();
     return () => observer.disconnect();
   }, [history]);
+  useEffect(() => {
+    const list = historyList.current;
+    if (!history || !list || !selectedHistoryKey) return;
+    const card = [...list.querySelectorAll<HTMLElement>("[data-history-key]")]
+      .find((element) => element.dataset.historyKey === selectedHistoryKey);
+    if (card) list.scrollTo({
+      left: card.offsetLeft - (list.clientWidth - card.offsetWidth) / 2,
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth",
+    });
+  }, [history, selectedHistoryKey, historySelection.request]);
   function openGreeting(next: number) {
     setParams((previous) => {
       previous.delete("submission");
@@ -233,30 +272,6 @@ export default function MyPage() {
     );
   }
   if (history) {
-    const peerRecords = showOthers
-      ? newestFirst(peerQuestIds.flatMap((questId, index) => {
-          const record = visibleRecords.find((item) => item.questId === questId);
-          if (!record) return [];
-          return (greetingQueries[index]?.data?.submissions ?? [])
-            .filter((item) => item.verifyStatus === "PASSED" && item.performer.userId !== user?.userId)
-            .map((item) => ({
-              record,
-              submissionId: item.submissionId,
-              photoUrl: item.photoUrl,
-              createdAt: item.createdAt,
-              performerName: item.performer.nickname,
-            }));
-        }))
-      : [];
-    const historyCards = showOthers
-      ? peerRecords.map((peer) => ({ ...peer, key: `peer-${peer.submissionId}` }))
-      : visibleRecords.map((record) => ({
-          key: record.id,
-          record,
-          photoUrl: record.photoUrl,
-          submissionId: undefined,
-          performerName: undefined,
-        }));
     const peerStatus = greetingQueries.find((query) => query.isError)
       ?? greetingQueries.find((query) => query.isPending);
     return (
@@ -266,7 +281,16 @@ export default function MyPage() {
       >
         <div className="mypage-history-header">{summary}</div>
         <div className="mypage-history-map">
-          <HistoryMap records={visibleRecords} source="records" token={token} />
+          <HistoryMap
+            records={visibleRecords}
+            token={token}
+            selectedRecordId={selectedHistoryCard?.record.id ?? null}
+            focusRequest={historySelection.request}
+            onSelectRecord={(recordId) => {
+              const card = historyCards.find((item) => item.record.id === recordId);
+              if (card) selectHistoryCard(card.key);
+            }}
+          />
           <div
             ref={historyPanel}
             className="mypage-history-panel"
@@ -280,14 +304,15 @@ export default function MyPage() {
               <h2>{showOthers ? "다른 수행자 기록" : "수행 기록"} · 최신순</h2>
               <button
                 aria-controls="history-record-list"
-                onClick={() =>
+                onClick={() => {
+                  setHistorySelection({ key: "", request: 0 });
                   setParams((previous) => {
                     if (showOthers) previous.delete("showOthers");
                     else previous.set("showOthers", "1");
                     previous.delete("scope");
                     return previous;
-                  })
-                }
+                  });
+                }}
               >
                 {showOthers
                   ? "내 기록 보기"
@@ -295,6 +320,7 @@ export default function MyPage() {
               </button>
             </header>
             <div
+              ref={historyList}
               key={String(showOthers)}
               id="history-record-list"
               role="region"
@@ -302,26 +328,11 @@ export default function MyPage() {
               aria-label={showOthers ? "다른 수행자 기록 목록" : "내 수행 퀘스트 목록"}
               className="mypage-record-list"
             >
-              {historyCards.map(({ key, record, photoUrl, submissionId, performerName }) => (
-                <Link
-                  key={key}
-                  className="mypage-record-card"
-                  to={`/me/memories?${new URLSearchParams({
-                    source: "records",
-                    record: record.id,
-                    quest: record.questId ?? record.id,
-                    message: "0",
-                    returnOthers: showOthers ? "1" : "0",
-                    ...(submissionId === undefined ? {} : { submission: String(submissionId) }),
-                  })}`}
-                >
-                  <RemotePhoto photoUrl={photoUrl} alt={record.title} />
-                  <h3>
-                    {record.title}
-                  </h3>
-                  {performerName && <p className="truncate text-[10px] text-neutral-600">{performerName} 님</p>}
-                  <span className="sr-only">안부 보기</span>
-                </Link>
+              {historyCards.map((item) => (
+                <HistoryRecordCard key={item.key} item={item}
+                  selected={selectedHistoryCard?.key === item.key}
+                  onSelect={() => selectHistoryCard(item.key)}
+                />
               ))}
               {!showOthers && (
                 <Link
@@ -332,6 +343,23 @@ export default function MyPage() {
                 </Link>
               )}
             </div>
+            {selectedHistoryCard ? (
+              <div className="mypage-history-actions">
+                <Link to={`/me/memories?${new URLSearchParams({
+                  source: "records",
+                  record: selectedHistoryCard.record.id,
+                  quest: selectedHistoryCard.record.questId ?? selectedHistoryCard.record.id,
+                  message: "0", returnOthers: showOthers ? "1" : "0",
+                  ...(selectedHistoryCard.submissionId === undefined ? {} : { submission: String(selectedHistoryCard.submissionId) }),
+                })}`}>이곳의 안부 보기</Link>
+                {selectedLocation ? (
+                  <a href={`https://map.kakao.com/link/map/${encodeURIComponent(selectedLocation.placeName || selectedHistoryCard.record.title)},${selectedLocation.lat},${selectedLocation.lng}`}
+                    target="_blank" rel="noreferrer">지도 열기 <ExternalLink size={13} /></a>
+                ) : <span>위치 정보가 없어요</span>}
+              </div>
+            ) : historyCards.length > 0 && (
+              <p className="mypage-history-hint">기록을 누르면 장소와 안부를 확인할 수 있어요.</p>
+            )}
             {showOthers && visibleRecords.length > 0 && (
               peerStatus
                 ? <ListStatus query={peerStatus} enabled={Boolean(token)} label="다른 수행 기록을" empty="" />

@@ -111,19 +111,23 @@
 .mypage-history-header .mypage-stats { margin-bottom: 0; }
 .mypage-history-map { position: relative; min-height: 0; flex: 1; }
 .mypage-history-panel { position: absolute; inset-inline: 16px; bottom: var(--mypage-nav-space); z-index: 10; max-height: min(260px, max(120px, calc(100% - var(--mypage-nav-space) - 140px))); overflow-x: hidden; overflow-y: auto; overscroll-behavior-y: contain; padding: 12px; border-radius: 20px; background: #fffffff5; box-shadow: 0 8px 24px #00000012; }
-.mypage-history-panel > header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
-.mypage-history-panel h2 { font-size: 14px; font-weight: 500; }
-.mypage-history-panel > header button { min-height: 36px; padding: 8px 12px; border-radius: 999px; background: #242624; color: white; font-size: 12px; }
-.mypage-record-list { display: grid; grid-auto-flow: column; grid-auto-columns: 152px; gap: 10px; width: 100%; min-width: 0; overflow-x: auto; overscroll-behavior-x: contain; padding-bottom: 6px; scroll-snap-type: x proximity; scrollbar-width: thin; }
-.mypage-record-card { min-width: 0; padding: 10px; border-radius: 16px; background: #edf4f6; scroll-snap-align: start; }
-.mypage-record-card .remote-photo { height: 88px; border-radius: 10px; }
-.mypage-record-card h3 { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; margin-top: 8px; font-size: 14px; font-weight: 500; line-height: 1.4; overflow-wrap: anywhere; }
-.mypage-record-next { display: grid; min-height: 156px; place-items: center; padding: 12px; border: 1px dashed #a8afad; border-radius: 16px; font-size: 13px; text-align: center; scroll-snap-align: start; }
-.mypage-history-place { position: absolute; inset-inline: 16px; bottom: calc(var(--history-panel-height, 180px) + var(--history-overlay-space)); z-index: 20; padding: 14px 38px 14px 14px; border-radius: 16px; background: white; box-shadow: 0 8px 24px #00000012; }
-.mypage-history-place h3 { font-size: 15px; font-weight: 600; overflow-wrap: anywhere; }
-.mypage-history-place > p { margin-top: 6px; color: #69716e; font-size: 12px; }
-.mypage-history-place > div { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-.mypage-history-place > div > a { display: inline-flex; min-height: 36px; align-items: center; gap: 6px; padding: 8px 10px; border-radius: 999px; background: #edf4f6; font-size: 12px; text-decoration: none; }
+.mypage-history-panel > header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0 8px; margin-bottom: 6px; }
+.mypage-history-panel h2 { font-size: 13px; font-weight: 600; }
+.mypage-history-panel > header button { min-height: 44px; color: #607581; font-size: 11px; }
+.mypage-record-list { position: relative; display: grid; grid-auto-flow: column; grid-auto-columns: min(260px, 90%); gap: 10px; width: 100%; min-width: 0; overflow-x: auto; overscroll-behavior-x: contain; padding-bottom: 6px; scroll-snap-type: x proximity; scrollbar-width: thin; scrollbar-color: #ccdce2 transparent; }
+.mypage-record-card { display: grid; grid-template-columns: 64px minmax(0, 1fr); align-items: center; gap: 10px; min-width: 0; min-height: 96px; padding: 10px; border: 1px solid transparent; border-radius: 16px; background: #f0f5f7; text-align: left; scroll-snap-align: center; transition: background-color 160ms, border-color 160ms; }
+.mypage-record-card[aria-pressed="true"] { border-color: #9ec4d6; background: #e1eff6; }
+.mypage-record-card .remote-photo { width: 64px; height: 64px; border-radius: 10px; }
+.mypage-record-card .remote-photo > span { padding: 4px; font-size: 10px; line-height: 1.4; }
+.mypage-record-copy { min-width: 0; }
+.mypage-record-copy strong { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; font-size: 14px; font-weight: 600; line-height: 1.4; overflow-wrap: anywhere; }
+.mypage-record-copy small { display: block; overflow: hidden; margin-top: 3px; color: #6e7c82; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.mypage-record-next { display: grid; min-height: 96px; place-items: center; padding: 12px; border: 1px dashed #a8afad; border-radius: 16px; font-size: 13px; text-align: center; scroll-snap-align: center; }
+.mypage-history-actions { display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: 8px; margin-top: 8px; }
+.mypage-history-actions > a { display: flex; min-height: 44px; align-items: center; justify-content: center; gap: 6px; border: 1px solid #bdcfd9; border-radius: 999px; font-size: 12px; }
+.mypage-history-actions > a:first-child { border-color: transparent; background: #d4eaf5; }
+.mypage-history-actions > span { color: #69716e; font-size: 11px; text-align: center; }
+.mypage-history-hint { margin-top: 8px; color: #69716e; font-size: 11px; line-height: 1.5; }
 .mypage-history-count { position: absolute; left: 16px; bottom: calc(var(--history-panel-height, 180px) + var(--history-overlay-space)); z-index: 10; padding: 6px 10px; border-radius: 999px; background: #242624; color: white; font-size: 11px; pointer-events: none; }
 .mypage-history-missing { position: absolute; inset-inline: 16px; top: 12px; z-index: 10; padding: 6px 10px; border-radius: 12px; background: #fffffff0; color: #69716e; font-size: 11px; pointer-events: none; }
 

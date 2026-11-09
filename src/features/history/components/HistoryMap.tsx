@@ -1,15 +1,20 @@
 import { createQuestMarkerImage } from "@/features/quests/pages/home/utils/createQuestMarkerImage";
-import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import { useQueries } from "@tanstack/react-query";
 import { getVerificationQuest, isQuestId } from "@/features/quests/api/verification";
-import { Link } from "react-router";
-import { ExternalLink } from "lucide-react";
 import type { RecordItem } from "@/features/memories/types";
 import type {
   KakaoMap,
   KakaoMarker,
 } from "@/features/quests/pages/home/types/kakaoMaps";
-import { greetingPath, locatedRecords } from "../lib/locations";
+import { locatedRecords } from "../lib/locations";
+
+function coveredHeight(element: HTMLElement) {
+  const panel = element.closest(".mypage-history-map")?.querySelector(".mypage-history-panel");
+  // 버튼 추가나 작은 화면의 패널 스크롤에도 마커가 실제 가려지지 않는 위치로 이동합니다.
+  if (panel) return Math.max(0, element.getBoundingClientRect().bottom - panel.getBoundingClientRect().top + 12);
+  return 306;
+}
 
 function focusLocation(
   map: KakaoMap,
@@ -19,12 +24,7 @@ function focusLocation(
 ) {
   const maps = window.kakao?.maps;
   if (!maps || !element) return;
-  const panelHeight =
-    parseFloat(
-      getComputedStyle(element).getPropertyValue("--history-panel-height"),
-    ) || 170;
-  const navHeight = element.closest(".app-phone")?.querySelector(".app-navigation")?.getBoundingClientRect().height ?? 124;
-  const visibleHeight = Math.max(64, element.clientHeight - panelHeight - navHeight - 12);
+  const visibleHeight = Math.max(64, element.clientHeight - coveredHeight(element));
   const projection = map.getProjection();
   const point = projection.containerPointFromCoords(new maps.LatLng(lat, lng));
   map.panTo(
@@ -39,12 +39,16 @@ function focusLocation(
 
 export function HistoryMap({
   records,
-  source,
   token,
+  selectedRecordId,
+  focusRequest,
+  onSelectRecord,
 }: {
   records: RecordItem[];
-  source: "records" | "completed";
   token: string | null;
+  selectedRecordId: string | null;
+  focusRequest: number;
+  onSelectRecord: (recordId: string) => void;
 }) {
   const points = useMemo(() => locatedRecords(records), [records]);
   const offsets = useMemo(() => {
@@ -80,24 +84,17 @@ export function HistoryMap({
   const [status, setStatus] = useState<"loading" | "ready" | "error">(
     "loading",
   );
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const selected = points.find((record) => record.id === selectedId);
-  const select = useCallback(
-    (id: string) => {
-      setSelectedId(id);
-      const point = points.find((record) => record.id === id);
-      const maps = window.kakao?.maps;
-      if (point && maps && mapRef.current) {
-        focusLocation(
-          mapRef.current,
-          point.location.lat,
-          point.location.lng,
-          container.current,
-        );
-      }
-    },
-    [points],
-  );
+  const selectRecord = useEffectEvent(onSelectRecord);
+  const focusSelected = useEffectEvent((map: KakaoMap) => {
+    const point = points.find((record) => record.id === selectedRecordId);
+    if (!point) return false;
+    focusLocation(map, point.location.lat, point.location.lng, container.current);
+    return true;
+  });
+
+  useEffect(() => {
+    if (status === "ready" && mapRef.current) focusSelected(mapRef.current);
+  }, [selectedRecordId, focusRequest, points, status]);
 
   const updateMarkerImages = useEffectEvent(() => {
     const maps = window.kakao?.maps;
@@ -105,7 +102,7 @@ export function HistoryMap({
     for (const record of points) {
       const marker = markersRef.current.get(record.id);
       if (!marker) continue;
-      const isSelected = record.id === selectedId;
+      const isSelected = record.id === selectedRecordId;
       const offset = offsets.get(record.id) ?? 0;
       marker.setZIndex(isSelected ? 10 : offset ? 1 : 0);
       const detail = questDetails.find((quest) => String(quest?.questId) === record.questId);
@@ -119,7 +116,7 @@ export function HistoryMap({
 
   useEffect(() => {
     updateMarkerImages();
-  }, [points, offsets, questDetails, selectedId]);
+  }, [points, offsets, questDetails, selectedRecordId]);
 
   useEffect(() => {
     if (!points.length) return;
@@ -143,7 +140,7 @@ export function HistoryMap({
         return;
       }
       maps.load(() => {
-        if (cancelled) return;
+        if (cancelled || expired) return;
         try {
           const first = points[0].location;
           const map = new maps.Map(element, {
@@ -164,7 +161,7 @@ export function HistoryMap({
               title: record.location.placeName || record.title,
               clickable: true,
             });
-            const handler = () => select(record.id);
+            const handler = () => selectRecord(record.id);
             maps.event.addListener(marker, "click", handler);
             markers.set(record.id, marker);
             listeners.push({ marker, handler });
@@ -172,20 +169,16 @@ export function HistoryMap({
           updateMarkerImages();
           const fit = () => {
             map.relayout();
-            const panelHeight =
-              parseFloat(
-                getComputedStyle(element).getPropertyValue(
-                  "--history-panel-height",
-                ),
-              ) || 170;
-            const navHeight = element.closest(".app-phone")?.querySelector(".app-navigation")?.getBoundingClientRect().height ?? 124;
-            const bottom = Math.min(element.clientHeight - 80, panelHeight + navHeight + 12);
+            if (focusSelected(map)) return;
+            const bottom = Math.min(element.clientHeight - 80, coveredHeight(element));
             if (points.length > 1) map.setBounds(bounds, 64, 40, bottom, 40);
             else focusLocation(map, first.lat, first.lng, element);
           };
           fit();
           observer = new ResizeObserver(fit);
           observer.observe(element);
+          const panel = element.closest(".mypage-history-map")?.querySelector(".mypage-history-panel");
+          if (panel) observer.observe(panel);
           clearTimeout(timeout);
           setStatus("ready");
         } catch {
@@ -209,7 +202,7 @@ export function HistoryMap({
       mapRef.current = null;
       element.replaceChildren();
     };
-  }, [points, select]);
+  }, [points]);
 
   return (
     <section
@@ -248,51 +241,6 @@ export function HistoryMap({
           대신 다녀온 곳 {points.length}
         </span>
       </div>
-      {status === "error" && (
-        <div className="absolute left-4 right-4 top-1/2 z-10 flex flex-wrap gap-2">
-          {points.map((record) => (
-            <button
-              key={record.id}
-              className="rounded-full bg-white px-3 py-2 text-xs"
-              onClick={() => select(record.id)}
-            >
-              {record.location.placeName || record.title}
-            </button>
-          ))}
-        </div>
-      )}
-      {selected && (
-        <div className="mypage-history-place">
-          <button
-            className="absolute right-3 top-2 p-1 text-neutral-500"
-            aria-label="장소 정보 닫기"
-            onClick={() => {
-              setSelectedId(null);
-            }}
-          >
-            ×
-          </button>
-          <h3>
-            {selected.location.placeName || selected.title}
-          </h3>
-          <p>
-            {selected.location.address ?? selected.title}
-          </p>
-          <div>
-            <Link to={greetingPath(selected, source)}>
-              이곳의 안부 보기
-            </Link>
-            <a
-              href={`https://map.kakao.com/link/map/${encodeURIComponent(selected.location.placeName || selected.title)},${selected.location.lat},${selected.location.lng}`}
-              target="_blank"
-              rel="noreferrer"
-            >
-              지도 열기
-              <ExternalLink size={11} />
-            </a>
-          </div>
-        </div>
-      )}
       {records.length > points.length && (
         <p className="mypage-history-missing">
           위치 정보가 없는 기록 {records.length - points.length}건은 지도에

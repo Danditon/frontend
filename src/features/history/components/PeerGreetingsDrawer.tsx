@@ -1,4 +1,5 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useIsPresent, useReducedMotion } from "motion/react";
 import { Link } from "react-router";
 import { ChevronRight, X } from "lucide-react";
 import { SwipeSheet } from "@/shared/components/SwipeSheet";
@@ -7,21 +8,37 @@ import type { RecordItem } from "@/features/memories/types";
 import type { SubmissionGreeting } from "@/features/memories/lib/greetingViews";
 
 export default function PeerGreetingsDrawer({ record, greetings, loading, failed, expanded,
-  onExpandedChange, onClose, onRetry, greetingPath, restoreScroll, saveScroll,
+  onExpandedChange, onClose, onRetry, greetingPath, restoreScroll, saveScroll, onEntered,
 }: {
   record: RecordItem; greetings: SubmissionGreeting[]; loading: boolean; failed: boolean;
   expanded: boolean; onExpandedChange: (expanded: boolean) => void;
   onClose: () => void; onRetry: () => void; greetingPath: (submissionId: number) => string;
   restoreScroll: (element: HTMLDivElement | null) => void; saveScroll: (top: number) => void;
+  onEntered: (recordId: string) => void;
 }) {
+  const present = useIsPresent();
+  const reducedMotion = useReducedMotion();
+  const [entered, setEntered] = useState(Boolean(reducedMotion));
   const closeButton = useRef<HTMLButtonElement>(null);
-  useEffect(() => { closeButton.current?.focus({ preventScroll: true }); }, []);
+  useEffect(() => {
+    if (reducedMotion && present) {
+      onEntered(record.id);
+    }
+  }, [reducedMotion, present, onEntered, record.id]);
+  useEffect(() => {
+    if (entered && present) closeButton.current?.focus({ preventScroll: true });
+  }, [entered, present]);
   return (
-    <div className="mypage-peer-host" onKeyDown={(event) => {
+    <div className="mypage-peer-host" inert={!present || !entered} aria-hidden={!present}
+      data-phase={!present ? "closing" : entered ? "open" : "opening"} onKeyDown={(event) => {
       if (event.key === "Escape") { event.stopPropagation(); onClose(); }
     }}>
       <SwipeSheet label="다른 사람 안부" className="mypage-peer-drawer" collapsed={0.64}
-        expanded={expanded} onExpandedChange={onExpandedChange}>
+        expanded={expanded} onExpandedChange={onExpandedChange} slideFromBottom onSlideComplete={() => {
+          if (!present || entered) return;
+          setEntered(true);
+          onEntered(record.id);
+        }}>
         <header className="mypage-peer-header">
           <h2>같은 퀘스트의 다른 안부 {!loading && !failed && <span>{greetings.length}</span>}</h2>
           <p>{record.title}</p>

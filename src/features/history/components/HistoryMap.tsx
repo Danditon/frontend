@@ -47,6 +47,7 @@ export function HistoryMap({
   focusRequest,
   onSelectRecord,
   overlayKey = "records",
+  overlayReady = true,
 }: {
   records: RecordItem[];
   token: string | null;
@@ -54,6 +55,7 @@ export function HistoryMap({
   focusRequest: number;
   onSelectRecord: (recordId: string) => void;
   overlayKey?: "records" | "peers";
+  overlayReady?: boolean;
 }) {
   const points = useMemo(() => locatedRecords(records), [records]);
   const offsets = useMemo(() => {
@@ -86,6 +88,7 @@ export function HistoryMap({
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<KakaoMap | null>(null);
   const markersRef = useRef(new Map<string, KakaoMarker>());
+  const appliedFocus = useRef<{ map: KakaoMap; id: string; request: number; points: typeof points } | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">(
     "loading",
   );
@@ -100,7 +103,7 @@ export function HistoryMap({
     const map = mapRef.current;
     const element = container.current;
     const maps = window.kakao?.maps;
-    if (!map || !element || !maps || !points.length) return;
+    if (!overlayReady || !map || !element || !maps || !points.length) return;
     map.relayout();
     if (focusSelected(map)) return;
     const bounds = new maps.LatLngBounds();
@@ -111,7 +114,7 @@ export function HistoryMap({
   });
 
   useEffect(() => {
-    if (status !== "ready") return;
+    if (status !== "ready" || !overlayReady) return;
     const overlay = container.current?.closest(".mypage-history-map")?.querySelector(".mypage-history-panel, .mypage-peer-drawer");
     if (!overlay) return;
     // Drawer 전환·드래그 때도 지도를 새로 만들지 않고 보이는 영역만 보정합니다.
@@ -119,18 +122,22 @@ export function HistoryMap({
     observer.observe(overlay);
     fitMap();
     return () => observer.disconnect();
-  }, [overlayKey, status]);
+  }, [overlayKey, overlayReady, status]);
 
   useEffect(() => {
     const map = mapRef.current;
-    if (status !== "ready" || !map) return;
+    if (status !== "ready" || !map || !overlayReady || !selectedRecordId) return;
     if (!points.some((record) => record.id === selectedRecordId)) return;
 
     // 확대 수준을 먼저 바꾼 뒤 화면 좌표를 계산해야 중앙 보정이 정확합니다.
     // 패널 크기 변경 시에는 이 효과를 실행하지 않아 사용자의 확대 수준을 유지합니다.
-    map.setLevel(SELECTED_RECORD_LEVEL);
+    const previous = appliedFocus.current;
+    if (previous?.map !== map || previous.id !== selectedRecordId || previous.request !== focusRequest || previous.points !== points) {
+      map.setLevel(SELECTED_RECORD_LEVEL);
+      appliedFocus.current = { map, id: selectedRecordId, request: focusRequest, points };
+    }
     focusSelected(map);
-  }, [selectedRecordId, focusRequest, points, status]);
+  }, [selectedRecordId, focusRequest, points, status, overlayReady]);
 
   const updateMarkerImages = useEffectEvent(() => {
     const maps = window.kakao?.maps;

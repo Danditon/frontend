@@ -2,6 +2,7 @@ import { HistoryMap } from "@/features/history/components/HistoryMap";
 import { HistoryRecordCard, type HistoryCardItem } from "@/features/history/components/HistoryRecordCard";
 import PeerGreetingsDrawer from "@/features/history/components/PeerGreetingsDrawer";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { AnimatePresence } from "motion/react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router";
 import { Back } from "@/shared/components/WireUI";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -41,9 +42,11 @@ export default function MyPage() {
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
   const messageTop = useRef<HTMLElement>(null);
-  const historyPanel = useRef<HTMLDivElement>(null);
+  const [historyPanel, setHistoryPanel] = useState<HTMLDivElement | null>(null);
+  const [enteredPeerId, setEnteredPeerId] = useState<string | null>(null);
   const historyList = useRef<HTMLDivElement>(null);
   const peerTrigger = useRef<HTMLButtonElement>(null);
+  const restorePeerFocus = useRef(false);
   const peerScroll = useRef(new Map<string, number>());
   const [historySelection, setHistorySelection] = useState({ key: "", request: 0 });
   const [previewQuestId, setPreviewQuestId] = useState<string | null>(null);
@@ -98,6 +101,7 @@ export default function MyPage() {
   const selectedHistoryKey = selectedHistoryCard?.key;
   const peerOpen = Boolean(history && params.get("panel") === "others" && selectedHistoryCard?.record.questId);
   const peerExpanded = params.get("expanded") === "1";
+  const overlayReady = peerOpen ? enteredPeerId === selectedHistoryKey : Boolean(historyPanel);
   // 수행 기록에는 유형이 없을 수 있어 선택한 퀘스트의 상세 정보로 확인합니다.
   const selectedQuest = useQuery({
     queryKey: ["verification-quest", selectedQuestId, token],
@@ -171,8 +175,12 @@ export default function MyPage() {
     setParams({ quest: previewMemory.id, message: "0" });
   }, [previewMemory, previewHasGreetings, previewQuery.isFetching, previewQuery.isSuccess, setParams]);
   useEffect(() => {
-    const panel = historyPanel.current;
+    const panel = historyPanel;
     if (!history || !panel) return;
+    if (restorePeerFocus.current) {
+      restorePeerFocus.current = false;
+      peerTrigger.current?.focus({ preventScroll: true });
+    }
     const update = () =>
       panel.parentElement?.style.setProperty(
         "--history-panel-height",
@@ -182,7 +190,7 @@ export default function MyPage() {
     observer.observe(panel);
     update();
     return () => observer.disconnect();
-  }, [history, peerOpen]);
+  }, [history, historyPanel]);
   useEffect(() => {
     const list = historyList.current;
     if (!history || !list || !selectedHistoryKey) return;
@@ -209,10 +217,10 @@ export default function MyPage() {
     return `/me/memories?${next}`;
   }
   function closePeers() {
+    restorePeerFocus.current = true;
     setParams((previous) => {
       previous.delete("panel"); previous.delete("expanded"); return previous;
     }, { replace: true });
-    requestAnimationFrame(() => peerTrigger.current?.focus({ preventScroll: true }));
   }
   async function signOut() {
     try {
@@ -227,6 +235,7 @@ export default function MyPage() {
   }
   // 편지나 다른 탭에서 돌아왔을 때 이전 클릭이 편지를 자동으로 다시 열지 않게 합니다.
   if (previewQuestId !== null && (history || message || logout)) setPreviewQuestId(null);
+  if (enteredPeerId !== null && (!history || message)) setEnteredPeerId(null);
   const summary = (
     <MyPageSummary
       nickname={token ? user?.nickname : undefined}
@@ -305,11 +314,13 @@ export default function MyPage() {
             selectedRecordId={selectedHistoryCard?.record.id ?? null}
             focusRequest={historySelection.request}
             overlayKey={peerOpen ? "peers" : "records"}
+            overlayReady={overlayReady}
             onSelectRecord={(recordId) => {
               const card = historyCards.find((item) => item.record.id === recordId);
               if (card) selectHistoryCard(card.key);
             }}
           />
+          <AnimatePresence mode="wait" onExitComplete={() => setEnteredPeerId(null)}>
           {peerOpen && selectedHistoryCard ? (
             <PeerGreetingsDrawer key={selectedHistoryCard.key} record={selectedHistoryCard.record}
               greetings={peerGreetings} loading={greetingQuery.isPending} failed={greetingQuery.isError}
@@ -321,9 +332,10 @@ export default function MyPage() {
               greetingPath={(id) => recordGreetingPath(selectedHistoryCard.record, "others", String(id))}
               restoreScroll={(element) => { if (element) element.scrollTop = peerScroll.current.get(selectedHistoryCard.key) ?? 0; }}
               saveScroll={(top) => { peerScroll.current.set(selectedHistoryCard.key, top); }}
+              onEntered={setEnteredPeerId}
             />
-          ) : <div
-            ref={historyPanel}
+          ) : <div key="records"
+            ref={setHistoryPanel}
             className="mypage-history-panel"
           >
             {historyQuestId && (
@@ -354,10 +366,13 @@ export default function MyPage() {
               <div className="mypage-history-actions">
                 {selectedHistoryCard.record.questId ? <>
                   <Link to={recordGreetingPath(selectedHistoryCard.record, "mine", selectedHistoryCard.record.id)}>내가 남긴 안부 보기</Link>
-                  <button ref={peerTrigger} type="button" onClick={() => setParams((previous) => {
-                    previous.set("record", selectedHistoryCard.record.id);
-                    previous.set("panel", "others"); return previous;
-                  })}>다른 사람 안부</button>
+                  <button ref={peerTrigger} type="button" onClick={() => {
+                    setEnteredPeerId(null);
+                    setParams((previous) => {
+                      previous.set("record", selectedHistoryCard.record.id);
+                      previous.set("panel", "others"); return previous;
+                    });
+                  }}>다른 사람 안부</button>
                 </> : <span>퀘스트 정보를 찾을 수 없어요.</span>}
               </div>
             ) : historyCards.length > 0 && (
@@ -367,6 +382,7 @@ export default function MyPage() {
               <ListStatus query={recordsQuery} enabled={Boolean(token)} label="수행 기록을" empty="아직 수행한 기록이 없어요." />
             )}
           </div>}
+          </AnimatePresence>
         </div>
       </MyPageTabs>
     );

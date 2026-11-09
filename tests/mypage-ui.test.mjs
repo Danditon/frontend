@@ -100,6 +100,7 @@ function fixture(path = '/me', search = '') {
     'react-router': { ...router, useLocation: () => ({ pathname: f.pathname }), useSearchParams: () => [params, update => {
       params = typeof update === 'function' ? update(params) : new URLSearchParams(update)
     }], useNavigate: () => (...args) => f.navigations.push(args) },
+    'motion/react': { AnimatePresence: 'AnimatePresence' },
     'lucide-react': { Heart: 'Heart', ExternalLink: 'ExternalLink' }, '@/shared/components/WireUI': wire, '@/shared/components/RemotePhoto': photo,
     '@/features/history/components/HistoryMap': { HistoryMap: 'HistoryMap' },
     '@/features/history/components/HistoryRecordCard': { HistoryRecordCard: 'HistoryRecordCard' },
@@ -730,6 +731,7 @@ test('로그아웃은 목록 요청을 비활성화하고 기존 토큰 제거 �
 
 test('공용 SwipeSheet는 기존 자체 상태와 Drawer의 제어 상태 모두 접기·펼치기를 지원한다', () => {
   let cursor = 0
+  let reduced = true
   const states = [], refs = []
   const { SwipeSheet } = load('shared/components/SwipeSheet.tsx', {
     react: {
@@ -737,11 +739,13 @@ test('공용 SwipeSheet는 기존 자체 상태와 Drawer의 제어 상태 모�
       useState(initial) { const i = cursor++; if (!(i in states)) states[i] = initial; return [states[i], value => { states[i] = value }] },
       useRef(initial) { const i = cursor++; return refs[i] ??= { current: initial } },
     },
-    'motion/react': { motion: { section: 'section' }, useReducedMotion: () => true },
+    'motion/react': { motion: { section: 'section' }, useReducedMotion: () => reduced },
   })
   const render = props => { cursor = 0; return SwipeSheet({ label: '안부', ...props }) }
   let tree = render({})
   assert.equal(tree.props.animate.height, '64%')
+  assert.equal(tree.props.initial, false)
+  assert.equal(tree.props.exit, undefined)
   find(tree, 'button').props.onClick()
   tree = render({})
   assert.equal(tree.props.animate.height, '94%')
@@ -753,4 +757,64 @@ test('공용 SwipeSheet는 기존 자체 상태와 Drawer의 제어 상태 모�
   assert.equal(tree.props.animate.height, '64%')
   find(tree, 'button').props.onClick()
   assert.equal(expanded, true)
+  reduced = false
+  tree = render({ expanded: false, slideFromBottom: true })
+  assert.equal(tree.props.initial.y, '100%')
+  assert.equal(tree.props.initial.height, '64%')
+  assert.equal(tree.props.animate.y, 0)
+  assert.equal(tree.props.exit.y, '100%')
+  assert.equal(tree.props.transition.y.duration, 0.3)
+  reduced = true
+  tree = render({ expanded: false, slideFromBottom: true })
+  assert.equal(tree.props.initial, false)
+  assert.equal(tree.props.exit.y, 0)
+  assert.equal(tree.props.transition.y.duration, 0)
+})
+
+test('안부 Drawer는 열림 완료 후 한 번만 포커스·지도 보정을 요청하고 퇴장 중에는 조작을 막는다', () => {
+  function makeFixture(reducedMotion) {
+    let cursor = 0, effectCursor = 0
+    const states = [], effects = []
+    const f = { present: true, focused: 0, entered: [] }
+    const Drawer = load('features/history/components/PeerGreetingsDrawer.tsx', {
+      react: {
+        useState(initial) { const i = cursor++; if (!(i in states)) states[i] = initial; return [states[i], value => { states[i] = value }] },
+        useRef: () => ({ current: { focus() { f.focused++ } } }),
+        useEffect(run, deps) { const i = effectCursor++; if (!effects[i] || deps.some((value, j) => value !== effects[i][j])) { effects[i] = deps; run() } },
+      },
+      'motion/react': { useIsPresent: () => f.present, useReducedMotion: () => reducedMotion },
+      'react-router': router, 'lucide-react': { X: 'X', ChevronRight: 'ChevronRight' },
+      '@/shared/components/SwipeSheet': { SwipeSheet: 'SwipeSheet' }, '@/shared/components/RemotePhoto': photo,
+    })
+    const props = { record, greetings: [], loading: false, failed: false, expanded: false,
+      onEntered: id => f.entered.push(id), onClose() {}, onRetry() {}, onExpandedChange() {}, greetingPath() {}, restoreScroll() {}, saveScroll() {} }
+    return Object.assign(f, { render() { cursor = 0; effectCursor = 0; return Drawer(props) } })
+  }
+  const f = makeFixture(false)
+  let tree = f.render()
+  assert.equal(tree.props['data-phase'], 'opening')
+  assert.equal(tree.props.inert, true)
+  assert.equal(f.focused, 0)
+  find(tree, 'SwipeSheet').props.onSlideComplete()
+  tree = f.render()
+  assert.equal(tree.props['data-phase'], 'open')
+  assert.equal(tree.props.inert, false)
+  assert.deepEqual(f.entered, ['101'])
+  assert.equal(f.focused, 1)
+  find(tree, 'SwipeSheet').props.onSlideComplete()
+  assert.equal(f.focused, 1)
+  assert.equal(f.entered.length, 1)
+  f.present = false
+  tree = f.render()
+  assert.equal(tree.props['data-phase'], 'closing')
+  assert.equal(tree.props.inert, true)
+  assert.equal(tree.props['aria-hidden'], true)
+  find(tree, 'SwipeSheet').props.onSlideComplete()
+  assert.equal(f.entered.length, 1)
+  const reduced = makeFixture(true)
+  tree = reduced.render()
+  assert.equal(tree.props['data-phase'], 'open')
+  assert.equal(tree.props.inert, false)
+  assert.deepEqual(reduced.entered, ['101'])
+  assert.equal(reduced.focused, 1)
 })

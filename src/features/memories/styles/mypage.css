@@ -130,11 +130,13 @@
 .mypage-record-copy small { display: block; overflow: hidden; margin-top: 3px; color: #6e7c82; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .mypage-record-next { display: grid; min-height: 96px; place-items: center; padding: 12px; border: 1px dashed #a8afad; border-radius: 16px; font-size: 13px; text-align: center; scroll-snap-align: center; }
 .mypage-history-actions { display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: 8px; margin-top: 8px; }
-.mypage-history-actions > :is(a, button) { display: flex; min-height: 44px; align-items: center; justify-content: center; gap: 6px; border: 1px solid #bdcfd9; border-radius: 999px; font-size: 12px; }
-.mypage-history-actions > a:first-child { border-color: transparent; background: #d4eaf5; }
+.mypage-history-actions > :is(a, button) { display: flex; min-height: 44px; align-items: center; justify-content: center; gap: 6px; border: 1px solid #bdcfd9; border-radius: 999px; background: #fff; color: #242624; font-size: 12px; transition: background-color 150ms ease, transform 150ms ease; }
+.mypage-history-actions > :is(a, button):active { background: #f4f7f9; transform: scale(0.98); }
 .mypage-history-actions > span { color: #69716e; font-size: 11px; text-align: center; }
 .mypage-history-hint { margin-top: 8px; color: #69716e; font-size: 11px; line-height: 1.5; }
-.mypage-peer-host { position: absolute; inset: 0 0 var(--mypage-nav-space); z-index: 15; pointer-events: none; }
+.mypage-peer-host { position: absolute; inset: 0 0 var(--mypage-nav-space); z-index: 15; overflow: hidden; pointer-events: none; }
+.mypage-peer-host[inert] { pointer-events: none; }
+.mypage-peer-host[inert] .mypage-peer-drawer { pointer-events: none; }
 .swipe-sheet.mypage-peer-drawer { inset-inline: 16px; border-radius: 20px; background: #f3f9fc; box-shadow: 0 8px 24px #00000012; pointer-events: auto; }
 .mypage-peer-drawer .swipe-sheet-body { display: flex; flex-direction: column; overflow: hidden; padding-bottom: 0; }
 .mypage-peer-drawer .swipe-sheet-handle { height: 32px; }
@@ -173,4 +175,6 @@
 @media (prefers-reduced-motion: reduce) {
   .mypage-stats > a { transition: none; }
   .mypage-stats > a:active { transform: none; }
+  .mypage-history-actions > :is(a, button) { transition: none; }
+  .mypage-history-actions > :is(a, button):active { transform: none; }
 }

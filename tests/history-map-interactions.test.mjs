@@ -193,3 +193,23 @@ test('다른 안부 Drawer를 열고 높이를 바꿔도 지도와 확대 수준
   assert.equal(f.maps.length, 1)
   f.unmount()
 })
+
+test('Drawer 이동 중에는 지도 보정을 멈추고 완료 후 사용자 축척을 유지해 중앙을 맞춘다', () => {
+  const f = fixture()
+  f.render({ selectedRecordId: '101' }); f.ready(); f.render()
+  f.maps[0].level = 6
+  const before = f.maps[0].pans.length
+  f.render({ overlayKey: 'peers', overlayReady: false })
+  f.panel.top = 260
+  f.observers[0].resize()
+  assert.equal(f.maps[0].pans.length, before)
+  f.render({ overlayReady: true })
+  assert.equal(f.maps[0].pans.at(-1).y, 35 + 176)
+  assert.equal(f.maps[0].level, 6)
+  assert.equal(f.maps.length, 1)
+  f.render({ selectedRecordId: '102', focusRequest: 1, overlayReady: false })
+  f.render({ overlayReady: true })
+  assert.equal(f.maps[0].level, 4)
+  assert.equal(f.maps[0].pans.at(-1).x, 129)
+  f.unmount()
+})

@@ -725,7 +725,9 @@ test('인증은 URL ID만 사용하고 성공 시 추천·상세·목록·인증
     ]
     keys.forEach(key => client.setQueryData(key, {}))
     client.setQueryData(['unrelated'], {})
-    let params = { questId: '701' }, calls = 0
+    let params = { questId: '701' }, calls = 0, finishSubmission
+    const submissionResponse = new Promise(resolve => { finishSubmission = resolve })
+    const revokedPhotos = []
     const dependencies = {
       'react-router': { useParams: () => params, Link: 'Link' },
       'motion/react': { useReducedMotion: () => true, motion: { div: 'motion.div' } },
@@ -741,35 +743,67 @@ test('인증은 URL ID만 사용하고 성공 시 추천·상세·목록·인증
       '@/features/quests/hooks/useGeolocation': { useGeolocation: () => ({ requestLocation: async () => position }) },
       '@/features/quests/api/verification': {
         isQuestId: id => /^\d+$/.test(id), getAccessToken: () => 'token', similarityPercent: () => null,
-        createSubmissionForm: () => ({}),
-        submitVerification: async id => { calls++; assert.equal(id, '701'); return { verifyStatus: status } },
+        createSubmissionForm: (type, note, location, photo) => {
+          assert.equal(type, 'GENERAL')
+          assert.equal(note, '안부를 남겨요')
+          assert.equal(location, position)
+          assert.equal(photo?.name ?? null, status === 'FAILED' ? 'verification.jpg' : null)
+          return {}
+        },
+        submitVerification: async id => { calls++; assert.equal(id, '701'); return submissionResponse },
         verificationError: cause => String(cause),
       },
-      '@/features/quests/lib/questPhoto': { decodeQuestPhoto: () => {} },
+      '@/features/quests/lib/questPhoto': { decodeQuestPhoto: async () => 'blob:verification' },
       '@/shared/components/RemotePhoto': { RemotePhoto: 'RemotePhoto' },
     }
+    // 분리한 화면도 실제로 렌더링해 부모의 상태·이벤트 연결을 함께 확인합니다.
+    for (const name of ['VerificationForm', 'VerificationProgress', 'VerificationSuccess', 'VerificationNotice']) {
+      dependencies[`./verification/${name}`] = loadSource(`features/quests/pages/verification/${name}.tsx`, dependencies)
+    }
     const f = componentFixture('features/quests/pages/QuestVerifyPage.tsx', dependencies,
-      { AbortController }, module => {
+      { AbortController, URL: { revokeObjectURL: url => revokedPhotos.push(url) } }, module => {
         assert.equal(module.default().props.questId, '701')
         params = { questId: 'invalid' }
         assert.equal(module.default().props.questId, '')
         params = { questId: '701' }
         return module.default().type
       })
+    const renderScreen = () => {
+      const screen = f.render({ questId: '701' })
+      return screen.type(screen.props)
+    }
     try {
-      let tree = f.render({ questId: '701' })
+      let tree = renderScreen()
       findNode(tree, 'textarea').props.onChange({ target: { value: '안부를 남겨요' } })
-      tree = f.render({ questId: '701' })
+      tree = renderScreen()
+      if (status === 'FAILED') {
+        await findNode(tree, 'input', props => props.type === 'file').props.onChange({
+          target: { files: [{ name: 'verification.jpg' }] }, currentTarget: { value: 'verification.jpg' },
+        })
+        tree = renderScreen()
+      }
+      findNode(tree, 'SlideButton').props.onClick()
       findNode(tree, 'SlideButton').props.onClick()
       await new Promise(resolve => setImmediate(resolve))
       assert.equal(calls, 1)
+      assert.match(textOf(renderScreen()), /안부를 전송하고 있어요/)
+      finishSubmission({ verifyStatus: status })
+      await new Promise(resolve => setImmediate(resolve))
       for (const key of keys) assert.equal(client.getQueryState(key).isInvalidated, status === 'PASSED')
       assert.equal(client.getQueryState(['unrelated']).isInvalidated, false)
-      assert.match(textOf(f.render({ questId: '701' })), status === 'PASSED' ? /인증 성공/ : /인증 실패/)
+      const resultScreen = renderScreen()
+      assert.match(textOf(resultScreen), status === 'PASSED' ? /인증 성공/ : /인증 실패/)
+      if (status === 'FAILED') {
+        findNode(resultScreen, 'SlideButton').props.onClick()
+        const retryScreen = renderScreen()
+        assert.equal(findNode(retryScreen, 'textarea').props.value, '안부를 남겨요')
+        assert.ok(findNode(retryScreen, 'img', props => props.src === 'blob:verification'))
+      }
     } finally {
       f.unmount()
       client.clear()
     }
+    assert.equal(revokedPhotos.length, status === 'FAILED' ? 1 : 0)
   }
 })
 

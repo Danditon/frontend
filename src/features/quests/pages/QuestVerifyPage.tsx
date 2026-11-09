@@ -1,17 +1,18 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useParams } from "react-router";
+import { Link, useNavigate, useParams } from "react-router";
+import { useReducedMotion } from "motion/react";
 import { isAxiosError } from "axios";
 import { Back } from "@/shared/components/WireUI";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getDistanceMeters } from "./home/utils/getNearestQuest";
 import { useGeolocation, type UserPosition } from "@/features/quests/hooks/useGeolocation";
-import { getAccessToken, getVerificationQuest, isQuestId, submitVerification, createSubmissionForm, verificationError, similarityPercent, type VerificationResult } from "@/features/quests/api/verification";
+import { getAccessToken, getVerificationQuest, isQuestId, submitVerification, createSubmissionForm, verificationError } from "@/features/quests/api/verification";
 import { decodeQuestPhoto } from "@/features/quests/lib/questPhoto";
 import VerificationForm from "./verification/VerificationForm";
 import VerificationProgress from "./verification/VerificationProgress";
-import VerificationSuccess from "./verification/VerificationSuccess";
+import GreetingDelivery from "./verification/GreetingDelivery";
 import VerificationNotice from "./verification/VerificationNotice";
-type Phase = "editing" | "locating" | "verifying" | "checking-result" | "success"
+type Phase = "editing" | "locating" | "verifying" | "checking-result" | "verified" | "delivering" | "delivered"
   | "failed" | "out-of-range" | "location-error" | "request-error";
 const PHOTO_VERIFICATION_MS = 3000;
 export default function QuestVerifyPage() {
@@ -20,6 +21,8 @@ export default function QuestVerifyPage() {
   return <VerificationScreen key={id} questId={id} />;
 }
 function VerificationScreen({ questId }: { questId: string }) {
+  const navigate = useNavigate();
+  const reducedMotion = Boolean(useReducedMotion());
   // 화면 컴포넌트가 바뀌어도 초안과 제출 요청은 부모에서 유지합니다.
   const input = useRef<HTMLInputElement>(null);
   const [photo, setPhoto] = useState("");
@@ -29,7 +32,6 @@ function VerificationScreen({ questId }: { questId: string }) {
   const [error, setError] = useState("");
   const [measuredDistance, setMeasuredDistance] = useState<number | null>(null);
   const [phase, setPhase] = useState<Phase>("editing");
-  const [result, setResult] = useState<VerificationResult | null>(null);
   const [needsStatusCheck, setNeedsStatusCheck] = useState(false);
   const submitting = useRef(false);
   const request = useRef<AbortController | null>(null);
@@ -39,10 +41,23 @@ function VerificationScreen({ questId }: { questId: string }) {
   const detail = useQuery({ queryKey: ['verification-quest', questId, token], queryFn: ({ signal }) => getVerificationQuest(questId, signal), enabled: isQuestId(questId) && Boolean(token), retry: false });
   const quest = detail.data;
   const general = quest?.questType === 'GENERAL';
-  const busy = phase === "locating" || phase === "verifying" || phase === "checking-result";
-  const percent = similarityPercent(result?.similarity);
+  const completed = phase === "verified" || phase === "delivering" || phase === "delivered";
+  const busy = phase === "locating" || phase === "verifying" || phase === "checking-result" || completed;
   useEffect(() => () => { if (photo) URL.revokeObjectURL(photo); }, [photo]);
   useEffect(() => () => request.current?.abort(), []);
+  useEffect(() => {
+    const delay = phase === "verified" ? 700
+      : phase === "delivered" ? 800
+      : phase === "delivering" && reducedMotion ? 1200 : null;
+    if (delay === null) return;
+    const timer = window.setTimeout(() => {
+      if (phase === "verified") setPhase("delivering");
+      else if (phase === "delivering") setPhase("delivered");
+      else navigate('/', { replace: true });
+    }, delay);
+    // 화면 이탈과 단계 변경 시 이전 이동 타이머를 정리합니다.
+    return () => window.clearTimeout(timer);
+  }, [phase, reducedMotion, navigate]);
 
   function invalidateCompletedQuest() {
     void queryClient.invalidateQueries({ queryKey: ['quest-greetings', questId] });
@@ -53,7 +68,6 @@ function VerificationScreen({ questId }: { questId: string }) {
 
   function returnToForm() {
     // 사진·안부와 미확정 전송 상태를 보존한 채 입력 화면으로 돌아갑니다.
-    setResult(null);
     if (!needsStatusCheck) setError('');
     setPhase("editing");
   }
@@ -68,7 +82,6 @@ function VerificationScreen({ questId }: { questId: string }) {
     const controller = new AbortController();
     request.current = controller;
     setError('');
-    setResult(null);
     setPhase("locating");
     let position: UserPosition | null = null;
     let postStarted = false;
@@ -117,9 +130,8 @@ function VerificationScreen({ questId }: { questId: string }) {
       if (accepted) invalidateCompletedQuest();
       await scanFinished;
       if (controller.signal.aborted) return;
-      setResult(response);
       if (accepted) {
-        setPhase("success");
+        setPhase("verified");
       } else {
         setPhase("failed");
       }
@@ -166,7 +178,7 @@ function VerificationScreen({ questId }: { questId: string }) {
         confirmed = true;
         setNeedsStatusCheck(false);
         setError('');
-        setPhase("success");
+        setPhase("verified");
         invalidateCompletedQuest();
       } else {
         // NONE/FAILED만으로 이번 요청의 처리 중 여부를 알 수 없어 재전송하지 않습니다.
@@ -206,7 +218,6 @@ function VerificationScreen({ questId }: { questId: string }) {
           setPhoto(url);
           setPhotoFile(file);
           setError("");
-          setResult(null);
           setPhase("editing");
         } catch (cause) {
           setError(cause instanceof Error ? cause.message : "사진을 열 수 없어요.");
@@ -214,7 +225,7 @@ function VerificationScreen({ questId }: { questId: string }) {
       }}
     />
   );
-  if (!isQuestId(questId) || !token || detail.isPending || detail.isError || !quest) {
+  if (!isQuestId(questId) || !token || detail.isPending || (detail.isError && !completed) || !quest) {
     return <section className="p-6 min-h-full flex flex-col gap-5">
       <Back to="/" /><h1 className="text-xl font-semibold">수행 인증</h1>
       <p role={!token || detail.isError ? "alert" : "status"}>
@@ -226,10 +237,15 @@ function VerificationScreen({ questId }: { questId: string }) {
     </section>;
   }
   let screen;
-  if (phase === "locating" || phase === "verifying" || phase === "checking-result") {
+  if (phase === "locating" || phase === "verifying" || phase === "checking-result" || phase === "verified") {
     screen = <VerificationProgress phase={phase} photoUrl={photo || quest.photoUrl} general={general} />;
-  } else if (phase === "success") {
-    screen = <VerificationSuccess questId={questId} photo={photo} general={general} percent={percent} message={result?.message ?? "안부가 전달됐어요"} error={error} />;
+  } else if (phase === "delivering" || phase === "delivered") {
+    screen = <GreetingDelivery
+      phase={phase}
+      photoUrl={photo || quest.photoUrl}
+      reducedMotion={reducedMotion}
+      onComplete={() => setPhase(current => current === "delivering" ? "delivered" : current)}
+    />;
   } else if (phase === "failed" || phase === "out-of-range" || phase === "location-error" || phase === "request-error") {
     screen = (
       <VerificationNotice

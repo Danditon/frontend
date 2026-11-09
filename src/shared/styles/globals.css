@@ -141,49 +141,9 @@
 /* 공용 navbar는 아이콘을 줄여도 메뉴 터치 높이를 48px 이상 확보합니다. */
 .nav-item {display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;width:100%;min-height:48px;font-family:"Pretendard",system-ui,sans-serif;font-weight:500;font-size:11px;line-height:14px;white-space:nowrap;}
 .nav-icon {display:grid;place-items:center;width:24px;height:24px;flex-shrink:0;}
-.verify-checking,.verify-success,.past-photo {background-image:none;background-size:610.34% 364.03%;background-position:52.87% 23.65%;}
-.verify-checking {background-size:610.34% 364.03%;}
-.verify-checking::before,.verify-success::before {display:none;}
-.verify-checking>.checking-card {background:white;right:auto;width:83%;box-shadow:0 3px 20px #0001;}
-.checking-card small {color:#63a0b2;}
-.verify-checking>div:first-child {background:#c9eaf5;box-shadow:0 0 15px #fff;}
-.verify-success>div {position:relative;background:#c9eaf5;border-radius:45px 45px 0 0;}
-.verify-success>div::before {content:'';width:44px;height:5px;background:#5c7980;border-radius:8px;position:absolute;top:16px;left:calc(50% - 22px);}
-.verify-success>div>p:first-child {color:#438a9e;}
-.verify-success a:first-of-type {color:white;}
-.verify-success>div>div:last-of-type>a:last-child {color:#242624;text-decoration:underline;}
-.verify-failure {background:white;}
-.verify-failure>p:first-of-type {color:#8c6b20;background:#ffe6a2;align-self:start;border-radius:20px;padding:4px 12px;}
-.verify-failure>div:nth-of-type(2) {background:#d7ecdb;}
-.past-photo {position:absolute;inset:0;}
-.current-photo {filter:brightness(.88);background-position:53.4% 23.65%;}
-.compare-past {background-image:none;background-size:auto 364.03%;background-position:52.87% 23.65%;filter:sepia(.15);}
-.verify-page button>span {background:white;color:#242624;}
-.verify-page button:disabled {background:#ededed;color:#666;}
-.verify-page details {position:relative;top:auto;background:#f4f4f4;color:#555;}
 @media(max-width:500px){
  .designed-screen{min-height:100dvh;padding-top:env(safe-area-inset-top);}
- .memory-page,.verify-page{min-height:calc(100dvh - env(safe-area-inset-top));}
- .verify-page{padding-bottom:env(safe-area-inset-bottom);}
- .verify-success>div{min-height:70dvh;}
-}
-
-/* Dimensions refined against the ten individual mobile references. */
-.verify-success>div {margin-top:265px;min-height:525px;padding:52px 24px 26px;}
-.verify-success>div>div:nth-child(2) {font-size:112px;line-height:1.05;}
-.verify-success>div>small {font-size:12px;}
-.verify-success>div>h1 {font-weight:600;margin-top:38px;}
-.verify-success .save-demo-record {font-size:11px;}
-.verify-success>div>div:last-of-type {gap:18px;padding-top:24px;}
-.verify-failure {padding:68px 18px 26px;}
-.verify-failure>h1 {font-size:36px;line-height:1.15;font-weight:500;margin:8px 0 30px;}
-.verify-failure>div:first-of-type {height:260px;gap:10px;}
-.verify-failure>div:nth-of-type(2) {padding:20px 16px;gap:18px;}
-.verify-failure>div:last-of-type {padding-top:24px;}
-.verify-checking>.checking-card {bottom:28px;left:15px;padding:20px 22px;}
-.checking-card h1 {font-size:27px;margin-top:14px;}
-@media(max-width:500px){
- .verify-success>div{margin-top:36dvh;min-height:64dvh;}
+ .memory-page{min-height:calc(100dvh - env(safe-area-inset-top));}
 }
 
 /* User photos come exclusively from photoUrl, never the design screenshot. */
@@ -197,27 +157,11 @@
 .history-map-placeholder {height:100%;background:#eef5f3;}
 
 /* The sheet stays inside the phone viewport; its contents scroll independently. */
-.verify-page:has(>.swipe-sheet) {height:790px;min-height:0;flex:none;overflow:hidden;isolation:isolate;}
 .swipe-sheet {position:absolute;inset:auto 0 0;z-index:6;display:flex;flex-direction:column;min-height:0;border-radius:42px 42px 0 0;background:white;overflow:hidden;box-shadow:0 -3px 20px #00000008;}
 .swipe-sheet-handle {display:grid;place-items:center;flex:none;width:100%;height:44px;padding:0;border:0;background:transparent;cursor:grab;touch-action:none;user-select:none;}
 .swipe-sheet-handle:active {cursor:grabbing;}
 .swipe-sheet-handle>span {display:block;width:44px;height:4px;border-radius:4px;background:#526f76;}
 .swipe-sheet-body {min-height:0;flex:1;overflow-y:auto;overscroll-behavior:contain;padding-bottom:env(safe-area-inset-bottom);}
-.verify-success>.success-swipe-sheet {background:#c9eaf5;}
-.success-sheet-content {display:flex;flex-direction:column;justify-content:flex-end;min-height:100%;padding:18px 24px 26px;}
-.success-sheet-content>p:first-child {font-size:14px;color:#438a9e;}
-.success-sheet-content>small {font-size:12px;}
-.success-sheet-content>h1 {margin-top:32px;font-size:23px;line-height:1.3;font-weight:600;letter-spacing:-1px;}
-.success-sheet-content>div:last-of-type {margin-top:0;padding-top:24px;}
-.success-sheet-content a:first-of-type {color:white;}
-.success-sheet-content a:last-child {color:#242624;text-decoration:underline;}
-.verify-general .success-sheet-content>div:first-of-type {font-size:40px;letter-spacing:-2px;margin:12px 0;}
-.verify-result-background {position:absolute;inset:0;object-fit:cover;width:100%;height:100%;}
-.verify-success>a {z-index:7;}
-.verify-page .swipe-sheet-handle>span {background:#526f76;}
-@media(max-width:500px){
- .verify-page:has(>.swipe-sheet){height:calc(100dvh - env(safe-area-inset-top));min-height:0;padding-bottom:0;}
-}
 
 /* A single navigation footer is shared by every route in RootLayout. */
 .app-phone {height:calc(100dvh - 48px);min-height:0;padding-bottom:0;overflow:hidden;}
@@ -228,18 +172,14 @@
 .app-content[data-home="true"] + .app-navigation {position:absolute;inset:auto 0 0;background:transparent;pointer-events:none;}
 .app-content[data-home="true"] + .app-navigation>nav {pointer-events:auto;}
 .app-content>.memory-page {min-height:100%;padding-bottom:24px;}
-.app-content>.verify-page {min-height:100%;}
-.app-content>.verify-page:has(>.swipe-sheet) {height:100%;min-height:0;}
 @media(max-width:500px){
  .app-phone {height:100dvh;min-height:0;padding-bottom:0;}
  .app-navigation {height:calc(124px + env(safe-area-inset-bottom));}
  .app-navigation>nav {bottom:calc(26px + env(safe-area-inset-bottom));}
- .app-content>.memory-page,.app-content>.verify-page {min-height:100%;}
- .app-content>.verify-page:has(>.swipe-sheet) {height:100%;min-height:0;}
+ .app-content>.memory-page {min-height:100%;}
 }
 
 .greeting-api-card {border-radius:24px;background:linear-gradient(#fff 35%,#c9eaf5);padding:20px;flex:1;}
-.verify-success:has(.success-sheet-content>div:first-of-type:not(:has(span))) .success-sheet-content>div:first-of-type {font-size:40px;letter-spacing:-2px;}
 /* 홈 복귀 시 본문만 오른쪽으로 닫고 공용 navbar는 제자리에 둡니다. */
 .app-content[data-mypage="true"] { view-transition-name: mypage; }
 .app-navigation { view-transition-name: app-navigation; }

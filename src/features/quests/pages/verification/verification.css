@@ -61,7 +61,7 @@
 .qv-scan-photo { position: relative; width: fit-content; height: fit-content; max-width: 100%; max-height: 100%; }
 .qv-scan-image { display: block; width: auto; height: auto; max-width: 100cqw; max-height: 100cqh; }
 .qv-location-marker { position: absolute; top: 50%; left: 50%; display: grid; width: 120px; height: 120px; place-items: center; border: 1px solid #fff9; border-radius: 50%; transform: translate(-50%, -50%); background: #d3e7f455; color: #356978; box-shadow: 0 0 0 24px #d3e7f433; }
-.qv-status-card { position: relative; flex: none; margin: 16px 16px max(24px, env(safe-area-inset-bottom, 0px)); padding: 20px; border-radius: 28px; background: white; color: #242624; box-shadow: 0 3px 20px #0001; }
+.qv-status-card { position: relative; flex: none; min-height: 128px; margin: 16px 16px max(24px, env(safe-area-inset-bottom, 0px)); padding: 20px; border-radius: 28px; background: white; color: #242624; box-shadow: 0 3px 20px #0001; }
 .qv-status-card small { color: #6196a8; font-size: 13px; }
 .qv-status-card h1 { margin-top: 10px; font-size: 22px; font-weight: 600; line-height: 1.35; }
 .qv-status-card p { margin-top: 8px; color: #555d61; font-size: 14px; line-height: 1.5; }
@@ -110,3 +110,10 @@
   .qv-scan-sweep { top: 50%; animation: none; }
   .qv-scan-trail { animation: none; opacity: 0.35; }
 }
+.qv-verified-badge { position: absolute; top: 20%; left: 50%; display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border: 1px solid #fff9; border-radius: 999px; transform: translateX(-50%); background: #242624; color: white; font-size: 16px; font-weight: 600; white-space: nowrap; }
+.qv-delivery { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px; min-height: 100%; padding: max(32px, env(safe-area-inset-top, 0px)) 24px max(32px, env(safe-area-inset-bottom, 0px)); background: linear-gradient(160deg, #e4f1f5, #d3e7f4); color: #242624; text-align: center; }
+.qv-delivery-thumbnail { width: 96px; height: 120px; flex: none; border: 3px solid white; border-radius: 20px; object-fit: cover; box-shadow: 0 4px 16px #35697818; }
+.qv-delivery-placeholder { display: grid; width: 96px; height: 96px; flex: none; place-items: center; border-radius: 50%; background: #fff9; color: #63a4bc; }
+.qv-delivery-scene { display: block; width: 280px; max-width: 100%; height: auto; flex: none; }
+.qv-delivery h1 { font-size: 26px; font-weight: 700; line-height: 1.35; letter-spacing: -0.5px; }
+.qv-delivery p { margin-top: 10px; font-size: 15px; line-height: 1.6; }

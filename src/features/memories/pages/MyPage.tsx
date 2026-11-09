@@ -15,6 +15,7 @@ import { getQuestGreetings, getVerificationQuest, toggleSubmissionLike, type Que
 import MyPageSummary from "../components/MyPageSummary";
 import MemoryQuestCard from "../components/MemoryQuestCard";
 import GreetingEnvelope from "../components/GreetingEnvelope";
+import MyPageTabs from "../components/MyPageTabs";
 import "../styles/mypage.css";
 
 function ListStatus({ query, enabled, label, empty }: {
@@ -42,6 +43,7 @@ export default function MyPage() {
   const historyPanel = useRef<HTMLDivElement>(null);
   const historyList = useRef<HTMLDivElement>(null);
   const [historySelection, setHistorySelection] = useState({ key: "", request: 0 });
+  const [previewQuestId, setPreviewQuestId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const queryClient = useQueryClient();
   const { user, retrySession } = useAuth();
@@ -62,6 +64,14 @@ export default function MyPage() {
   });
   const memories = token ? questsQuery.data ?? [] : [];
   const records = token ? recordsQuery.data ?? [] : [];
+  const previewMemory = !history && !message && !logout ? memories.find((item) => item.id === previewQuestId) : undefined;
+  const previewQuery = useQuery({
+    queryKey: ["quest-greetings", previewMemory?.id, token],
+    queryFn: ({ signal }) => getQuestGreetings(previewMemory!.id, signal),
+    enabled: Boolean(token && previewMemory),
+    retry: false,
+  });
+  const previewHasGreetings = Boolean(previewQuery.data?.submissions.some((item) => item.verifyStatus === "PASSED"));
   const historyQuestId = history ? params.get("quest") : null;
   const visibleRecords = useMemo(() => {
     const items = token ? recordsQuery.data ?? [] : [];
@@ -172,6 +182,11 @@ export default function MyPage() {
     }
   }, [message, selected?.id, index]);
   useEffect(() => {
+    // 응답은 클릭한 퀘스트의 쿼리에만 연결해 이전 카드의 늦은 응답을 무시합니다.
+    if (!previewMemory || !previewHasGreetings || previewQuery.isFetching || !previewQuery.isSuccess) return;
+    setParams({ quest: previewMemory.id, message: "0" });
+  }, [previewMemory, previewHasGreetings, previewQuery.isFetching, previewQuery.isSuccess, setParams]);
+  useEffect(() => {
     const panel = historyPanel.current;
     if (!history || !panel) return;
     const update = () =>
@@ -212,6 +227,8 @@ export default function MyPage() {
       setError("로그아웃하지 못했어요. 다시 시도해 주세요.");
     }
   }
+  // 편지나 다른 탭에서 돌아왔을 때 이전 클릭이 편지를 자동으로 다시 열지 않게 합니다.
+  if (previewQuestId !== null && (history || message || logout)) setPreviewQuestId(null);
   const summary = (
     <MyPageSummary
       nickname={token ? user?.nickname : undefined}
@@ -275,11 +292,7 @@ export default function MyPage() {
     const peerStatus = greetingQueries.find((query) => query.isError)
       ?? greetingQueries.find((query) => query.isPending);
     return (
-      <section
-        aria-label="내 수행 기록 지도 화면"
-        className="mypage-history"
-      >
-        <div className="mypage-history-header">{summary}</div>
+      <MyPageTabs active="history" summary={summary}>
         <div className="mypage-history-map">
           <HistoryMap
             records={visibleRecords}
@@ -370,24 +383,23 @@ export default function MyPage() {
             )}
           </div>
         </div>
-      </section>
+      </MyPageTabs>
     );
   }
   return (
-    <section className="memory-page mypage-page">
-      {summary}
+    <MyPageTabs active="memories" summary={summary}>
       <div className="mypage-quest-list">
         {memories.map((memory) => (
-          <MemoryQuestCard key={memory.id} memory={memory} token={token} onOpen={(item) => {
-            if (item.passedCount) {
-              setError("");
-              setParams({ quest: item.id, message: "0" });
-            } else setError("아직 도착한 안부가 없어요.");
-          }} />
+          <MemoryQuestCard key={memory.id} memory={memory} token={token}
+            previewStatus={previewMemory?.id !== memory.id ? null
+              : previewQuery.isFetching || previewQuery.isPending ? "loading"
+              : previewQuery.isError || !token ? "error" : previewHasGreetings ? "loading" : "empty"}
+            onRetry={() => { void previewQuery.refetch({ cancelRefetch: false }); }}
+            onOpen={(item) => setPreviewQuestId((previous) => previous === item.id ? null : item.id)}
+          />
         ))}
         {memories.length === 0 && <ListStatus query={questsQuery} enabled={Boolean(token)} label="내 그리움을" empty="등록한 그리움이 없어요." />}
-        {error && <p className="p-3 text-sm" role="status">{error}</p>}
       </div>
-    </section>
+    </MyPageTabs>
   );
 }

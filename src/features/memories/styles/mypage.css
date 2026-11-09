@@ -6,28 +6,38 @@
   -webkit-font-smoothing: antialiased;
 }
 .app-phone[data-memories="true"] :where(button, input, textarea, select) { font-family: inherit; }
-.mypage-page { padding: 20px 20px 24px; background: linear-gradient(#fff 38%, #e4f2f6); }
+.mypage-shell { position: absolute; inset: 0; display: flex; min-height: 0; flex-direction: column; overflow: hidden; background: linear-gradient(#fff 38%, #e4f2f6); }
+.mypage-shell-header { position: relative; z-index: 10; flex: none; padding: 20px 20px 12px; background: white; }
+.mypage-shell-header .mypage-stats { margin-bottom: 0; }
+.mypage-tab-body { position: relative; min-height: 0; flex: 1; overflow: hidden; }
+.mypage-tab-panel { position: absolute; inset: 0; overflow: hidden; }
+.mypage-tab-panel[data-tab="memories"] { overflow-y: auto; overscroll-behavior-y: contain; padding: 12px 20px calc(var(--mypage-nav-space) + 24px); }
 .mypage-summary { min-width: 0; }
 .mypage-summary > header { height: 56px; gap: 12px; margin-bottom: 20px; }
 .mypage-summary > header > span, .mypage-summary > header > a { width: 48px; height: 48px; }
 .mypage-summary > header > div { min-width: 0; font-size: 16px; font-weight: 500; }
 .mypage-summary > header small { overflow: hidden; color: #6d7474; font-size: 12px; font-weight: 400; text-overflow: ellipsis; white-space: nowrap; }
 .mypage-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 24px; }
-.mypage-stats > a { position: relative; display: flex; min-width: 0; min-height: 120px; flex-direction: column; justify-content: flex-end; gap: 6px; padding: 18px 16px; border-radius: 24px; background: #f3f3f3; }
+.mypage-stats > a { position: relative; display: flex; min-width: 0; min-height: 120px; flex-direction: column; justify-content: flex-end; gap: 6px; padding: 18px 16px; border-radius: 24px; background: #f3f3f3; transition: background-color 200ms ease, transform 150ms ease; }
+.mypage-stats > a:active { transform: scale(0.98); }
 .mypage-stats > a[aria-current="page"] { background: #d1e7f2; }
 .mypage-stats strong { font-size: 40px; font-weight: 500; line-height: 1; }
 .mypage-stats small { font-size: 13px; }
 .mypage-greeting-badge { position: absolute; top: 12px; right: 12px; padding: 4px 8px; border-radius: 999px; background: #242624; color: white; font-size: 11px; }
 .mypage-quest-list { display: grid; gap: 12px; }
-.mypage-quest-card { display: grid; grid-template-columns: minmax(0, 1fr) 72px; align-items: center; gap: 16px; min-height: 120px; padding: 16px 18px; border-radius: 24px; background: #dceef5; text-align: left; }
-.mypage-quest-card:nth-child(3n + 2) { background: #e6ddf1; }
-.mypage-quest-card:nth-child(3n) { background: #f2e3d8; }
+.mypage-quest-card { display: grid; width: 100%; grid-template-columns: minmax(0, 1fr) 72px; align-items: center; gap: 16px; min-height: 120px; padding: 16px 18px; border-radius: 24px; background: #dceef5; text-align: left; }
+.mypage-quest-item:nth-child(3n + 2) .mypage-quest-card { background: #e6ddf1; }
+.mypage-quest-item:nth-child(3n) .mypage-quest-card { background: #f2e3d8; }
+.mypage-quest-notice { overflow: hidden; }
+.mypage-quest-notice > div { padding: 12px 16px 4px; color: #586b73; font-size: 13px; line-height: 1.5; }
+.mypage-quest-notice small { display: block; margin-top: 4px; color: #74848b; font-size: 12px; }
+.mypage-quest-notice button { min-height: 44px; padding-right: 12px; text-decoration: underline; }
 .mypage-quest-copy { min-width: 0; }
 .mypage-quest-copy strong { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; font-size: 16px; font-weight: 500; line-height: 1.45; overflow-wrap: anywhere; }
 .mypage-quest-copy small { display: block; margin-top: 6px; color: #69716e; font-size: 12px; }
 .mypage-quest-copy > span { display: inline-block; margin-top: 10px; padding: 4px 8px; border-radius: 999px; background: #242624; color: white; font-size: 11px; }
 .mypage-quest-photo { width: 72px; height: 92px; border: 4px solid white; background: #eceeed; box-shadow: 0 4px 10px #00000012; transform: rotate(8deg); }
-.mypage-quest-card:nth-child(even) .mypage-quest-photo { transform: rotate(-8deg); }
+.mypage-quest-item:nth-child(even) .mypage-quest-photo { transform: rotate(-8deg); }
 .mypage-quest-photo .remote-photo { width: 100%; height: 100%; }
 .mypage-quest-photo .remote-photo > span { padding: 4px; font-size: 10px; }
 
@@ -106,10 +116,7 @@
 .greeting-footer button { width: 100%; min-height: 52px; padding: 12px 18px; border-radius: 999px; background: #242624; color: white; font-size: 15px; }
 .greeting-footer button:disabled { opacity: 0.5; cursor: default; }
 
-.mypage-history { position: absolute; inset: 0; isolation: isolate; display: flex; flex-direction: column; overflow: hidden; background: white; }
-.mypage-history-header { position: relative; z-index: 10; flex: none; padding: 20px 20px 12px; background: white; }
-.mypage-history-header .mypage-stats { margin-bottom: 0; }
-.mypage-history-map { position: relative; min-height: 0; flex: 1; }
+.mypage-history-map { position: relative; height: 100%; min-height: 0; }
 .mypage-history-panel { position: absolute; inset-inline: 16px; bottom: var(--mypage-nav-space); z-index: 10; max-height: min(260px, max(120px, calc(100% - var(--mypage-nav-space) - 140px))); overflow-x: hidden; overflow-y: auto; overscroll-behavior-y: contain; padding: 12px; border-radius: 20px; background: #fffffff5; box-shadow: 0 8px 24px #00000012; }
 .mypage-history-panel > header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0 8px; margin-bottom: 6px; }
 .mypage-history-panel h2 { font-size: 13px; font-weight: 600; }
@@ -140,7 +147,11 @@
 .mypage-logout-dialog :is(button, a) { display: grid; min-height: 50px; min-width: 0; flex: 1; place-items: center; border-radius: 999px; background: white; color: #242624; font-size: 14px; }
 .mypage-logout-dialog a { background: #666; color: white; }
 @media (max-height: 740px) {
-  .mypage-page, .mypage-history-header { padding-top: 16px; }
+  .mypage-shell-header { padding-top: 16px; }
   .mypage-stats > a { min-height: 112px; }
   .greeting-header > a { top: 22px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mypage-stats > a { transition: none; }
+  .mypage-stats > a:active { transform: none; }
 }

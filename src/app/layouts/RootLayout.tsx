@@ -45,7 +45,7 @@ export function RootLayout() {
               : ""
           }`}
           data-home={pathname === "/" || pathname === "/me/history"}
-          data-mypage={pathname === "/me"}
+          data-mypage={pathname.startsWith("/me")}
         >
           <Outlet context={{ onNearbyNavigationChange: setNearbyNavigation } satisfies QuestMapOutletContext} />
         </main>

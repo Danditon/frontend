@@ -82,12 +82,14 @@ function fixture(path = '/me', search = '') {
       return envelope.render(tree.props)
     }
     if (tree.type === 'HistoryRecordCard') return expand(HistoryRecordCard(tree.props))
+    if (tree.type === 'MyPageTabs') return { type: 'section', props: { children: expand([tree.props.summary, tree.props.children]) } }
     return { ...tree, props: { ...tree.props, children: expand(tree.props?.children) } }
   }
   const mutation = { isPending: false, isError: false, variables: undefined, mutate(value) {
     f.likes.push(value); this.variables = value; this.isPending = true
   } }
-  const query = (data, isError = false) => ({ data, isError, isPending: f.pendingQueries, refetch() { f.retried = true } })
+  const query = (data, isError = false) => ({ data, isError, isPending: f.pendingQueries, isFetching: f.pendingQueries,
+    isSuccess: !isError && !f.pendingQueries && data !== undefined, refetch() { f.retried = true } })
   const Page = load('features/memories/pages/MyPage.tsx', {
     react: {
       useState(initial) { const i = cursor++; if (!(i in states)) states[i] = initial; return [states[i], value => { states[i] = typeof value === 'function' ? value(states[i]) : value }] },
@@ -110,6 +112,7 @@ function fixture(path = '/me', search = '') {
         f.queries.push(options)
         if (options.queryKey[0] === 'my-quests') return query(f.memories, f.questError)
         if (options.queryKey[0] === 'verification-quest') return query(f.detailQuestType ? { questType: f.detailQuestType } : undefined)
+        if (options.queryKey[0] === 'quest-greetings') return query(client.getQueryData(options.queryKey), f.greetingError)
         return query(f.records)
       },
       useQueries: ({ queries }) => queries.map(options => query(client.getQueryData(options.queryKey), f.greetingError)),
@@ -121,6 +124,7 @@ function fixture(path = '/me', search = '') {
     '../components/MyPageSummary': { __esModule: true, default: 'MyPageSummary' },
     '../components/MemoryQuestCard': { __esModule: true, default: 'MemoryQuestCard' },
     '../components/GreetingEnvelope': { __esModule: true, default: 'GreetingEnvelope' },
+    '../components/MyPageTabs': { __esModule: true, default: 'MyPageTabs' },
   }, { URLSearchParams, localStorage: { removeItem: key => f.removed.push(key) }, sessionStorage: { removeItem: key => f.removed.push(key) } })
   return Object.defineProperty(Object.assign(f, {
     render() { cursor = 0; refCursor = 0; effectCursor = 0; return expand(Page()) },
@@ -252,13 +256,47 @@ test('마이페이지 진입은 내 그리움이며 안부가 있는 카드만 �
   const f = fixture()
   let tree = f.render()
   assert.equal(find(tree, 'MyPageSummary').props.active, 'memories')
-  find(tree, 'MemoryQuestCard').props.onOpen({ ...memory, passedCount: 0 })
-  assert.match(text(f.render()), /아직 도착한 안부가 없어요/)
-  assert.equal(f.params.has('message'), false)
+  f.client.setQueryData(['quest-greetings', '22', 'token'], { submissions: [] })
   find(tree, 'MemoryQuestCard').props.onOpen(memory)
+  tree = f.render()
+  assert.equal(find(tree, 'MemoryQuestCard').props.previewStatus, 'empty')
+  assert.equal(f.params.has('message'), false)
+  f.client.setQueryData(['quest-greetings', '22', 'token'], { submissions: [submission(2, '2026-11-02')] })
+  f.render()
   tree = f.render()
   assert.equal(f.params.get('quest'), '22')
   assert.equal(find(tree, 'GreetingLetter').props.greeting.id, '2')
+  // 실제 라우터는 상태 변경 후 재렌더링하므로 편지 진입 상태를 한 번 더 반영합니다.
+  f.render()
+  f.params.delete('message')
+  tree = f.render()
+  assert.equal(find(tree, 'GreetingLetter'), undefined)
+  assert.equal(find(tree, 'MemoryQuestCard').props.previewStatus, null)
+})
+
+test('다른 카드를 누른 뒤 도착한 이전 응답은 이동하지 않고 카드별 없음·실패·재시도를 구분한다', () => {
+  const f = fixture()
+  f.memories.push({ ...memory, id: '23' })
+  f.client.setQueryData(['quest-greetings', '23', 'token'], { submissions: [] })
+  f.pendingQueries = true
+  let tree = f.render()
+  const card = (tree, id) => all(tree, 'MemoryQuestCard').find(node => node.props.memory.id === id)
+  card(tree, '22').props.onOpen(memory)
+  tree = f.render()
+  assert.equal(card(tree, '22').props.previewStatus, 'loading')
+  card(tree, '23').props.onOpen(f.memories[1])
+  f.pendingQueries = false
+  tree = f.render()
+  assert.equal(card(tree, '22').props.previewStatus, null)
+  assert.equal(card(tree, '23').props.previewStatus, 'empty')
+  assert.equal(f.params.has('message'), false)
+  f.greetingError = true
+  tree = f.render()
+  assert.equal(card(tree, '23').props.previewStatus, 'error')
+  card(tree, '23').props.onRetry()
+  assert.equal(f.retried, true)
+  card(tree, '23').props.onOpen(f.memories[1])
+  assert.equal(card(f.render(), '23').props.previewStatus, null)
 })
 
 test('안부 하단 목록 없이 다음 버튼으로 최신순 이동·순환하며 기록과 복귀 경로를 보존한다', () => {
@@ -486,6 +524,7 @@ test('내 그리움 API는 일반·이미지 유형을 버리지 않고 화면�
 test('그리움 카드는 자신의 퀘스트 ID로 상세 사진을 조회하고 선택한 항목을 전달한다', async () => {
   let options, requested, opened
   const Card = load('features/memories/components/MemoryQuestCard.tsx', {
+    'motion/react': { AnimatePresence: 'AnimatePresence', motion: { div: 'div' }, useReducedMotion: () => true },
     '@tanstack/react-query': { useQuery: value => { options = value; return { data: { photoUrl: '/quest-detail.jpg' } } } },
     '@/shared/components/RemotePhoto': photo,
     '@/features/quests/api/verification': { getVerificationQuest: (...args) => { requested = args } },
@@ -496,8 +535,83 @@ test('그리움 카드는 자신의 퀘스트 ID로 상세 사진을 조회하�
   assert.equal(requested[0], '22')
   assert.equal(requested[1], signal)
   assert.equal(find(tree, 'RemotePhoto').props.photoUrl, '/quest-detail.jpg')
-  tree.props.onClick()
+  find(tree, 'button').props.onClick()
   assert.equal(opened, memory)
+})
+
+test('안부 없음 안내는 해당 카드의 버튼 아래에 펼치고 재시도 버튼을 중첩하지 않는다', () => {
+  let retried = false
+  const Card = load('features/memories/components/MemoryQuestCard.tsx', {
+    'motion/react': { AnimatePresence: 'AnimatePresence', motion: { div: 'div' }, useReducedMotion: () => true },
+    '@tanstack/react-query': { useQuery: () => ({ data: {} }) },
+    '@/shared/components/RemotePhoto': photo,
+    '@/features/quests/api/verification': { getVerificationQuest() {} },
+  })
+  const props = { memory, token: 'token', onOpen() {}, onRetry() { retried = true } }
+  let tree = Card({ ...props, previewStatus: 'empty' })
+  const button = find(tree, 'button')
+  assert.equal(button.props['aria-expanded'], true)
+  assert.equal(find(button, 'div', props => props.role === 'status'), undefined)
+  assert.match(text(tree), /아직 도착한 안부가 없어요/)
+  tree = Card({ ...props, previewStatus: 'error' })
+  const alert = find(tree, 'div', props => props.role === 'alert')
+  assert.doesNotMatch(text(alert), /아직 도착한 안부/)
+  find(alert, 'button').props.onClick()
+  assert.equal(retried, true)
+  assert.equal(all(find(tree, 'button'), 'button').length, 1)
+})
+
+function homeLinkFixture({ native = false, reduced = false, pathname = '/me/history' } = {}) {
+  let cleanup, finish, reject
+  const state = { navigations: [], animations: 0, pathname }
+  const element = { inert: false, animate() {
+    state.animations++
+    return { finished: new Promise((resolve, fail) => { finish = resolve; reject = fail }), cancel() { reject(new Error('cancelled')) } }
+  } }
+  const Link = load('shared/components/MyPageHomeLink.tsx', {
+    react: { useRef: () => ({ current: null }), useLayoutEffect: fn => { cleanup = fn() } },
+    'react-router': { Link: 'Link', useLocation: () => ({ pathname: state.pathname }), useNavigate: () => path => state.navigations.push(path) },
+    'motion/react': { useReducedMotion: () => reduced },
+  }, { document: { startViewTransition: native ? () => {} : undefined, querySelector: () => element } })
+  const tree = Link({ children: '홈', className: 'home' })
+  const event = { button: 0, preventDefault() { this.defaultPrevented = true } }
+  return { state, element, tree, event, cleanup: () => cleanup(), finish: () => finish() }
+}
+
+test('홈 복귀는 native 전환을 사용하고 미지원 환경에서는 닫힘 완료 후 한 번만 이동한다', async () => {
+  const native = homeLinkFixture({ native: true })
+  await native.tree.props.onClick(native.event)
+  assert.equal(native.tree.props.viewTransition, true)
+  assert.equal(native.state.animations, 0)
+  const fallback = homeLinkFixture()
+  const closing = fallback.tree.props.onClick(fallback.event)
+  assert.equal(fallback.event.defaultPrevented, true)
+  assert.equal(fallback.element.inert, true)
+  await fallback.tree.props.onClick({ ...fallback.event, defaultPrevented: false })
+  assert.equal(fallback.state.animations, 1)
+  assert.deepEqual(fallback.state.navigations, [])
+  fallback.finish()
+  await closing
+  assert.deepEqual(fallback.state.navigations, ['/'])
+  fallback.cleanup()
+  assert.equal(fallback.element.inert, false)
+})
+
+test('취소된 닫힘은 홈으로 이동하지 않으며 동작 줄이기·새 탭 열기·다른 화면의 홈 링크는 그대로 동작한다', async () => {
+  const cancelled = homeLinkFixture()
+  const closing = cancelled.tree.props.onClick(cancelled.event)
+  cancelled.cleanup()
+  await closing
+  assert.deepEqual(cancelled.state.navigations, [])
+  for (const options of [{ reduced: true }, { pathname: '/' }, { pathname: '/quests/new' }]) {
+    const f = homeLinkFixture(options)
+    await f.tree.props.onClick(f.event)
+    assert.equal(f.event.defaultPrevented, undefined)
+    assert.equal(f.state.animations, 0)
+  }
+  const modified = homeLinkFixture()
+  await modified.tree.props.onClick({ ...modified.event, ctrlKey: true })
+  assert.equal(modified.state.animations, 0)
 })
 
 test('로그아웃 확인·안부에는 navbar가 없고 일반 마이페이지와 기록에는 유지된다', () => {

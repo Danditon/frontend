@@ -44,6 +44,7 @@ function componentFixture(path, dependencies, globals = {}, select = module => m
   const Component = select(loadSource(path, {
     ...dependencies,
     react: {
+      useId: () => 'fixture-id',
       useCallback: (fn) => fn,
       useRef: (initial) => {
         const index = refIndex++
@@ -786,6 +787,10 @@ test('인증은 URL ID만 사용하고 성공 시 추천·상세·목록·인증
     }
     // 분리한 화면도 실제로 렌더링해 부모의 상태·이벤트 연결을 함께 확인합니다.
     dependencies['./PhotoScanner'] = loadSource('features/quests/pages/verification/PhotoScanner.tsx')
+    dependencies['./DeliveryAnimation'] = loadSource('features/quests/pages/verification/DeliveryAnimation.tsx', {
+      react: { useId: () => 'delivery-id', useState: () => [null, () => {}] },
+      'motion/react': { motion: { g: 'motion.g' } },
+    })
     for (const name of ['VerificationForm', 'VerificationProgress', 'GreetingDelivery', 'VerificationNotice']) {
       dependencies[`./verification/${name}`] = loadSource(`features/quests/pages/verification/${name}.tsx`, dependencies)
     }
@@ -921,6 +926,10 @@ function verificationFlowFixture(options = {}) {
     '@/features/quests/lib/questPhoto': { decodeQuestPhoto: async () => 'blob:selected-photo' },
   }
   dependencies['./PhotoScanner'] = loadSource('features/quests/pages/verification/PhotoScanner.tsx')
+  dependencies['./DeliveryAnimation'] = loadSource('features/quests/pages/verification/DeliveryAnimation.tsx', {
+    react: { useId: () => 'delivery-id', useState: () => [null, () => {}] },
+    'motion/react': { motion: { g: 'motion.g' } },
+  })
   for (const name of ['VerificationForm', 'VerificationProgress', 'GreetingDelivery', 'VerificationNotice']) {
     dependencies[`./verification/${name}`] = loadSource(`features/quests/pages/verification/${name}.tsx`, dependencies)
   }
@@ -1120,8 +1129,9 @@ test('인증 완료·전달 연출 뒤 완료 화면에 머물며 홈 버튼을 
     assert.equal(findNode(delivering, 'section', item => item.className === 'qv-progress'), null)
     assert.match(textOf(delivering), /안부를 전하고 있어요/)
     assert.equal(findNode(delivering, 'Button'), null)
-    const flight = findNode(delivering, 'motion.g')
-    assert.equal(flight.props.transition.duration, 1.2)
+    const flight = findNode(delivering, 'motion.g', item => item['data-layer'] === 'flight')
+    assert.equal(flight.props.transition.duration, 4)
+    assert.equal(findNode(delivering, 'image').props.href, 'blob:selected-photo')
     f.advance(5000)
     assert.match(textOf(f.render()), /안부를 전하고 있어요/)
     assert.equal(f.navigations.length, 0)
@@ -1147,7 +1157,7 @@ test('인증 완료·전달 연출 뒤 완료 화면에 머물며 홈 버튼을 
 })
 
 test('동작 줄이기에서도 일반 퀘스트의 전달 완료 화면을 유지하고 홈 버튼으로 복귀한다', async () => {
-  const f = verificationFlowFixture({ reducedMotion: true, questType: 'GENERAL', photoUrl: null })
+  const f = verificationFlowFixture({ reducedMotion: true, questType: 'GENERAL' })
   try {
     await f.prepare()
     f.start()
@@ -1156,9 +1166,11 @@ test('동작 줄이기에서도 일반 퀘스트의 전달 완료 화면을 유�
     f.advance(700)
     const delivering = f.render()
     assert.match(textOf(delivering), /안부를 전하고 있어요/)
-    assert.equal(findNode(delivering, 'motion.g'), null)
+    assert.equal(findNode(delivering, 'motion.g', item => item['data-layer'] === 'flight').props.onAnimationComplete, undefined)
     assert.equal(findNode(delivering, 'img'), null)
-    assert.ok(findNode(delivering, 'div', item => item.className === 'qv-delivery-placeholder'))
+    assert.equal(findNode(delivering, 'image'), null)
+    assert.ok(findNode(delivering, 'g', item => item['data-layer'] === 'note-paper'))
+    assert.match(textOf(delivering), /지금도 그대로예요/)
     f.advance(1199)
     assert.match(textOf(f.render()), /안부를 전하고 있어요/)
     f.advance(1)
@@ -1214,6 +1226,61 @@ test('인증 실패·범위 초과·응답 대기 초과에서는 전달 화면�
       assert.equal(f.posts.length, 1)
     } finally { f.unmount() }
   }
+})
+
+test('전달 장면은 사진 담기·덮개 닫기·포물선 이동·축소와 투입구 가림을 4초에 연결한다', () => {
+  const f = componentFixture('features/quests/pages/verification/DeliveryAnimation.tsx', {
+    'motion/react': { motion: { g: 'motion.g' } },
+  })
+  const props = { photoUrl: 'selected.jpg', note: '오늘의 안부', delivered: false, reducedMotion: false, onComplete() {} }
+  try {
+    const tree = f.render(props)
+    const layer = name => findNode(tree, 'motion.g', item => item['data-layer'] === name)
+    const flight = layer('flight')
+    assert.equal(flight.props.transition.duration, 4)
+    assert.equal(flight.props.onAnimationComplete, props.onComplete)
+    assert.equal(layer('paper').props.transition.times[1] * 4, 0.8)
+    assert.equal(layer('flap').props.transition.times[2] * 4, 1.2)
+    assert.equal(layer('paper').props.onAnimationComplete, undefined)
+    assert.equal(layer('arrival').props.onAnimationComplete, undefined)
+    const { x, y, scale, opacity } = flight.props.animate
+    assert.equal(x[0], 0)
+    assert.equal(x.at(-1), 212)
+    assert.equal(y[0], y.at(-1))
+    assert.equal(y[3], -52)
+    // 중간 지점들도 시작점과 도착점을 잇는 포물선 위에 놓입니다.
+    for (const index of [2, 3, 4]) {
+      const t = x[index] / 212
+      assert.equal(y[index], -208 * t * (1 - t))
+    }
+    assert.ok(scale.at(-1) < scale[0])
+    assert.equal(opacity.at(-1), 0)
+    assert.ok(findNode(tree, 'mask'))
+    assert.ok(findNode(tree, 'g', item => item.mask === 'url(#fixture-id-slot)'))
+    assert.equal(findNode(tree, 'image').props.href, 'selected.jpg')
+    assert.ok(findNode(tree, 'g', item => item['data-layer'] === 'mailbox'))
+    const completed = f.render({ ...props, delivered: true })
+    assert.equal(findNode(completed, 'motion.g', item => item['data-layer'] === 'flight'), null)
+    assert.ok(findNode(completed, 'g', item => item['data-layer'] === 'mailbox'))
+  } finally { f.unmount() }
+})
+
+test('사진이 없거나 열리지 않으면 작성한 안부 편지지를 쓰고 동작 줄이기에서는 이동하지 않는다', () => {
+  const f = componentFixture('features/quests/pages/verification/DeliveryAnimation.tsx', {
+    'motion/react': { motion: { g: 'motion.g' } },
+  })
+  const props = { photoUrl: 'broken.jpg', note: '지금도 잘 있어요', delivered: false, reducedMotion: false, onComplete() {} }
+  try {
+    findNode(f.render(props), 'image').props.onError()
+    const fallback = f.render(props)
+    assert.equal(findNode(fallback, 'image'), null)
+    assert.match(textOf(fallback), /지금도 잘 있어요/)
+    const reduced = f.render({ ...props, photoUrl: null, reducedMotion: true })
+    const flight = findNode(reduced, 'motion.g', item => item['data-layer'] === 'flight')
+    assert.equal(flight.props.initial, false)
+    assert.equal(flight.props.animate.x, 0)
+    assert.equal(flight.props.onAnimationComplete, undefined)
+  } finally { f.unmount() }
 })
 
 test('사진 검증 3초 초과는 초안을 보존해 입력으로 복귀하고 늦은 응답과 중복 전송을 막는다', async () => {

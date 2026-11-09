@@ -112,9 +112,15 @@
 }
 .qv-verified-badge { position: absolute; top: 20%; left: 50%; display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border: 1px solid #fff9; border-radius: 999px; transform: translateX(-50%); background: #242624; color: white; font-size: 16px; font-weight: 600; white-space: nowrap; }
 .qv-delivery { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px; min-height: 100%; padding: max(32px, env(safe-area-inset-top, 0px)) 24px max(32px, env(safe-area-inset-bottom, 0px)); background: linear-gradient(160deg, #e4f1f5, #d3e7f4); color: #242624; text-align: center; }
-.qv-delivery-thumbnail { width: 96px; height: 120px; flex: none; border: 3px solid white; border-radius: 20px; object-fit: cover; box-shadow: 0 4px 16px #35697818; }
-.qv-delivery-placeholder { display: grid; width: 96px; height: 96px; flex: none; place-items: center; border-radius: 50%; background: #fff9; color: #63a4bc; }
-.qv-delivery-scene { display: block; width: 280px; max-width: 100%; height: auto; flex: none; }
+.qv-delivery-scene { display: block; width: 360px; max-width: 100%; height: auto; flex: none; }
+.qv-delivery-status { min-height: 78px; }
+.qv-delivery-actions { display: flex; justify-content: center; width: 100%; min-height: 56px; }
 .qv-delivery h1 { font-size: 26px; font-weight: 700; line-height: 1.35; letter-spacing: -0.5px; }
 .qv-delivery p { margin-top: 10px; font-size: 15px; line-height: 1.6; }
 .qv-delivery-home { max-width: 320px; }
+.qv-delivery-preview { position: fixed; inset: 0; z-index: 2147483647; display: grid; place-items: center; padding: 12px; background: #242624aa; }
+.qv-delivery-preview-phone { display: flex; flex-direction: column; width: min(420px, 100%); height: min(850px, 100%); overflow-y: auto; border-radius: 24px; background: #e4f1f5; }
+.qv-delivery-preview-controls { position: sticky; top: 0; z-index: 1; display: flex; flex: none; justify-content: space-between; gap: 12px; padding: 8px 16px; background: #f6fbff; }
+.qv-delivery-preview-controls button { min-height: 44px; padding: 8px 12px; border-radius: 12px; font-size: 14px; }
+.qv-delivery-preview-controls button:focus-visible { outline: 2px solid #356978; }
+.qv-delivery-preview-phone > .qv-delivery { flex: 1 0 auto; min-height: 480px; }

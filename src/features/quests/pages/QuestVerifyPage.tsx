@@ -240,7 +240,8 @@ function VerificationScreen({ questId }: { questId: string }) {
   } else if (phase === "delivering" || phase === "delivered") {
     screen = <GreetingDelivery
       phase={phase}
-      photoUrl={photo || quest.photoUrl}
+      photoUrl={photo || null}
+      note={note}
       reducedMotion={reducedMotion}
       onComplete={() => setPhase(current => current === "delivering" ? "delivered" : current)}
       onHome={() => navigate('/', { replace: true })}

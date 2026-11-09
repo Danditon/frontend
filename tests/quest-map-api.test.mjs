@@ -94,6 +94,14 @@ function textOf(tree) {
   return [tree?.props?.children].flat().map((child) => textOf(child)).join('')
 }
 
+// 실제 표시 컴포넌트도 평가해 Fragment 안의 파일 입력까지 확인합니다.
+function renderComponents(tree) {
+  if (Array.isArray(tree)) return tree.map(renderComponents)
+  if (!tree || typeof tree !== 'object' || !tree.props) return tree
+  if (typeof tree.type === 'function') return renderComponents(tree.type(tree.props))
+  return { ...tree, props: { ...tree.props, children: renderComponents(tree.props.children) } }
+}
+
 const position = { lat: 35.8714, lng: 128.6014, accuracy: 10, timestamp: 1000 }
 const quests = [
   { questId: 701, questTitle: 'Nearby', questType: 'GENERAL', difficulty: 1, placeName: 'Cafe', lat: 35.8714, lng: 128.6014, distance: 0, isMine: false },
@@ -732,7 +740,7 @@ test('인증은 URL ID만 사용하고 성공 시 추천·상세·목록·인증
       'react-router': { useParams: () => params, Link: 'Link' },
       'motion/react': { useReducedMotion: () => true, motion: { div: 'motion.div' } },
       axios: { isAxiosError: axios.isAxiosError },
-      'lucide-react': { ChevronsLeftRight: 'ChevronsLeftRight', Mail: 'Mail', MapPin: 'MapPin', Plus: 'Plus', X: 'X' },
+      'lucide-react': { ChevronLeft: 'ChevronLeft', ChevronsLeftRight: 'ChevronsLeftRight', Mail: 'Mail', MapPin: 'MapPin', Plus: 'Plus', X: 'X' },
       '@/shared/components/WireUI': { Back: 'Back', SlideButton: 'SlideButton' },
       '@/shared/components/ui/button': { Button: 'Button' },
       '@/shared/components/SwipeSheet': { SwipeSheet: 'SwipeSheet' },
@@ -770,10 +778,7 @@ test('인증은 URL ID만 사용하고 성공 시 추천·상세·목록·인증
         params = { questId: '701' }
         return module.default().type
       })
-    const renderScreen = () => {
-      const screen = f.render({ questId: '701' })
-      return screen.type(screen.props)
-    }
+    const renderScreen = () => renderComponents(f.render({ questId: '701' }))
     try {
       let tree = renderScreen()
       findNode(tree, 'textarea').props.onChange({ target: { value: '안부를 남겨요' } })
@@ -794,9 +799,9 @@ test('인증은 URL ID만 사용하고 성공 시 추천·상세·목록·인증
       for (const key of keys) assert.equal(client.getQueryState(key).isInvalidated, status === 'PASSED')
       assert.equal(client.getQueryState(['unrelated']).isInvalidated, false)
       const resultScreen = renderScreen()
-      assert.match(textOf(resultScreen), status === 'PASSED' ? /인증 성공/ : /인증 실패/)
+      assert.match(textOf(resultScreen), status === 'PASSED' ? /인증 성공/ : /인증 미완료/)
       if (status === 'FAILED') {
-        findNode(resultScreen, 'SlideButton').props.onClick()
+        findNode(resultScreen, 'Button').props.onClick()
         const retryScreen = renderScreen()
         assert.equal(findNode(retryScreen, 'textarea').props.value, '안부를 남겨요')
         assert.ok(findNode(retryScreen, 'img', props => props.src === 'blob:verification'))
@@ -849,6 +854,232 @@ test('고정 인증 폼은 일반 사진 선택·이미지 사진 필수·비교
   assert.equal(mix, 75)
   const compared = Form({ ...props, quest: imageQuest, step: 'compare', photo: 'now.jpg', hasPhoto: true, mix })
   assert.equal(findNode(compared, 'img', item => item.src === 'now.jpg').props.style.clipPath, 'inset(0 0 0 75%)')
+})
+
+function verificationFlowFixture(options = {}) {
+  const quest = {
+    ...quests[0], questType: options.questType ?? 'IMAGE', myStatus: 'NONE',
+    photoUrl: 'past.jpg', author: { nickname: '작성자' }, questDescription: '안부를 전해주세요',
+  }
+  const posts = [], reads = [], invalidations = [], revoked = []
+  let picks = 0
+  const dependencies = {
+    'react-router': { useParams: () => ({ questId: '701' }), Link: 'Link' },
+    'motion/react': { useReducedMotion: () => true, motion: { div: 'motion.div' } },
+    axios: { isAxiosError: axios.isAxiosError },
+    'lucide-react': { ChevronLeft: 'ChevronLeft', ChevronsLeftRight: 'ChevronsLeftRight', Mail: 'Mail', MapPin: 'MapPin', Plus: 'Plus', X: 'X' },
+    '@/shared/components/WireUI': { Back: 'Back' },
+    '@/shared/components/ui/button': { Button: 'Button' },
+    '@/shared/components/SwipeSheet': { SwipeSheet: 'SwipeSheet' },
+    '@/shared/components/RemotePhoto': { RemotePhoto: 'RemotePhoto' },
+    './verification.css': {},
+    '@tanstack/react-query': {
+      useQueryClient: () => ({ invalidateQueries: ({ queryKey }) => { invalidations.push(queryKey); return Promise.resolve() } }),
+      useQuery: () => ({ data: quest, isPending: false, isError: false }),
+    },
+    './home/utils/getNearestQuest': distanceUtils,
+    '@/features/quests/hooks/useGeolocation': { useGeolocation: () => ({
+      error: options.locationError,
+      requestLocation: options.locate ?? (async () => position),
+    }) },
+    '@/features/quests/api/verification': {
+      isQuestId: () => true, getAccessToken: () => 'token',
+      similarityPercent: value => value == null ? null : Math.round(value * 100),
+      createSubmissionForm: (type, note, coordinates, photo) => ({ type, note, coordinates, photo }),
+      submitVerification: async (id, body, signal) => {
+        posts.push({ id, body, signal })
+        return options.submit ? options.submit() : { verifyStatus: 'PASSED', similarity: 0.84, message: '안부가 전달됐어요' }
+      },
+      getVerificationQuest: async (id, signal) => {
+        reads.push({ id, signal })
+        return { ...quest, myStatus: options.readStatus?.() ?? 'NONE' }
+      },
+      verificationError: () => '잠시 후 다시 확인해 주세요.',
+    },
+    '@/features/quests/lib/questPhoto': { decodeQuestPhoto: async () => 'blob:selected-photo' },
+  }
+  for (const name of ['VerificationForm', 'VerificationProgress', 'VerificationSuccess', 'VerificationNotice']) {
+    dependencies[`./verification/${name}`] = loadSource(`features/quests/pages/verification/${name}.tsx`, dependencies)
+  }
+  const f = componentFixture('features/quests/pages/QuestVerifyPage.tsx', dependencies,
+    { AbortController, URL: { revokeObjectURL: value => revoked.push(value) } }, module => module.default().type)
+  const render = () => {
+    const tree = renderComponents(f.render({ questId: '701' }))
+    findNode(tree, 'input', item => item.type === 'file').props.ref.current = { click: () => { picks++ } }
+    return tree
+  }
+  return {
+    posts, reads, invalidations, revoked, render,
+    unmount: () => f.unmount(),
+    get picks() { return picks },
+    async prepare(withPhoto = quest.questType === 'IMAGE') {
+      findNode(render(), 'textarea').props.onChange({ target: { value: '지금도 그대로예요' } })
+      if (withPhoto) await findNode(render(), 'input', item => item.type === 'file').props.onChange({
+        target: { files: [{ name: 'selected.jpg' }] }, currentTarget: { value: 'selected.jpg' },
+      })
+    },
+    start: () => findNode(render(), 'Button').props.onClick(),
+    returnToForm: () => findNode(render(), 'button', item => item['aria-label'] === '인증 화면으로 돌아가기').props.onClick(),
+  }
+}
+
+const flushVerification = () => new Promise(resolve => setImmediate(resolve))
+
+test('인증 위치 조회가 완료된 뒤에만 사진 검증을 시작하고 FAILED이면 점수 없이 사진을 재선택한다', async () => {
+  let finishLocation, finishSubmission
+  const locationPromise = new Promise(resolve => { finishLocation = resolve })
+  const submissionPromise = new Promise(resolve => { finishSubmission = resolve })
+  const f = verificationFlowFixture({ locate: () => locationPromise, submit: () => submissionPromise })
+  try {
+    await f.prepare()
+    f.start()
+    assert.match(textOf(f.render()), /현재 위치를 확인하고 있어요/)
+    assert.doesNotMatch(textOf(f.render()), /AI 검증 중/)
+    assert.equal(f.posts.length, 0)
+    finishLocation(position)
+    await flushVerification()
+    assert.match(textOf(f.render()), /같은 자리인지비교하고 있어요/)
+    assert.equal(f.posts.length, 1)
+    finishSubmission({ verifyStatus: 'FAILED', similarity: 0.99, message: '유사도 99%' })
+    await flushVerification()
+    assert.match(textOf(f.render()), /인증 미완료/)
+    assert.doesNotMatch(textOf(f.render()), /99|%/)
+    findNode(f.render(), 'Button').props.onClick()
+    assert.equal(f.picks, 1)
+    assert.equal(findNode(f.render(), 'textarea').props.value, '지금도 그대로예요')
+    assert.ok(findNode(f.render(), 'img', item => item.src === 'blob:selected-photo'))
+  } finally { f.unmount() }
+})
+
+test('위치 확인 실패는 제출하지 않으며 재확인 후에도 사진과 안부를 유지한다', async () => {
+  let currentPosition = null, locationCalls = 0
+  const f = verificationFlowFixture({
+    locate: async () => { locationCalls++; return currentPosition },
+    locationError: { message: '위치 권한을 허용해주세요.' },
+  })
+  try {
+    await f.prepare()
+    f.start()
+    await flushVerification()
+    assert.match(textOf(f.render()), /위치 권한을 허용해주세요/)
+    assert.equal(f.posts.length, 0)
+    currentPosition = position
+    findNode(f.render(), 'Button').props.onClick()
+    await flushVerification()
+    assert.equal(locationCalls, 2)
+    assert.equal(f.posts.length, 1)
+    assert.equal(f.posts[0].body.note, '지금도 그대로예요')
+    assert.equal(f.posts[0].body.photo.name, 'selected.jpg')
+    assert.match(textOf(f.render()), /인증 성공/)
+  } finally { f.unmount() }
+})
+
+test('서버 범위 초과는 별도 화면으로 안내하고 기기 거리 0m여도 통과시키지 않는다', async () => {
+  for (const coordinates of [position, { ...position, lat: position.lat + 0.01 }]) {
+    const f = verificationFlowFixture({ locate: async () => coordinates, submit: async () => { throw httpError(403, 'OUT_OF_RANGE') } })
+    try {
+      await f.prepare()
+      f.start()
+      await flushVerification()
+      const tree = f.render()
+      assert.match(textOf(tree), /인증 범위 안내/)
+      assert.match(textOf(tree), /200m 이내/)
+      assert.equal(findNode(tree, 'textarea'), null)
+      assert.equal(f.invalidations.length, 0)
+      if (coordinates === position) assert.match(textOf(tree), /위치를 다시 확인해주세요/)
+      findNode(tree, 'Button').props.onClick()
+      assert.equal(findNode(f.render(), 'textarea').props.value, '지금도 그대로예요')
+      assert.ok(findNode(f.render(), 'img', item => item.src === 'blob:selected-photo'))
+      assert.equal(f.posts.length, 1)
+    } finally { f.unmount() }
+  }
+})
+
+test('응답 불명에서는 입력 화면으로 돌아와도 POST를 재전송하지 않고 조회로만 완료를 확인한다', async () => {
+  let status = 'NONE'
+  const f = verificationFlowFixture({
+    submit: async () => { throw new axios.AxiosError('timeout', 'ECONNABORTED') },
+    readStatus: () => status,
+  })
+  try {
+    await f.prepare()
+    f.start()
+    await flushVerification()
+    assert.match(textOf(f.render()), /전송 결과를 확인해주세요/)
+    for (const pendingStatus of ['NONE', 'FAILED']) {
+      status = pendingStatus
+      findNode(f.render(), 'Button').props.onClick()
+      assert.match(textOf(f.render()), /전송 결과를 확인하고 있어요/)
+      assert.equal(findNode(f.render(), 'motion.div'), null)
+      await flushVerification()
+      assert.equal(f.posts.length, 1)
+      assert.match(textOf(f.render()), /아직 확인하지 못했어요/)
+    }
+    f.returnToForm()
+    assert.equal(findNode(f.render(), 'textarea').props.value, '지금도 그대로예요')
+    assert.match(textOf(findNode(f.render(), 'Button')), /전송 결과 확인/)
+    status = 'PASSED'
+    f.start()
+    await flushVerification()
+    assert.equal(f.reads.length, 3)
+    assert.equal(f.posts.length, 1)
+    assert.match(textOf(f.render()), /인증 성공/)
+    assert.equal(f.invalidations.length, 4)
+  } finally { f.unmount() }
+})
+
+test('일반 퀘스트와 전송 결과 조회에는 이미지 스캔을 표시하지 않는다', async () => {
+  let finishSubmission
+  const promise = new Promise(resolve => { finishSubmission = resolve })
+  const f = verificationFlowFixture({ questType: 'GENERAL', submit: () => promise })
+  try {
+    await f.prepare()
+    f.start()
+    await flushVerification()
+    const tree = f.render()
+    assert.match(textOf(tree), /안부를 전송하고 있어요/)
+    assert.equal(findNode(tree, 'motion.div'), null)
+    finishSubmission({ verifyStatus: 'PASSED', similarity: null })
+    await flushVerification()
+    assert.equal(f.posts[0].body.photo, null)
+  } finally { f.unmount() }
+})
+
+test('AI 서버의 명시적 실패는 입력 복귀 후 사용자가 다시 보낼 수 있고 자동 재전송하지 않는다', async () => {
+  let attempts = 0
+  const f = verificationFlowFixture({ submit: async () => {
+    if (++attempts === 1) throw httpError(503, 'AI_ERROR')
+    return { verifyStatus: 'PASSED', similarity: 0.12, message: '안부가 전달됐어요' }
+  } })
+  try {
+    await f.prepare()
+    f.start()
+    await flushVerification()
+    assert.match(textOf(f.render()), /인증 요청을 완료하지 못했어요/)
+    assert.equal(f.posts.length, 1)
+    findNode(f.render(), 'Button').props.onClick()
+    assert.match(textOf(findNode(f.render(), 'Button')), /인증하고 안부 보내기/)
+    f.start()
+    await flushVerification()
+    assert.equal(f.posts.length, 2)
+    assert.equal(f.reads.length, 0)
+    assert.match(textOf(f.render()), /인증 성공/)
+  } finally { f.unmount() }
+})
+
+test('인증 화면을 떠나면 요청을 취소하고 늦은 성공 응답으로 결과·캐시를 변경하지 않는다', async () => {
+  let finishSubmission
+  const promise = new Promise(resolve => { finishSubmission = resolve })
+  const f = verificationFlowFixture({ submit: () => promise })
+  await f.prepare()
+  f.start()
+  await flushVerification()
+  f.unmount()
+  assert.equal(f.posts[0].signal.aborted, true)
+  finishSubmission({ verifyStatus: 'PASSED', similarity: 0.84 })
+  await flushVerification()
+  assert.equal(f.invalidations.length, 0)
+  assert.equal(f.revoked.length, 1)
 })
 
 test('실제 상세 훅은 인증·선택을 검사하고 같은 사용자·ID의 요청과 캐시를 공유한다', async () => {

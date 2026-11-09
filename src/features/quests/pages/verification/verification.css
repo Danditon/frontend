@@ -1,4 +1,4 @@
-/* 기존 결과 화면과 공용 Drawer에 영향을 주지 않도록 입력 화면에만 적용합니다. */
+/* 공용 Drawer와 분리된 인증 입력·진행·안내 화면 스타일입니다. */
 .qv-form {
   position: relative;
   display: flex;
@@ -54,3 +54,26 @@
 .qv-distance-notice > div > span:last-child { padding: 2px 8px; border-radius: 999px; background: white; }
 .qv-distance-notice .qv-distance-value { margin: 8px 0 4px; font-size: 14px; font-variant-numeric: tabular-nums; }
 .qv-distance-value strong { font-size: 30px; font-weight: 600; }
+.qv-progress { position: relative; height: 100%; min-height: 420px; overflow: hidden; background: #e4f1f5; }
+.qv-location-marker { position: absolute; top: 40%; left: 50%; display: grid; width: 120px; height: 120px; place-items: center; border: 1px solid #fff9; border-radius: 50%; transform: translate(-50%, -50%); background: #d3e7f455; color: #356978; box-shadow: 0 0 0 24px #d3e7f433; }
+.qv-legacy-scan-line { position: absolute; top: 63%; left: 0; right: 0; height: 3px; background: #111; }
+.qv-status-card { position: absolute; bottom: max(24px, env(safe-area-inset-bottom, 0px)); left: 16px; right: 16px; padding: 20px; border-radius: 28px; background: white; color: #242624; box-shadow: 0 3px 20px #0001; }
+.qv-status-card small { color: #6196a8; font-size: 13px; }
+.qv-status-card h1 { margin-top: 10px; font-size: 22px; font-weight: 600; line-height: 1.35; }
+.qv-status-card p { margin-top: 8px; color: #555d61; font-size: 14px; line-height: 1.5; }
+.qv-notice { display: flex; flex-direction: column; min-height: 100%; padding: max(20px, env(safe-area-inset-top, 0px)) 20px max(24px, env(safe-area-inset-bottom, 0px)); background: linear-gradient(#e4f1f5, white 75%); color: #242624; }
+.qv-notice-back { display: grid; width: 44px; height: 44px; flex: none; place-items: center; margin-bottom: 24px; border-radius: 50%; background: #242624; color: white; }
+.qv-notice-badge { display: inline-flex; padding: 5px 12px; border-radius: 999px; background: #f5e6ac; font-size: 13px; font-weight: 600; }
+.qv-notice h1 { margin-top: 16px; font-size: 28px; font-weight: 600; line-height: 1.3; letter-spacing: -0.5px; }
+.qv-notice-description { margin-top: 12px; font-size: 15px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+.qv-range-illustration { display: flex; width: 150px; height: 150px; flex: none; align-items: center; justify-content: center; gap: 8px; align-self: center; margin: 32px 0 12px; border: 1px solid #b9d9e6; border-radius: 50%; background: #d3e7f477; color: #356978; font-size: 14px; font-weight: 600; }
+.qv-notice .qv-distance-notice { margin-top: 16px; padding: 20px; background: #fff9; text-align: center; }
+.qv-failed-photos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 24px; }
+.qv-failed-photos > div { position: relative; height: 220px; overflow: hidden; border-radius: 24px; background: #ededed; }
+.qv-failed-photos > div > span { position: absolute; top: 10px; left: 10px; z-index: 1; padding: 4px 10px; border-radius: 999px; background: #242624; color: white; font-size: 12px; }
+.qv-failed-photos > div:last-child > span { background: #d3e7f4; color: #242624; }
+.qv-failed-photos .remote-photo, .qv-failed-photos img { width: 100%; height: 100%; object-fit: cover; }
+.qv-failed-guidance { margin-top: 12px; padding: 16px; border-radius: 20px; background: #ededed; font-size: 14px; line-height: 1.6; }
+.qv-notice-actions { margin-top: auto; padding-top: 28px; text-align: center; }
+.qv-notice-actions > p { margin-bottom: 12px; color: #66757b; font-size: 13px; line-height: 1.5; }
+.qv-notice-return { min-height: 44px; margin-top: 8px; font-size: 14px; text-decoration: underline; text-underline-offset: 3px; }

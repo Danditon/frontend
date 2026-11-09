@@ -1,6 +1,5 @@
 // 사진 비교와 입력 폼을 표시하고, 입력 상태는 부모 페이지에서 관리합니다.
-import type { ReactNode } from "react";
-import { ChevronsLeftRight, Mail, MapPin, Plus } from "lucide-react";
+import { ChevronsLeftRight, Mail, Plus } from "lucide-react";
 import { Back } from "@/shared/components/WireUI";
 import { Button } from "@/shared/components/ui/button";
 import type { VerificationQuest } from "@/features/quests/api/verification";
@@ -15,24 +14,23 @@ type Props = {
   mix: number;
   sending: boolean;
   error: string;
-  measuredDistance: number | null;
-  locationError?: string;
+  needsStatusCheck?: boolean;
   onNoteChange: (note: string) => void;
   onMixChange: (mix: number) => void;
   onPickPhoto: () => void;
   onSubmit: () => void;
-  children: ReactNode;
 };
 
 export default function VerificationForm({
-  quest, step, photo, hasPhoto, note, mix, sending, error, measuredDistance,
-  locationError, onNoteChange, onMixChange, onPickPhoto, onSubmit, children,
+  quest, step, photo, hasPhoto, note, mix, sending, error, needsStatusCheck = false,
+  onNoteChange, onMixChange, onPickPhoto, onSubmit,
 }: Props) {
   const general = quest.questType === "GENERAL";
   const showComparison = step === "compare" && Boolean(quest.photoUrl?.trim());
   const basePhoto = showComparison ? quest.photoUrl : photo || quest.photoUrl;
-  const disabled = sending || !note.trim() || (!hasPhoto && !general) || quest.isMine || quest.myStatus === "PASSED";
-  const submitLabel = quest.isMine ? "내 퀘스트는 인증할 수 없어요"
+  const disabled = sending || (!needsStatusCheck && (!note.trim() || (!hasPhoto && !general) || quest.isMine || quest.myStatus === "PASSED"));
+  const submitLabel = needsStatusCheck ? "전송 결과 확인"
+    : quest.isMine ? "내 퀘스트는 인증할 수 없어요"
     : quest.myStatus === "PASSED" ? "이미 인증한 퀘스트예요"
     : sending ? "인증을 요청하고 있어요"
     : !note.trim() && !hasPhoto && !general ? "사진과 안부를 남겨주세요"
@@ -120,26 +118,15 @@ export default function VerificationForm({
           maxLength={500}
         />
 
-        {measuredDistance !== null ? (
-          <div role="alert" className="qv-distance-notice">
-            <div>
-              <span><MapPin size={15} aria-hidden="true" /> 퀘스트까지 측정 거리</span>
-              <span>인증 범위 200m 이내</span>
-            </div>
-            <p className="qv-distance-value">약 <strong>{Math.round(measuredDistance).toLocaleString("ko-KR")}</strong> m</p>
-            <p>{error}</p>
-          </div>
-        ) : error && <p role="alert" className="qv-form-error">{error}</p>}
-        {locationError && <p role="alert" className="qv-form-error">{locationError}</p>}
+        {error && <p role="alert" className="qv-form-error">{error}</p>}
 
         <div className="qv-submit-area">
           <Button type="button" className="qv-submit" disabled={disabled} onClick={onSubmit}>
-            {!disabled && <Mail size={20} aria-hidden="true" />}
+            {!disabled && !needsStatusCheck && <Mail size={20} aria-hidden="true" />}
             {submitLabel}
           </Button>
         </div>
       </div>
-      {children}
     </section>
   );
 }

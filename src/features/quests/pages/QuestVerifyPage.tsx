@@ -11,7 +11,8 @@ import VerificationForm from "./verification/VerificationForm";
 import VerificationProgress from "./verification/VerificationProgress";
 import VerificationSuccess from "./verification/VerificationSuccess";
 import VerificationNotice from "./verification/VerificationNotice";
-type Step = "capture" | "compare" | "checking" | "success" | "failure";
+type Phase = "editing" | "locating" | "verifying" | "checking-result" | "success"
+  | "failed" | "out-of-range" | "location-error" | "request-error";
 export default function QuestVerifyPage() {
   const { questId = "" } = useParams();
   const id = isQuestId(questId) ? questId : "";
@@ -26,9 +27,9 @@ function VerificationScreen({ questId }: { questId: string }) {
   const [mix, setMix] = useState(50);
   const [error, setError] = useState("");
   const [measuredDistance, setMeasuredDistance] = useState<number | null>(null);
-  const [view, setView] = useState<Step>("capture");
+  const [phase, setPhase] = useState<Phase>("editing");
   const [result, setResult] = useState<VerificationResult | null>(null);
-  const [sending, setSending] = useState(false);
+  const [needsStatusCheck, setNeedsStatusCheck] = useState(false);
   const submitting = useRef(false);
   const request = useRef<AbortController | null>(null);
   const token = getAccessToken();
@@ -37,13 +38,27 @@ function VerificationScreen({ questId }: { questId: string }) {
   const detail = useQuery({ queryKey: ['verification-quest', questId, token], queryFn: ({ signal }) => getVerificationQuest(questId, signal), enabled: isQuestId(questId) && Boolean(token), retry: false });
   const quest = detail.data;
   const general = quest?.questType === 'GENERAL';
-  const step: Step = sending ? 'checking' : result ? (result.verifyStatus === 'PASSED' ? 'success' : 'failure') : view;
+  const busy = phase === "locating" || phase === "verifying" || phase === "checking-result";
   const percent = similarityPercent(result?.similarity);
-  const go = (screen: Step) => { setResult(null); setView(screen); };
   useEffect(() => () => { if (photo) URL.revokeObjectURL(photo); }, [photo]);
   useEffect(() => () => request.current?.abort(), []);
+
+  function invalidateCompletedQuest() {
+    void queryClient.invalidateQueries({ queryKey: ['quest-greetings', questId] });
+    void queryClient.invalidateQueries({ queryKey: ['my-submissions'] });
+    void queryClient.invalidateQueries({ queryKey: ['quests'] });
+    void queryClient.invalidateQueries({ queryKey: ['verification-quest', questId] });
+  }
+
+  function returnToForm() {
+    // 사진·안부와 미확정 전송 상태를 보존한 채 입력 화면으로 돌아갑니다.
+    setResult(null);
+    if (!needsStatusCheck) setError('');
+    setPhase("editing");
+  }
+
   async function submit() {
-    if (submitting.current || !quest) return;
+    if (submitting.current || !quest || needsStatusCheck) return;
     setMeasuredDistance(null);
     if (!note.trim()) { setError('안부를 한 줄 이상 남겨주세요.'); return; }
     if (!general && !photoFile) { setError('인증 사진을 선택해 주세요.'); return; }
@@ -51,41 +66,101 @@ function VerificationScreen({ questId }: { questId: string }) {
     submitting.current = true;
     const controller = new AbortController();
     request.current = controller;
-    setError(''); setSending(true);
+    setError('');
+    setResult(null);
+    setPhase("locating");
     let position: UserPosition | null = null;
+    let postStarted = false;
+    let accepted = false;
     try {
       position = await location.requestLocation();
       if (controller.signal.aborted) return;
-      if (!position) { setError('현재 위치를 확인하지 못했어요. 위치 권한을 확인하고 다시 시도해 주세요.'); return; }
+      if (!position) {
+        setError('현재 위치를 확인하지 못했어요. 위치 권한을 확인하고 다시 시도해 주세요.');
+        setPhase("location-error");
+        return;
+      }
       const body = createSubmissionForm(quest.questType, note, position, photoFile);
+      setPhase("verifying");
+      postStarted = true;
       const response = await submitVerification(questId, body, controller.signal);
       if (controller.signal.aborted) return;
       setResult(response);
       if (response.verifyStatus === 'PASSED') {
-        void queryClient.invalidateQueries({ queryKey: ['quest-greetings', questId] });
-        void queryClient.invalidateQueries({ queryKey: ['my-submissions'] });
-        void queryClient.invalidateQueries({ queryKey: ['quests'] });
-        void queryClient.invalidateQueries({ queryKey: ['verification-quest', questId] });
+        accepted = true;
+        setPhase("success");
+        invalidateCompletedQuest();
+      } else {
+        setPhase("failed");
       }
     } catch (cause) {
       if (!controller.signal.aborted) {
-        const distance = position && isAxiosError(cause) && cause.response?.data?.code === "OUT_OF_RANGE"
+        const code = isAxiosError(cause) ? cause.response?.data?.code : undefined;
+        const distance = position && code === "OUT_OF_RANGE"
           ? getDistanceMeters(position, quest)
           : null;
         setMeasuredDistance(distance);
         setError(verificationError(cause, distance === null ? undefined : { distance }));
+        // 응답이 끊겼어도 전송이 완료됐을 수 있어 확인 전 재제출을 막습니다.
+        const rejected = isAxiosError(cause) && (
+          Boolean(cause.response && cause.response.status >= 400 && cause.response.status < 500 && cause.response.status !== 408)
+          || code === "AI_ERROR" || code === "OUT_OF_RANGE"
+        );
+        setNeedsStatusCheck(code === "ALREADY_PASSED" || (postStarted && !rejected));
+        setPhase(code === "OUT_OF_RANGE" ? "out-of-range" : "request-error");
       }
     } finally {
-      submitting.current = false;
-      if (!controller.signal.aborted) setSending(false);
+      if (request.current === controller) {
+        request.current = null;
+        // 성공 후에도 이전 이벤트로 중복 제출되지 않도록 잠금을 유지합니다.
+        if (!accepted) submitting.current = false;
+      }
     }
   }
+
+  async function checkSubmission() {
+    if (submitting.current || !quest) return;
+    submitting.current = true;
+    const controller = new AbortController();
+    request.current = controller;
+    setPhase("checking-result");
+    let confirmed = false;
+    try {
+      // 조회 요청으로만 확인하고 제출 POST를 반복하지 않습니다.
+      const latest = await getVerificationQuest(questId, controller.signal);
+      if (controller.signal.aborted) return;
+      if (latest.myStatus === "PASSED") {
+        confirmed = true;
+        setNeedsStatusCheck(false);
+        setError('');
+        setPhase("success");
+        invalidateCompletedQuest();
+      } else {
+        // NONE/FAILED만으로 이번 요청의 처리 중 여부를 알 수 없어 재전송하지 않습니다.
+        setError('전송 결과를 아직 확인하지 못했어요. 잠시 후 다시 확인해 주세요.');
+        setPhase("request-error");
+      }
+    } catch (cause) {
+      if (!controller.signal.aborted) {
+        setError(verificationError(cause));
+        setPhase("request-error");
+      }
+    } finally {
+      if (request.current === controller) {
+        request.current = null;
+        if (!confirmed) submitting.current = false;
+      }
+    }
+  }
+
   const pick = () => input.current?.click();
   const fileInput = (
     <input
       ref={input}
       type="file"
       className="sr-only"
+      tabIndex={-1}
+      disabled={busy}
       accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
       aria-label="인증 사진 선택"
       onChange={async (e) => {
@@ -98,7 +173,8 @@ function VerificationScreen({ questId }: { questId: string }) {
           setPhoto(url);
           setPhotoFile(file);
           setError("");
-          go("compare");
+          setResult(null);
+          setPhase("editing");
         } catch (cause) {
           setError(cause instanceof Error ? cause.message : "사진을 열 수 없어요.");
         }
@@ -116,44 +192,51 @@ function VerificationScreen({ questId }: { questId: string }) {
       <Link to="/" className="underline">홈으로 돌아가기</Link>
     </section>;
   }
-  if (step === "checking") {
-    return <VerificationProgress photoUrl={photo || quest.photoUrl} general={general} isLocating={location.isLocating} />;
-  }
-  if (step === "success") {
-    return <VerificationSuccess questId={questId} photo={photo} general={general} percent={percent} message={result?.message} error={error} locationError={location.error?.message} />;
-  }
-  if (step === "failure") {
-    return (
+  let screen;
+  if (phase === "locating" || phase === "verifying" || phase === "checking-result") {
+    screen = <VerificationProgress phase={phase} photoUrl={photo || quest.photoUrl} general={general} />;
+  } else if (phase === "success") {
+    screen = <VerificationSuccess questId={questId} photo={photo} general={general} percent={percent} message={result?.message ?? "안부가 전달됐어요"} error={error} />;
+  } else if (phase === "failed" || phase === "out-of-range" || phase === "location-error" || phase === "request-error") {
+    screen = (
       <VerificationNotice
+        kind={phase}
         photoUrl={quest.photoUrl}
         photo={photo}
         general={general}
-        percent={percent}
-        message={result?.message}
-        onRetry={() => { go("capture"); pick(); }}
-      >
-        {fileInput}
-      </VerificationNotice>
+        message={phase === "location-error" ? location.error?.message || error : error}
+        distance={measuredDistance}
+        needsStatusCheck={needsStatusCheck}
+        onReturn={returnToForm}
+        onRetry={() => {
+          if (phase === "location-error") void submit();
+          else if (phase === "request-error" && needsStatusCheck) void checkSubmission();
+          else {
+            returnToForm();
+            if (phase === "failed" && !general) pick();
+          }
+        }}
+      />
+    );
+  } else {
+    screen = (
+      <VerificationForm
+        quest={quest}
+        step={photoFile ? "compare" : "capture"}
+        photo={photo}
+        hasPhoto={Boolean(photoFile)}
+        note={note}
+        mix={mix}
+        sending={busy}
+        error={error}
+        needsStatusCheck={needsStatusCheck}
+        onNoteChange={setNote}
+        onMixChange={setMix}
+        onPickPhoto={pick}
+        onSubmit={() => { void (needsStatusCheck ? checkSubmission() : submit()); }}
+      />
     );
   }
-  return (
-    <VerificationForm
-      quest={quest}
-      step={step}
-      photo={photo}
-      hasPhoto={Boolean(photoFile)}
-      note={note}
-      mix={mix}
-      sending={sending}
-      error={error}
-      measuredDistance={measuredDistance}
-      locationError={location.error?.message}
-      onNoteChange={setNote}
-      onMixChange={setMix}
-      onPickPhoto={pick}
-      onSubmit={() => void submit()}
-    >
-      {fileInput}
-    </VerificationForm>
-  );
+  // 파일 입력을 유지해 실패 화면에서도 사진 선택창을 바로 열 수 있게 합니다.
+  return <>{fileInput}{screen}</>;
 }

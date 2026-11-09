@@ -732,9 +732,11 @@ test('인증은 URL ID만 사용하고 성공 시 추천·상세·목록·인증
       'react-router': { useParams: () => params, Link: 'Link' },
       'motion/react': { useReducedMotion: () => true, motion: { div: 'motion.div' } },
       axios: { isAxiosError: axios.isAxiosError },
-      'lucide-react': { ChevronsLeftRight: 'ChevronsLeftRight', MapPin: 'MapPin', Plus: 'Plus', X: 'X' },
+      'lucide-react': { ChevronsLeftRight: 'ChevronsLeftRight', Mail: 'Mail', MapPin: 'MapPin', Plus: 'Plus', X: 'X' },
       '@/shared/components/WireUI': { Back: 'Back', SlideButton: 'SlideButton' },
+      '@/shared/components/ui/button': { Button: 'Button' },
       '@/shared/components/SwipeSheet': { SwipeSheet: 'SwipeSheet' },
+      './verification.css': {},
       '@tanstack/react-query': {
         useQueryClient: () => client,
         useQuery: () => ({ data: { ...quests[0], myStatus: 'NONE', photoUrl: null, author: { nickname: '작성자' } }, isPending: false, isError: false }),
@@ -782,8 +784,8 @@ test('인증은 URL ID만 사용하고 성공 시 추천·상세·목록·인증
         })
         tree = renderScreen()
       }
-      findNode(tree, 'SlideButton').props.onClick()
-      findNode(tree, 'SlideButton').props.onClick()
+      findNode(tree, 'Button').props.onClick()
+      findNode(tree, 'Button').props.onClick()
       await new Promise(resolve => setImmediate(resolve))
       assert.equal(calls, 1)
       assert.match(textOf(renderScreen()), /안부를 전송하고 있어요/)
@@ -805,6 +807,48 @@ test('인증은 URL ID만 사용하고 성공 시 추천·상세·목록·인증
     }
     assert.equal(revokedPhotos.length, status === 'FAILED' ? 1 : 0)
   }
+})
+
+test('고정 인증 폼은 일반 사진 선택·이미지 사진 필수·비교 조작과 입력 콜백을 유지한다', () => {
+  const { default: Form } = loadSource('features/quests/pages/verification/VerificationForm.tsx', {
+    'lucide-react': { ChevronsLeftRight: 'ChevronsLeftRight', Mail: 'Mail', MapPin: 'MapPin', Plus: 'Plus' },
+    '@/shared/components/WireUI': { Back: 'Back' },
+    '@/shared/components/ui/button': { Button: 'Button' },
+    './verification.css': {},
+  })
+  let selected = 0, submitted = 0, note = '', mix = 50
+  const props = {
+    quest: { ...quests[0], photoUrl: null, myStatus: 'NONE', author: { nickname: '작성자' }, questDescription: '안부를 전해주세요' },
+    step: 'capture', photo: '', hasPhoto: false, note: '안부', mix,
+    sending: false, error: '', measuredDistance: null,
+    onNoteChange: value => { note = value },
+    onMixChange: value => { mix = value },
+    onPickPhoto: () => { selected++ },
+    onSubmit: () => { submitted++ },
+    children: element('input', { type: 'file' }),
+  }
+  let tree = Form(props)
+  assert.equal(findNode(tree, 'SwipeSheet'), null)
+  assert.equal(findNode(tree, 'Button').props.disabled, false)
+  findNode(tree, 'Button').props.onClick()
+  findNode(tree, 'button', item => item.className === 'qv-pick-photo').props.onClick()
+  findNode(tree, 'textarea').props.onChange({ target: { value: '지금도 그대로예요' } })
+  assert.equal(submitted, 1)
+  assert.equal(selected, 1)
+  assert.equal(note, '지금도 그대로예요')
+  const imageQuest = { ...props.quest, questType: 'IMAGE', photoUrl: 'past.jpg' }
+  assert.equal(findNode(Form({ ...props, quest: imageQuest }), 'Button').props.disabled, true)
+  assert.match(textOf(findNode(Form({ ...props, quest: imageQuest }), 'Button')), /사진을 골라주세요/)
+  for (const blocked of [{ note: ' ' }, { sending: true }, { quest: { ...props.quest, isMine: true } }, { quest: { ...props.quest, myStatus: 'PASSED' } }]) {
+    assert.equal(findNode(Form({ ...props, ...blocked }), 'Button').props.disabled, true)
+  }
+  tree = Form({ ...props, quest: imageQuest, step: 'compare', photo: 'now.jpg', hasPhoto: true })
+  assert.equal(findNode(tree, 'Button').props.disabled, false)
+  const comparison = findNode(tree, 'input', item => item.type === 'range')
+  comparison.props.onChange({ target: { value: '75' } })
+  assert.equal(mix, 75)
+  const compared = Form({ ...props, quest: imageQuest, step: 'compare', photo: 'now.jpg', hasPhoto: true, mix })
+  assert.equal(findNode(compared, 'img', item => item.src === 'now.jpg').props.style.clipPath, 'inset(0 0 0 75%)')
 })
 
 test('실제 상세 훅은 인증·선택을 검사하고 같은 사용자·ID의 요청과 캐시를 공유한다', async () => {

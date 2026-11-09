@@ -28,7 +28,7 @@ export function RootLayout() {
   return (
     <div
       data-history={pathname === "/me/history" || greetingScreen}
-      className="group data-[history=true]:h-dvh data-[history=true]:overflow-hidden [&_button]:cursor-pointer [&_:is(button,a,input,textarea)]:[-webkit-tap-highlight-color:transparent] [&_:is(button,a,input,textarea):focus-visible]:outline-2 [&_:is(button,a,input,textarea):focus-visible]:outline-[#333] [&_:is(button,a,input,textarea):focus-visible]:outline-offset-[3px] min-h-[100dvh] bg-[#444] flex flex-col items-center justify-start p-[24px] text-[#080808] [font-family:Arial,Malgun_Gothic,sans-serif] max-[500px]:p-0 max-[500px]:bg-[#fff]"
+      className="group data-[history=true]:h-dvh data-[history=true]:overflow-hidden [&_button]:cursor-pointer [&_:is(button,a,input,textarea)]:[-webkit-tap-highlight-color:transparent] [&_:is(button,a,input,textarea):focus-visible]:outline-2 [&_:is(button,a,input,textarea):focus-visible]:outline-[#333] [&_:is(button,a,input,textarea):focus-visible]:outline-offset-[3px] min-h-[100dvh] bg-[#444] flex flex-col items-center justify-start p-[24px] text-[#080808] font-sans max-[500px]:p-0 max-[500px]:bg-[#fff]"
     >
       <div
         data-memories={pathname.startsWith("/me")}

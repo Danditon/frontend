@@ -1,13 +1,11 @@
 // 로그인 화면 상단의 서비스 로고 영역입니다.
+import gripdayLogo from '@/assets/auth/gripday-logo.svg'
+
 export default function LoginHeader() {
   return (
-    <header className="flex justify-center pt-[clamp(4rem,15dvh,8rem)]">
-      {/* 실제 로고 에셋이 준비되면 이 영역에 연결합니다. */}
-      <h1
-        id="login-heading"
-        className="text-2xl font-semibold tracking-tight"
-      >
-        <span aria-hidden="true">그립데이</span>
+    <header className="flex justify-center pt-[clamp(2rem,10dvh,5rem)]">
+      <h1 id="login-heading">
+        <img src={gripdayLogo} alt="" width={573} height={219} className="h-auto w-[clamp(9rem,48vw,12rem)]" />
         <span className="sr-only">그립데이 로그인</span>
       </h1>
     </header>

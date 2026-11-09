@@ -11,7 +11,7 @@ function load(path, dependencies = {}, globals = {}) {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX },
   }).outputText
   const module = { exports: {} }
-  const element = (type, props) => ({ type, props })
+  const element = (type, props, key) => ({ type, props, key })
   runInNewContext(code, { ...globals, module, exports: module.exports, require(id) {
     if (id === 'react/jsx-runtime') return { jsx: element, jsxs: element, Fragment: 'Fragment' }
     if (id.endsWith('.css')) return {}
@@ -37,6 +37,27 @@ const record = { id: '101', questId: '22', title: '카페의 안부', photoUrl: 
 const submission = (id, createdAt, extra = {}) => ({ submissionId: id, createdAt, greeting: `안부 ${id}`, photoUrl: `/photo-${id}.jpg`,
   isLiked: false, verifyStatus: 'PASSED', performer: { userId: 8, nickname: '보낸 사람' }, ...extra })
 
+function envelopeFixture(reducedMotion = false) {
+  let cursor = 0
+  const states = []
+  const f = { reducedMotion }
+  const Envelope = load('features/memories/components/GreetingEnvelope.tsx', {
+    react: { useState(initial) {
+      const i = cursor++
+      if (!(i in states)) states[i] = initial
+      return [states[i], value => { states[i] = value }]
+    } },
+    'motion/react': {
+      motion: { div: 'div', footer: 'footer' }, useReducedMotion: () => f.reducedMotion,
+      useMotionValue: value => ({ get: () => value, set: next => { value = next } }),
+      useTransform: (source, convert) => ({ get: () => convert(source.get()) }),
+    },
+    'lucide-react': { Heart: 'Heart' },
+    './GreetingLetter': { __esModule: true, default: 'GreetingLetter' },
+  })
+  return Object.assign(f, { render(props) { cursor = 0; return Envelope(props) } })
+}
+
 function fixture(path = '/me', search = '') {
   const client = new QueryClient()
   client.setQueryData(['quest-greetings', '22', 'token'], { viewerRole: 'AUTHOR', submissions: [
@@ -45,6 +66,16 @@ function fixture(path = '/me', search = '') {
   let params = new URLSearchParams(search), cursor = 0, refCursor = 0, effectCursor = 0, mutationOptions
   const states = [], refs = [], effects = []
   const f = { pathname: path, client, memories: [memory], records: [record], likes: [], navigations: [], removed: [], scrolls: [], queries: [], questError: false, greetingError: false, pendingQueries: false, detailQuestType: 'IMAGE' }
+  const envelope = envelopeFixture(true)
+  function expand(tree) {
+    if (Array.isArray(tree)) return tree.map(expand)
+    if (!tree || typeof tree !== 'object') return tree
+    if (tree.type === 'GreetingEnvelope') {
+      f.envelopeKey = tree.key
+      return envelope.render(tree.props)
+    }
+    return { ...tree, props: { ...tree.props, children: expand(tree.props?.children) } }
+  }
   const mutation = { isPending: false, isError: false, variables: undefined, mutate(value) {
     f.likes.push(value); this.variables = value; this.isPending = true
   } }
@@ -53,7 +84,7 @@ function fixture(path = '/me', search = '') {
     react: {
       useState(initial) { const i = cursor++; if (!(i in states)) states[i] = initial; return [states[i], value => { states[i] = typeof value === 'function' ? value(states[i]) : value }] },
       useMemo: fn => fn(),
-      useRef() { const i = refCursor++; return refs[i] ??= { current: i < 2 ? { scrollIntoView: () => {}, scrollTo: () => f.scrolls.push('top') } : null } },
+      useRef() { const i = refCursor++; return refs[i] ??= { current: i === 0 ? { scrollIntoView: () => f.scrolls.push('top') } : null } },
       useEffect(run, deps) { const i = effectCursor++; if (!effects[i] || deps.some((value, j) => !Object.is(value, effects[i][j]))) { effects[i] = deps; run() } },
     },
     'react-router': { ...router, useLocation: () => ({ pathname: f.pathname }), useSearchParams: () => [params, update => {
@@ -79,13 +110,125 @@ function fixture(path = '/me', search = '') {
     '@/features/quests/api/verification': { getQuestGreetings: () => {}, toggleSubmissionLike: () => {}, getVerificationQuest: (...args) => { f.requestedDetail = args } },
     '../components/MyPageSummary': { __esModule: true, default: 'MyPageSummary' },
     '../components/MemoryQuestCard': { __esModule: true, default: 'MemoryQuestCard' },
-    '../components/GreetingLetter': { __esModule: true, default: 'GreetingLetter' },
+    '../components/GreetingEnvelope': { __esModule: true, default: 'GreetingEnvelope' },
   }, { URLSearchParams, localStorage: { removeItem: key => f.removed.push(key) }, sessionStorage: { removeItem: key => f.removed.push(key) } })
   return Object.defineProperty(Object.assign(f, {
-    render() { cursor = 0; refCursor = 0; effectCursor = 0; return Page() },
+    render() { cursor = 0; refCursor = 0; effectCursor = 0; return expand(Page()) },
     finishLike() { mutationOptions.onSuccess({ submissionId: mutation.variables.submissionId, isLiked: true }, mutation.variables); mutation.isPending = false },
   }), 'params', { get: () => params })
 }
+
+test('뚜껑은 수직에서만 편지지 뒤로 넘어가며 회전축은 봉투 입구에 고정된다', () => {
+  const tree = envelopeFixture().render({ greeting: { id: '2' } })
+  const flap = find(tree, 'div', props => props.className === 'greeting-envelope-flap')
+  assert.equal(flap.props.style.transformOrigin, '50% 0')
+  const { rotateX, zIndex } = flap.props.style
+  for (const [angle, layer] of [[0, 5], [-45, 5], [-89.9, 5], [-90, 1], [-135, 1], [-180, 1]]) {
+    rotateX.set(angle)
+    assert.equal(zIndex.get(), layer)
+  }
+})
+
+test('뚜껑 뒷면을 뒤집으면 앞면과 일치하고 열린 상태의 밑변이 회전축에 붙는다', () => {
+  const css = readFileSync(new URL('../src/features/memories/styles/mypage.css', import.meta.url), 'utf8')
+  const points = selector => {
+    const body = css.slice(css.indexOf(`${selector} {`)).split('}')[0]
+    return body.match(/clip-path:\s*polygon\(([^)]+)\)/)[1].split(',').map(point => point.trim().split(/\s+/).map(parseFloat))
+  }
+  const front = points('.greeting-envelope-flap-face')
+  const back = points('.greeting-envelope-flap-inside')
+  const reflectedBack = back.map(([x, y]) => [x, 100 - y])
+  assert.deepEqual(reflectedBack, front)
+  const opened = reflectedBack.map(([x, y]) => [x, y === 0 ? 0 : -y])
+  assert.deepEqual(opened, [[0, 0], [100, 0], [50, -100]])
+})
+
+test('뚜껑이 열리기 전부터 안감과 실제 편지지가 있고 같은 편지지를 위로 꺼낸다', () => {
+  const f = envelopeFixture()
+  const greeting = { id: '2', photoUrl: '/photo.jpg', greeting: '안부', senderName: '보낸 사람' }
+  const props = { greeting, questType: 'GENERAL' }
+  let tree = f.render(props)
+  const lining = find(tree, 'div', props => props.className === 'greeting-envelope-lining')
+  assert.ok(lining)
+  assert.equal(lining.props['aria-hidden'], 'true')
+  assert.equal(find(tree, 'div', props => props.className === 'greeting-envelope-back').props.style.visibility, 'hidden')
+  const reader = find(tree, 'div', props => props.className === 'greeting-reader')
+  assert.equal(reader.props.initial['--greeting-paper-offset'], 1)
+  assert.equal(reader.props.animate['--greeting-paper-offset'], 0)
+  assert.equal(all(tree, 'GreetingLetter').length, 1)
+  assert.equal(find(tree, 'GreetingLetter').props.greeting, greeting)
+  find(tree, 'div', props => props.className === 'greeting-envelope-flap').props.onAnimationComplete()
+  tree = f.render(props)
+  assert.ok(find(tree, 'div', props => props.className === 'greeting-envelope-lining'))
+  assert.equal(all(tree, 'GreetingLetter').length, 1)
+  assert.equal(find(tree, 'GreetingLetter').props.greeting, greeting)
+  const empty = envelopeFixture().render({ loading: true })
+  assert.equal(find(empty, 'div', props => props.className === 'greeting-envelope-lining'), undefined)
+})
+
+test('봉투가 열리는 동안 내용을 숨기고 입력을 막으며 완료 후 스크롤과 버튼을 푼다', () => {
+  const f = envelopeFixture()
+  let likes = 0, next = 0
+  const props = { greeting: { id: '2' }, canLike: true, liking: false, hasNext: true, onLike: () => likes++, onNext: () => next++ }
+  let tree = f.render(props)
+  assert.equal(tree.props['aria-busy'], true)
+  const reader = find(tree, 'div', props => props.className === 'greeting-reader')
+  assert.equal(reader.props.inert, true)
+  assert.equal(reader.props['aria-hidden'], true)
+  assert.equal(likeButton(tree).props.disabled, true)
+  assert.equal(nextButton(tree).props.disabled, true)
+  likeButton(tree).props.onClick()
+  nextButton(tree).props.onClick()
+  assert.equal(likes + next, 0)
+
+  find(tree, 'div', props => props.className === 'greeting-envelope-flap').props.onAnimationComplete()
+  tree = f.render(props)
+  assert.equal(find(tree, 'div', props => props.className === 'greeting-envelope-flap'), undefined)
+  assert.equal(find(tree, 'div', props => props.className === 'greeting-envelope-back').props.style.visibility, 'visible')
+  assert.equal(nextButton(tree).props.disabled, true)
+
+  find(tree, 'footer').props.onAnimationComplete()
+  tree = f.render(props)
+  assert.equal(tree.props['aria-busy'], false)
+  assert.equal(find(tree, 'div', props => props.className === 'greeting-reader').props.inert, false)
+  assert.equal(likeButton(tree).props.disabled, false)
+  assert.equal(nextButton(tree).props.disabled, false)
+  likeButton(tree).props.onClick()
+  nextButton(tree).props.onClick()
+  assert.equal(likes, 1)
+  assert.equal(next, 1)
+})
+
+test('동작 줄이기와 안부 없음에서는 열림을 기다리지 않고 화면을 사용할 수 있다', () => {
+  const props = { greeting: { id: '2' }, canLike: true, hasNext: true }
+  const f = envelopeFixture(true)
+  let tree = f.render(props)
+  assert.equal(tree.props['aria-busy'], false)
+  assert.equal(nextButton(tree).props.disabled, false)
+  assert.equal(find(tree, 'div', props => props.className === 'greeting-reader').props.initial, false)
+  assert.equal(find(tree, 'div', props => props.className === 'greeting-envelope-flap'), undefined)
+  tree = envelopeFixture().render({ loading: true, hasNext: false })
+  assert.equal(tree.props['aria-busy'], false)
+  assert.equal(find(tree, 'GreetingLetter').props.loading, true)
+  assert.equal(find(tree, 'div', props => props.className === 'greeting-reader').props.inert, false)
+  assert.equal(nextButton(tree).props.disabled, true)
+})
+
+test('봉투 재생 기준은 퀘스트와 안부 ID이며 좋아요와 같은 안부 재조회로 바뀌지 않는다', () => {
+  const f = fixture('/me/memories', 'quest=22&message=0')
+  let tree = f.render()
+  const key = f.envelopeKey
+  likeButton(tree).props.onClick()
+  f.finishLike()
+  tree = f.render()
+  assert.equal(f.envelopeKey, key)
+  f.client.setQueryData(['quest-greetings', '22', 'token'], current => ({ ...current, submissions: [...current.submissions] }))
+  tree = f.render()
+  assert.equal(f.envelopeKey, key)
+  nextButton(tree).props.onClick()
+  f.render()
+  assert.notEqual(f.envelopeKey, key)
+})
 
 test('마이페이지 진입은 내 그리움이며 안부가 있는 카드만 해당 퀘스트의 편지로 이동한다', () => {
   const f = fixture()

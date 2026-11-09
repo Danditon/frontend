@@ -1,7 +1,6 @@
 import { HistoryMap } from "@/features/history/components/HistoryMap";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router";
-import { Heart } from "lucide-react";
 import { Back } from "@/shared/components/WireUI";
 import { RemotePhoto } from "@/shared/components/RemotePhoto";
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -13,7 +12,7 @@ import { getQuestGreetings, getVerificationQuest, toggleSubmissionLike, type Que
 
 import MyPageSummary from "../components/MyPageSummary";
 import MemoryQuestCard from "../components/MemoryQuestCard";
-import GreetingLetter from "../components/GreetingLetter";
+import GreetingEnvelope from "../components/GreetingEnvelope";
 import "../styles/mypage.css";
 
 function ListStatus({ query, enabled, label, empty }: {
@@ -38,7 +37,6 @@ export default function MyPage() {
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
   const messageTop = useRef<HTMLElement>(null);
-  const greetingBody = useRef<HTMLDivElement>(null);
   const historyPanel = useRef<HTMLDivElement>(null);
   const [error, setError] = useState("");
   const queryClient = useQueryClient();
@@ -142,7 +140,6 @@ export default function MyPage() {
   useEffect(() => {
     if (message) {
       messageTop.current?.scrollIntoView({ block: "start" });
-      greetingBody.current?.scrollTo({ top: 0 });
     }
   }, [message, selected?.id, index]);
   useEffect(() => {
@@ -215,57 +212,26 @@ export default function MyPage() {
           </div>
           <h1>{selected?.title ?? (loading ? "불러오는 중…" : "퀘스트를 찾을 수 없어요")}</h1>
         </header>
-        <div className="greeting-scene" data-quest-type={questType}>
-          <div ref={greetingBody} className="greeting-reader">
-            <GreetingLetter
-              greeting={greeting}
-              statusMessage={loading ? "안부를 불러오는 중이에요." : failed ? "안부를 불러오지 못했어요." : "아직 도착한 안부가 없어요."}
-              loading={loading}
-              failed={failed}
-              onRetry={() => { void (sourceQuery.isError ? sourceQuery.refetch() : greetingQuery?.refetch()); }}
-            />
-          </div>
-          <div className="greeting-envelope-bottom">
-            {/* V자 깊이와 하트 중심을 같은 기준선에 맞춥니다. */}
-            {greeting && (
-              <>
-                <div className="greeting-envelope-back" aria-hidden="true" />
-                <div className="greeting-envelope-front" aria-hidden="true">
-                  <svg className="greeting-envelope-rim" viewBox="0 0 100 100" preserveAspectRatio="none" focusable="false">
-                    <path d="M0 0 L50 100 L100 0" fill="none" stroke="#fff9" strokeWidth="4.5" vectorEffect="non-scaling-stroke" />
-                  </svg>
-                </div>
-              </>
-            )}
-            {canLike && (
-              <div className="greeting-reaction">
-                <button
-                  type="button"
-                  className="greeting-like"
-                  aria-label="안부 좋아요"
-                  aria-pressed={liked}
-                  disabled={likeMutation.isPending}
-                  onClick={() => {
-                    if (canLike && token && greeting && selectedQuestId && !likeMutation.isPending) {
-                      likeMutation.mutate({ submissionId: greeting.submissionId, questId: selectedQuestId, token });
-                    }
-                  }}
-                >
-                  <Heart fill={liked ? "currentColor" : "none"} size={25} strokeWidth={1.8} />
-                </button>
-                <p>{liked ? "고마운 마음을 전했어요" : "좋아요로 고마움을 전해보세요"}</p>
-                {likeMutation.isError && likeMutation.variables?.submissionId === greeting?.submissionId && (
-                  <p role="alert">좋아요를 변경하지 못했어요. 다시 시도해 주세요.</p>
-                )}
-              </div>
-            )}
-            <footer className="greeting-footer" aria-label="안부 이동">
-              <button className="greeting-next" type="button" disabled={greetings.length < 2} onClick={() => openGreeting((index + 1) % greetings.length)}>
-                다음 안부 보기
-              </button>
-            </footer>
-          </div>
-        </div>
+        <GreetingEnvelope
+          key={`${selectedQuestId ?? "none"}:${greeting?.id ?? "empty"}`}
+          greeting={greeting}
+          questType={questType}
+          statusMessage={loading ? "안부를 불러오는 중이에요." : failed ? "안부를 불러오지 못했어요." : "아직 도착한 안부가 없어요."}
+          loading={loading}
+          failed={failed}
+          onRetry={() => { void (sourceQuery.isError ? sourceQuery.refetch() : greetingQuery?.refetch()); }}
+          canLike={canLike}
+          liked={liked}
+          liking={likeMutation.isPending}
+          likeFailed={likeMutation.isError && likeMutation.variables?.submissionId === greeting?.submissionId}
+          onLike={() => {
+            if (canLike && token && greeting && selectedQuestId && !likeMutation.isPending) {
+              likeMutation.mutate({ submissionId: greeting.submissionId, questId: selectedQuestId, token });
+            }
+          }}
+          hasNext={greetings.length > 1}
+          onNext={() => openGreeting((index + 1) % greetings.length)}
+        />
       </section>
     );
   }

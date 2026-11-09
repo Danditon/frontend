@@ -47,6 +47,7 @@
   --envelope-fold-height: 28cqw;
   --envelope-back-lift: 36cqw;
   --greeting-heart-size: 58px;
+  --greeting-reader-top: 16px;
   position: relative;
   isolation: isolate;
   container-type: inline-size;
@@ -57,12 +58,15 @@
 }
 .greeting-scene[data-quest-type="GENERAL"] { --envelope-top: #fff2bd; --envelope-bottom: #f2d98e; --paper-top: #fffdf3; --paper-bottom: #fff4dc; }
 .greeting-scene[data-quest-type="IMAGE"] { --envelope-top: #ece2fa; --envelope-bottom: #cdb7e6; --paper-top: #fdfbff; --paper-bottom: #f1eaf9; }
-.greeting-reader { position: relative; z-index: 2; min-height: 0; flex: 1; overflow-y: auto; overscroll-behavior-y: contain; padding: 16px 20px 0; scroll-padding-bottom: calc(var(--envelope-fold-height) + 20px); }
+/* 첫 프레임에도 편지지 윗변이 봉투 입구에 놓이며, 같은 편지지가 최종 위치까지 올라옵니다. */
+.greeting-reader { position: relative; z-index: 2; min-height: 0; flex: 1; overflow-y: auto; overscroll-behavior-y: contain; padding: var(--greeting-reader-top) 20px 0; scroll-padding-bottom: calc(var(--envelope-fold-height) + 20px); transform: translateY(calc((100% - var(--envelope-fold-height) - var(--greeting-reader-top)) * var(--greeting-paper-offset, 0))); }
+.greeting-scene[data-opening="true"] .greeting-reader { overflow-y: hidden; pointer-events: none; }
 .greeting-letter { position: relative; display: flex; min-height: 100%; flex-direction: column; align-items: center; padding: 16px 16px calc(var(--envelope-fold-height) + 20px); border-radius: 12px 12px 0 0; background: radial-gradient(ellipse at 20% 5%, #ffffff70, transparent 65%), linear-gradient(var(--paper-top), var(--paper-bottom)); box-shadow: 0 2px 16px #2426240d; }
 .greeting-photo { width: 100%; aspect-ratio: 16 / 10; flex: none; border-radius: 14px; }
 .greeting-text { width: 100%; flex: none; margin-top: 26px; font-size: 20px; font-weight: 500; line-height: 1.5; text-align: center; white-space: pre-wrap; overflow-wrap: anywhere; }
 .greeting-sender { flex: none; margin-top: 16px; color: #727875; font-size: 12px; text-align: center; overflow-wrap: anywhere; }
 .greeting-envelope-bottom { position: relative; z-index: auto; display: flex; min-height: clamp(180px, 26dvh, 228px); flex: none; flex-direction: column; }
+.greeting-envelope-lining { position: absolute; inset: calc(0px - var(--envelope-fold-height)) 0 0; z-index: 0; background: linear-gradient(135deg, var(--envelope-bottom), var(--envelope-top)); pointer-events: none; }
 /* 하단 전체를 앞쪽 레이어로 묶지 않아야 뒷면이 편지지 뒤로 들어갑니다. */
 .greeting-envelope-back {
   position: absolute;
@@ -73,6 +77,12 @@
   pointer-events: none;
 }
 .greeting-envelope-back::before { content: ""; position: absolute; inset: 3px 0 0; background: linear-gradient(135deg, var(--envelope-bottom), var(--envelope-top)); clip-path: inherit; }
+.greeting-envelope-flap { position: absolute; top: calc(0px - var(--envelope-fold-height)); left: 0; width: 100%; height: var(--envelope-back-lift); transform-style: preserve-3d; pointer-events: none; }
+.greeting-envelope-flap-face { position: absolute; inset: 0; backface-visibility: hidden; background: #ffffffb3; clip-path: polygon(0 0, 100% 0, 50% 100%); }
+.greeting-envelope-flap-face::before { content: ""; position: absolute; inset: 0 0 3px; background: linear-gradient(var(--envelope-top), var(--envelope-bottom)); clip-path: inherit; }
+/* 뒷면을 가운데에서 뒤집어도 앞면과 같은 영역을 차지하도록 삼각형과 테두리를 반전합니다. */
+.greeting-envelope-flap-inside { transform: rotateX(180deg); clip-path: polygon(0 100%, 100% 100%, 50% 0); }
+.greeting-envelope-flap-inside::before { inset: 3px 0 0; background: linear-gradient(135deg, var(--envelope-bottom), var(--envelope-top)); }
 /* 앞면의 V자 꼭짓점은 하단 영역의 시작점이며, 하트 중심도 이 선에 놓입니다. */
 .greeting-envelope-front { position: absolute; inset: calc(0px - var(--envelope-fold-height)) 0 0; z-index: 3; background: linear-gradient(var(--envelope-top), var(--envelope-bottom)); clip-path: polygon(0 0, 50% var(--envelope-fold-height), 100% 0, 100% 100%, 0 100%); pointer-events: none; }
 /* 아래 덮개가 하트 뒤로 더 올라오도록 접힘선을 올려, V자와 한 점에서 교차하지 않게 합니다. */

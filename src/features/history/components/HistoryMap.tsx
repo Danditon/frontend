@@ -9,6 +9,9 @@ import type {
 } from "@/features/quests/pages/home/types/kakaoMaps";
 import { locatedRecords } from "../lib/locations";
 
+// 카카오 일반 지도의 100m 축척입니다.
+const SELECTED_RECORD_LEVEL = 4;
+
 function coveredHeight(element: HTMLElement) {
   const panel = element.closest(".mypage-history-map")?.querySelector(".mypage-history-panel");
   // 버튼 추가나 작은 화면의 패널 스크롤에도 마커가 실제 가려지지 않는 위치로 이동합니다.
@@ -93,7 +96,14 @@ export function HistoryMap({
   });
 
   useEffect(() => {
-    if (status === "ready" && mapRef.current) focusSelected(mapRef.current);
+    const map = mapRef.current;
+    if (status !== "ready" || !map) return;
+    if (!points.some((record) => record.id === selectedRecordId)) return;
+
+    // 확대 수준을 먼저 바꾼 뒤 화면 좌표를 계산해야 중앙 보정이 정확합니다.
+    // 패널 크기 변경 시에는 이 효과를 실행하지 않아 사용자의 확대 수준을 유지합니다.
+    map.setLevel(SELECTED_RECORD_LEVEL);
+    focusSelected(map);
   }, [selectedRecordId, focusRequest, points, status]);
 
   const updateMarkerImages = useEffectEvent(() => {
@@ -103,7 +113,8 @@ export function HistoryMap({
       const marker = markersRef.current.get(record.id);
       if (!marker) continue;
       const isSelected = record.id === selectedRecordId;
-      const offset = offsets.get(record.id) ?? 0;
+      // 선택한 마커는 겹침 방지용 오프셋 없이 실제 좌표의 중앙에 표시합니다.
+      const offset = isSelected ? 0 : offsets.get(record.id) ?? 0;
       marker.setZIndex(isSelected ? 10 : offset ? 1 : 0);
       const detail = questDetails.find((quest) => String(quest?.questId) === record.questId);
       const questType = record.questType ?? detail?.questType;

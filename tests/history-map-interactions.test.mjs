@@ -51,10 +51,11 @@ function fixture() {
       Point: class { constructor(x, y) { this.x = x; this.y = y } },
       LatLngBounds: class { extend() {} },
       Map: class {
-        constructor() { this.pans = []; this.bounds = 0; maps.push(this) }
-        getProjection() { return { containerPointFromCoords: ({ lat, lng }) => ({ x: lng, y: lat }), coordsFromContainerPoint: p => p } }
+        constructor(_element, options) { this.level = options.level; this.levels = []; this.calls = []; this.pans = []; this.bounds = 0; maps.push(this) }
+        setLevel(level) { this.level = level; this.levels.push(level); this.calls.push('level') }
+        getProjection() { this.calls.push('projection'); return { containerPointFromCoords: ({ lat, lng }) => ({ x: lng, y: lat }), coordsFromContainerPoint: p => p } }
         relayout() {}
-        panTo(p) { this.pans.push(p) }
+        panTo(p) { this.pans.push(p); this.calls.push('pan') }
         setBounds() { this.bounds++ }
       },
       Marker: class {
@@ -78,7 +79,7 @@ function fixture() {
       if (id === 'react') return react
       if (id === 'react/jsx-runtime') return { jsx: (type, props) => ({ type, props }), jsxs: (type, props) => ({ type, props }) }
       if (id === '@tanstack/react-query') return { useQueries: () => [] }
-      if (id.endsWith('/createQuestMarkerImage')) return { createQuestMarkerImage: (_maps, type, difficulty, selected) => ({ type, difficulty, selected }) }
+      if (id.endsWith('/createQuestMarkerImage')) return { createQuestMarkerImage: (_maps, type, difficulty, selected, offset) => ({ type, difficulty, selected, offset }) }
       if (id.endsWith('/verification')) return { isQuestId: () => true }
       if (id === '../lib/locations') return { locatedRecords: items => items.filter(item => item.location) }
       throw new Error(`Unexpected dependency: ${id}`)
@@ -101,21 +102,30 @@ function fixture() {
 test('카드 선택·재선택은 지도를 재생성하지 않고 보이는 영역으로 이동하며 마커를 강조한다', () => {
   const f = fixture()
   f.render(); f.ready(); f.render()
+  assert.equal(f.maps[0].levels.length, 0, '선택 전에는 전체 장소 보기 축척을 유지한다')
   let clicked
   f.render({ selectedRecordId: '102', focusRequest: 1, onSelectRecord: id => { clicked = id } })
   assert.equal(f.maps.length, 1)
   assert.equal(f.markers[1].zIndex, 10)
   assert.equal(f.markers[1].image.selected, true)
+  assert.equal(f.maps[0].level, 4)
+  assert.deepEqual(f.maps[0].calls.slice(-3), ['level', 'projection', 'pan'])
   assert.equal(f.maps[0].pans.at(-1).x, 129)
   assert.equal(f.maps[0].pans.at(-1).y, 36 + 106)
   const before = f.maps[0].pans.length
+  f.maps[0].level = 7 // 사용자가 직접 축소한 상태
   f.render({ focusRequest: 2 })
   assert.equal(f.maps[0].pans.length, before + 1)
+  assert.equal(f.maps[0].level, 4, '같은 카드 재선택 시 100m 축척으로 복귀한다')
   f.markers[0].click()
   assert.equal(clicked, '101')
   f.panel.top = 360
+  const levelsBeforeResize = f.maps[0].levels.length
+  f.maps[0].level = 6
   f.observers[0].resize()
   assert.equal(f.maps[0].pans.at(-1).y, 36 + 126)
+  assert.equal(f.maps[0].levels.length, levelsBeforeResize)
+  assert.equal(f.maps[0].level, 6, '패널 크기 변경은 사용자 확대 수준을 바꾸지 않는다')
   f.unmount()
   assert.equal(f.markers[0].click, undefined)
   assert.equal(f.markers[0].map, null)
@@ -129,10 +139,38 @@ test('SDK 준비 전에 선택한 카드도 로딩 완료 후 이동하고, 시�
   f.ready(); f.render()
   assert.equal(f.maps.length, 1)
   assert.equal(f.maps[0].pans.at(-1).x, 129)
+  assert.equal(f.maps[0].level, 4)
   const failed = fixture()
   failed.render()
   failed.timers.find(timer => timer.ms === 8000).fn()
   failed.ready()
   assert.equal(failed.maps.length, 0)
   failed.unmount(); f.unmount()
+})
+
+test('동일 좌표의 선택 마커는 좌우 오프셋을 제거하고 선택 해제된 마커는 원래 간격으로 돌아간다', () => {
+  const f = fixture()
+  const overlapping = records.map(record => ({ ...record, location: records[0].location }))
+  f.render({ records: overlapping }); f.ready(); f.render()
+  assert.equal(f.markers[0].image.offset, -28)
+  assert.equal(f.markers[1].image.offset, 28)
+  f.render({ selectedRecordId: '102' })
+  assert.equal(f.markers[1].image.offset, 0)
+  assert.equal(f.markers[0].image.offset, -28)
+  f.render({ selectedRecordId: '101' })
+  assert.equal(f.markers[0].image.offset, 0)
+  assert.equal(f.markers[1].image.offset, 28)
+  f.unmount()
+})
+
+test('위치가 없는 기록을 선택하면 기존 지도의 확대 수준과 중심을 바꾸지 않는다', () => {
+  const f = fixture()
+  f.render({ records: [...records, { id: '103', title: '위치 없음' }] })
+  f.ready(); f.render()
+  f.maps[0].level = 8
+  const before = f.maps[0].pans.length
+  f.render({ selectedRecordId: '103', focusRequest: 1 })
+  assert.equal(f.maps[0].level, 8)
+  assert.equal(f.maps[0].pans.length, before)
+  f.unmount()
 })

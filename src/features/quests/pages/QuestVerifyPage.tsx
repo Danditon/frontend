@@ -220,10 +220,12 @@ function VerificationScreen({ questId }: { questId: string }) {
         {fileInput}
       </section>
     );
+  const showComparison = step === "compare" && Boolean(quest.photoUrl?.trim());
+  const basePhoto = showComparison ? quest.photoUrl : photo || quest.photoUrl;
   return (
     <section className={`verify-page verify-${step} ${general ? "verify-general" : ""} min-h-[790px] flex-1 flex flex-col relative max-[500px]:[min-height:calc(100dvh_-_54px)]`}>
       <div
-        className={`verify-photo h-[430px] relative shrink-0 overflow-hidden max-[500px]:h-[48dvh] max-[500px]:min-h-[325px] ${step === "compare" ? "comparing" : ""}`}
+        className={`verify-photo h-[430px] relative shrink-0 overflow-hidden max-[500px]:h-[48dvh] max-[500px]:min-h-[325px] ${showComparison ? "comparing" : ""}`}
       >
         <div className="flex justify-between absolute top-[12px] left-[15px] right-[15px] z-[4]">
           <Back to="/" />
@@ -232,11 +234,11 @@ function VerificationScreen({ questId }: { questId: string }) {
             {quest.placeName}
           </span>
         </div>
-        {(photo || quest.photoUrl) && (
+        {basePhoto && (
           <img
-            className="absolute [inset:0] w-full h-full object-cover"
-            src={photo || quest.photoUrl || ""}
-            alt={photo ? "인증을 위해 선택한 사진" : "퀘스트 기준 사진"}
+            className={`absolute inset-0 h-full w-full object-cover ${showComparison ? "compare-past" : ""}`}
+            src={basePhoto}
+            alt={!showComparison && photo ? "인증을 위해 선택한 사진" : "퀘스트 기준 사진"}
           />
         )}
         {step === "capture" ? (
@@ -272,11 +274,13 @@ function VerificationScreen({ questId }: { questId: string }) {
               {general ? "사진 추가/선택" : "갤러리에서 고르기"}
             </button>
           </>
-        ) : (
+        ) : showComparison ? (
           <>
-            <div
-              className="compare-past absolute [inset:0_auto_0_0] bg-transparent"
-              style={{ width: `${mix}%`, backgroundImage: quest.photoUrl ? `url(${JSON.stringify(quest.photoUrl)})` : undefined, backgroundSize: "cover", backgroundPosition: "center" }}
+            <img
+              className="absolute inset-0 h-full w-full object-cover"
+              src={photo}
+              alt="인증을 위해 선택한 사진"
+              style={{ clipPath: `inset(0 0 0 ${mix}%)` }}
             />
             <div
               className="absolute top-0 bottom-0 [border-left:1px_solid_#ccc] [&_>_span]:absolute [&_>_span]:top-[46%] [&_>_span]:left-0 [&_>_span]:[transform:translateX(-50%)] [&_>_span]:h-[48px] [&_>_span]:w-[48px] [&_>_span]:rounded-full [&_>_span]:bg-[#ddd] [&_>_span]:grid [&_>_span]:place-items-center"
@@ -301,6 +305,14 @@ function VerificationScreen({ questId }: { questId: string }) {
               <span>지금</span>
             </div>
           </>
+        ) : (
+          <button
+            type="button"
+            className="absolute bottom-[16px] left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-[#ededed] px-5 py-3 text-xs"
+            onClick={pick}
+          >
+            사진 다시 고르기
+          </button>
         )}
       </div>
       <SwipeSheet key="capture" label="퀘스트 인증 입력" collapsed={0.50} className="capture-swipe-sheet">

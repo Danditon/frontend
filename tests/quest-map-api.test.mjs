@@ -863,6 +863,12 @@ function verificationFlowFixture(options = {}) {
     photoUrl: 'past.jpg', author: { nickname: '작성자' }, questDescription: '안부를 전해주세요',
   }
   const posts = [], reads = [], invalidations = [], revoked = []
+  const timers = new Map()
+  let now = 0, timerId = 0
+  const clock = {
+    setTimeout(run, delay) { const id = ++timerId; timers.set(id, { run, at: now + delay }); return id },
+    clearTimeout(id) { timers.delete(id) },
+  }
   let picks = 0
   const dependencies = {
     'react-router': { useParams: () => ({ questId: '701' }), Link: 'Link' },
@@ -904,7 +910,7 @@ function verificationFlowFixture(options = {}) {
     dependencies[`./verification/${name}`] = loadSource(`features/quests/pages/verification/${name}.tsx`, dependencies)
   }
   const f = componentFixture('features/quests/pages/QuestVerifyPage.tsx', dependencies,
-    { AbortController, URL: { revokeObjectURL: value => revoked.push(value) } }, module => module.default().type)
+    { AbortController, window: clock, URL: { revokeObjectURL: value => revoked.push(value) } }, module => module.default().type)
   const render = () => {
     const tree = renderComponents(f.render({ questId: '701' }))
     findNode(tree, 'input', item => item.type === 'file').props.ref.current = { click: () => { picks++ } }
@@ -912,6 +918,13 @@ function verificationFlowFixture(options = {}) {
   }
   return {
     posts, reads, invalidations, revoked, render,
+    advance(ms) {
+      now += ms
+      for (const [id, timer] of [...timers]) {
+        if (timer.at <= now) { timers.delete(id); timer.run() }
+      }
+    },
+    get pendingTimers() { return timers.size },
     unmount: () => f.unmount(),
     get picks() { return picks },
     async prepare(withPhoto = quest.questType === 'IMAGE') {
@@ -938,12 +951,18 @@ test('인증 위치 조회가 완료된 뒤에만 사진 검증을 시작하고 
     assert.match(textOf(f.render()), /현재 위치를 확인하고 있어요/)
     assert.doesNotMatch(textOf(f.render()), /AI 검증 중/)
     assert.equal(f.posts.length, 0)
+    f.advance(5000)
+    assert.match(textOf(f.render()), /현재 위치를 확인하고 있어요/)
     finishLocation(position)
     await flushVerification()
     assert.match(textOf(f.render()), /같은 자리인지비교하고 있어요/)
     assert.ok(findNode(f.render(), 'div', item => item.className === 'qv-scanner'))
     assert.equal(f.posts.length, 1)
     finishSubmission({ verifyStatus: 'FAILED', similarity: 0.99, message: '유사도 99%' })
+    await flushVerification()
+    f.advance(2999)
+    assert.match(textOf(f.render()), /AI 검증 중/)
+    f.advance(1)
     await flushVerification()
     assert.match(textOf(f.render()), /인증 미완료/)
     assert.equal(findNode(f.render(), 'div', item => item.className === 'qv-scanner'), null)
@@ -970,6 +989,8 @@ test('위치 확인 실패는 제출하지 않으며 재확인 후에도 사진�
     currentPosition = position
     findNode(f.render(), 'Button').props.onClick()
     await flushVerification()
+    f.advance(3000)
+    await flushVerification()
     assert.equal(locationCalls, 2)
     assert.equal(f.posts.length, 1)
     assert.equal(f.posts[0].body.note, '지금도 그대로예요')
@@ -990,6 +1011,7 @@ test('서버 범위 초과는 별도 화면으로 안내하고 기기 거리 0m�
       assert.match(textOf(tree), /200m 이내/)
       assert.equal(findNode(tree, 'textarea'), null)
       assert.equal(f.invalidations.length, 0)
+      assert.equal(f.pendingTimers, 0)
       if (coordinates === position) assert.match(textOf(tree), /위치를 다시 확인해주세요/)
       findNode(tree, 'Button').props.onClick()
       assert.equal(findNode(f.render(), 'textarea').props.value, '지금도 그대로예요')
@@ -1049,6 +1071,53 @@ test('일반 퀘스트와 전송 결과 조회에는 이미지 스캔을 표시�
   } finally { f.unmount() }
 })
 
+test('빠른 인증 성공은 완료 상태를 갱신하되 스캔 화면은 3초 유지한다', async () => {
+  const f = verificationFlowFixture()
+  try {
+    await f.prepare()
+    f.start()
+    await flushVerification()
+    assert.equal(f.invalidations.length, 4)
+    f.advance(2999)
+    assert.match(textOf(f.render()), /AI 검증 중/)
+    f.advance(1)
+    await flushVerification()
+    assert.match(textOf(f.render()), /인증 성공/)
+    assert.equal(f.posts.length, 1)
+    assert.equal(f.pendingTimers, 0)
+  } finally { f.unmount() }
+})
+
+test('사진 검증 3초 초과는 초안을 보존해 입력으로 복귀하고 늦은 응답과 중복 전송을 막는다', async () => {
+  let finishSubmission
+  const response = new Promise(resolve => { finishSubmission = resolve })
+  const f = verificationFlowFixture({ submit: () => response, readStatus: () => 'PASSED' })
+  try {
+    await f.prepare()
+    f.start()
+    await flushVerification()
+    f.advance(2999)
+    assert.match(textOf(f.render()), /AI 검증 중/)
+    f.advance(1)
+    const tree = f.render()
+    assert.match(textOf(tree), /3초 안에 끝나지 않았어요/)
+    assert.equal(findNode(tree, 'textarea').props.value, '지금도 그대로예요')
+    assert.ok(findNode(tree, 'img', item => item.src === 'blob:selected-photo'))
+    assert.equal(f.posts[0].signal.aborted, true)
+    assert.match(textOf(findNode(tree, 'Button')), /전송 결과 확인/)
+    assert.equal(f.pendingTimers, 0)
+    finishSubmission({ verifyStatus: 'PASSED', similarity: 0.84 })
+    await flushVerification()
+    assert.ok(findNode(f.render(), 'textarea'))
+    assert.equal(f.invalidations.length, 0)
+    f.start()
+    await flushVerification()
+    assert.equal(f.posts.length, 1)
+    assert.equal(f.reads.length, 1)
+    assert.match(textOf(f.render()), /인증 성공/)
+  } finally { f.unmount() }
+})
+
 test('사진 스캐너는 사진이 있는 이미지 검증에만 표시하고 상태 문구와 분리한다', () => {
   const { default: Progress } = loadSource('features/quests/pages/verification/VerificationProgress.tsx', {
     'lucide-react': { MapPin: 'MapPin' },
@@ -1089,6 +1158,8 @@ test('AI 서버의 명시적 실패는 입력 복귀 후 사용자가 다시 보
     assert.match(textOf(findNode(f.render(), 'Button')), /인증하고 안부 보내기/)
     f.start()
     await flushVerification()
+    f.advance(3000)
+    await flushVerification()
     assert.equal(f.posts.length, 2)
     assert.equal(f.reads.length, 0)
     assert.match(textOf(f.render()), /인증 성공/)
@@ -1102,7 +1173,9 @@ test('인증 화면을 떠나면 요청을 취소하고 늦은 성공 응답으�
   await f.prepare()
   f.start()
   await flushVerification()
+  assert.equal(f.pendingTimers, 1)
   f.unmount()
+  assert.equal(f.pendingTimers, 0)
   assert.equal(f.posts[0].signal.aborted, true)
   finishSubmission({ verifyStatus: 'PASSED', similarity: 0.84 })
   await flushVerification()

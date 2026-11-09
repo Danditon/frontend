@@ -83,11 +83,11 @@
 .qv-notice-return { min-height: 44px; margin-top: 8px; font-size: 14px; text-decoration: underline; text-underline-offset: 3px; }
 
 .qv-scanner { position: absolute; inset: 0; overflow: hidden; pointer-events: none; container-type: size; }
-.qv-scan-sweep { position: absolute; top: 0; left: 0; right: 0; height: 2px; background: #e3faff; box-shadow: 0 0 8px #8ce4ff, 0 0 18px #b4efff88; animation: qv-scan-sweep 4.8s ease-in-out infinite; }
+.qv-scan-sweep { position: absolute; top: 0; left: 0; right: 0; height: 2px; background: #e3faff; box-shadow: 0 0 8px #8ce4ff, 0 0 18px #b4efff88; animation: qv-scan-sweep 3s ease-in-out infinite; }
 .qv-scan-trail { position: absolute; left: 0; right: 0; height: clamp(24px, 12cqh, 84px); background-color: #8bdcf733; background-image: linear-gradient(#c4f5ff22 1px, transparent 1px), linear-gradient(90deg, #c4f5ff22 1px, transparent 1px); background-size: 20px 20px; }
 /* 왕복 방향에 맞춰 빛 띠가 항상 스캔선 뒤를 따르도록 전환합니다. */
-.qv-scan-trail-down { bottom: 100%; mask-image: linear-gradient(transparent, black); animation: qv-scan-trail-down 4.8s linear infinite; }
-.qv-scan-trail-up { top: 100%; mask-image: linear-gradient(black, transparent); opacity: 0; animation: qv-scan-trail-up 4.8s linear infinite; }
+.qv-scan-trail-down { bottom: 100%; mask-image: linear-gradient(transparent, black); animation: qv-scan-trail-down 3s linear infinite; }
+.qv-scan-trail-up { top: 100%; mask-image: linear-gradient(black, transparent); opacity: 0; animation: qv-scan-trail-up 3s linear infinite; }
 .qv-scan-corners { position: absolute; inset: 8px; color: #d6f5ff; filter: drop-shadow(0 0 3px #35697888); }
 .qv-scan-corners i { position: absolute; width: 24px; height: 24px; border: solid currentColor; }
 .qv-scan-corners i:nth-child(1) { top: 0; left: 0; border-width: 2px 0 0 2px; border-radius: 6px 0 0; }

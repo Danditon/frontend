@@ -13,6 +13,7 @@ import VerificationSuccess from "./verification/VerificationSuccess";
 import VerificationNotice from "./verification/VerificationNotice";
 type Phase = "editing" | "locating" | "verifying" | "checking-result" | "success"
   | "failed" | "out-of-range" | "location-error" | "request-error";
+const PHOTO_VERIFICATION_MS = 3000;
 export default function QuestVerifyPage() {
   const { questId = "" } = useParams();
   const id = isQuestId(questId) ? questId : "";
@@ -72,6 +73,15 @@ function VerificationScreen({ questId }: { questId: string }) {
     let position: UserPosition | null = null;
     let postStarted = false;
     let accepted = false;
+    let responseReceived = false;
+    let scanTimer: number | undefined;
+    let finishScan: (() => void) | undefined;
+    const stopScanTimer = () => {
+      if (scanTimer !== undefined) window.clearTimeout(scanTimer);
+      scanTimer = undefined;
+      finishScan?.();
+    };
+    controller.signal.addEventListener("abort", stopScanTimer, { once: true });
     try {
       position = await location.requestLocation();
       if (controller.signal.aborted) return;
@@ -82,18 +92,39 @@ function VerificationScreen({ questId }: { questId: string }) {
       }
       const body = createSubmissionForm(quest.questType, note, position, photoFile);
       setPhase("verifying");
+      // 위치 조회 시간은 제외하고 사진 검증 화면에만 3초를 적용합니다.
+      const scanFinished = !general ? new Promise<void>((resolve) => {
+        finishScan = resolve;
+        scanTimer = window.setTimeout(() => {
+          if (!responseReceived && !controller.signal.aborted && request.current === controller) {
+            controller.abort();
+            request.current = null;
+            submitting.current = false;
+            // 서버 처리는 계속됐을 수 있어 재전송 전 결과를 확인합니다.
+            setNeedsStatusCheck(true);
+            setError('검증이 3초 안에 끝나지 않았어요. 전송 결과를 확인한 뒤 다시 시도해주세요.');
+            setPhase("editing");
+          }
+          resolve();
+        }, PHOTO_VERIFICATION_MS);
+      }) : undefined;
       postStarted = true;
       const response = await submitVerification(questId, body, controller.signal);
+      responseReceived = true;
+      if (controller.signal.aborted) return;
+      // 실제 완료 상태는 즉시 갱신하되, 결과 화면은 3초 뒤 표시합니다.
+      accepted = response.verifyStatus === 'PASSED';
+      if (accepted) invalidateCompletedQuest();
+      await scanFinished;
       if (controller.signal.aborted) return;
       setResult(response);
-      if (response.verifyStatus === 'PASSED') {
-        accepted = true;
+      if (accepted) {
         setPhase("success");
-        invalidateCompletedQuest();
       } else {
         setPhase("failed");
       }
     } catch (cause) {
+      responseReceived = true;
       if (!controller.signal.aborted) {
         const code = isAxiosError(cause) ? cause.response?.data?.code : undefined;
         const distance = position && code === "OUT_OF_RANGE"
@@ -110,6 +141,8 @@ function VerificationScreen({ questId }: { questId: string }) {
         setPhase(code === "OUT_OF_RANGE" ? "out-of-range" : "request-error");
       }
     } finally {
+      stopScanTimer();
+      controller.signal.removeEventListener("abort", stopScanTimer);
       if (request.current === controller) {
         request.current = null;
         // 성공 후에도 이전 이벤트로 중복 제출되지 않도록 잠금을 유지합니다.

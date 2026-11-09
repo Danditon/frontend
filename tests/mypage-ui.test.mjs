@@ -351,11 +351,32 @@ test('편지지에는 사진·본문·작성자를 함께 표시하고 사진 �
   assert.equal(find(tree, 'RemotePhoto'), undefined)
   assert.equal(find(tree, 'button'), undefined)
   assert.match(text(tree), /긴 안부\n둘째 줄/)
+  assert.equal(find(tree, 'p', props => props.className === 'greeting-text').props['data-long'], false)
   let retried = false
   tree = Letter({ failed: true, statusMessage: '안부 조회 실패', onRetry: () => { retried = true } })
   assert.equal(tree.props.role, 'alert')
   find(tree, 'button').props.onClick()
   assert.equal(retried, true)
+})
+
+test('500자 안부는 생략 없이 사진·본문·From을 같은 키보드 스크롤 영역에 표시한다', () => {
+  const Letter = load('features/memories/components/GreetingLetter.tsx', { '@/shared/components/RemotePhoto': photo })
+  const message = '오랜만에 찾은 학교의 모습이 반가웠어요.\n함께 걷던 길도 그대로 남아 있었어요. '.repeat(12).slice(0, 500)
+  assert.equal(message.length, 500)
+  const greeting = { greeting: message, photoUrl: '/school.jpg', senderName: '보낸 사람', createdAt: '2026-11-08' }
+  for (const photoUrl of [greeting.photoUrl, null]) {
+    const tree = Letter({ greeting: { ...greeting, photoUrl } })
+    const region = find(tree, 'div', props => props.className === 'greeting-letter-content')
+    assert.equal(region.props.role, 'region')
+    assert.equal(region.props['aria-label'], '안부 편지 내용')
+    assert.equal(region.props.tabIndex, 0)
+    assert.equal(Boolean(find(region, 'RemotePhoto')), Boolean(photoUrl))
+    const body = find(region, 'p', props => props.className === 'greeting-text')
+    assert.equal(body.props['data-long'], true)
+    assert.equal(text(body), message)
+    assert.match(text(region), /From\. 보낸 사람 \| 2026-11-08$/)
+    assert.equal(region.props.children.at(-1).props.className, 'greeting-sender')
+  }
 })
 
 test('숫자 카드는 선택 상태·실제 개수·미조회 표시를 구분하고 새 안부를 추정하지 않는다', () => {

@@ -23,12 +23,14 @@ export default function GreetingLetter({
 
   return (
     <article className="greeting-letter" aria-label="도착한 안부">
-      {greeting.photoUrl && <RemotePhoto className="greeting-photo" photoUrl={greeting.photoUrl} alt="도착한 안부 사진" />}
-      <p className="greeting-text">{greeting.greeting}</p>
-      <p className="greeting-sender">
-        From. {greeting.senderName}
-        {greeting.createdAt && <> | <time dateTime={greeting.createdAt}>{greeting.createdAt.slice(0, 10)}</time></>}
-      </p>
+      <div className="greeting-letter-content" role="region" aria-label="안부 편지 내용" tabIndex={0}>
+        {greeting.photoUrl && <RemotePhoto className="greeting-photo" photoUrl={greeting.photoUrl} alt="도착한 안부 사진" />}
+        <p className="greeting-text" data-long={greeting.greeting.length > 80}>{greeting.greeting}</p>
+        <p className="greeting-sender">
+          From. {greeting.senderName}
+          {greeting.createdAt && <> | <time dateTime={greeting.createdAt}>{greeting.createdAt.slice(0, 10)}</time></>}
+        </p>
+      </div>
     </article>
   );
 }

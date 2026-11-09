@@ -245,7 +245,7 @@ export function HistoryMap({
           )
         )}
         <span className="mypage-history-count">
-          미션 다녀온 곳 {points.length}
+          대신 다녀온 곳 {points.length}
         </span>
       </div>
       {status === "error" && (

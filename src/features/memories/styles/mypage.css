@@ -31,12 +31,13 @@
 .mypage-quest-photo .remote-photo { width: 100%; height: 100%; }
 .mypage-quest-photo .remote-photo > span { padding: 4px; font-size: 10px; }
 
-.memory-page.mypage-greeting { position: relative; isolation: isolate; display: flex; height: 100%; min-height: 0; flex-direction: column; overflow: hidden; background: #f3f4f6; }
-.greeting-header { flex: none; padding: 20px 20px 20px; }
-.greeting-tools { display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px; align-items: center; gap: 12px; }
-.greeting-tools > a { display: grid; width: 44px; height: 44px; place-items: center; border-radius: 50%; background: #242624; color: white; }
-.greeting-tools > p { color: #737976; font-size: 12px; text-align: center; }
-.greeting-header h1 { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; margin-top: 12px; font-size: 18px; font-weight: 600; line-height: 1.4; text-align: center; overflow-wrap: anywhere; }
+/* 제목이 길 때는 필요한 높이를 확보하고, 그 외에는 화면의 25% 아래에서 편지지가 멈춥니다. */
+.memory-page.mypage-greeting { position: relative; isolation: isolate; display: grid; height: 100%; min-height: 0; grid-template-rows: minmax(max-content, 25%) minmax(0, 1fr); overflow: hidden; background: #f3f4f6; }
+.greeting-header { position: relative; display: flex; flex-direction: column; justify-content: center; padding: 76px 20px 24px; }
+/* 마이페이지 로그아웃과 중심 높이를 맞추고, 중앙 문구의 배치와 분리합니다. */
+.greeting-header > a { position: absolute; top: 26px; left: 20px; display: grid; width: 44px; height: 44px; place-items: center; border-radius: 50%; background: #242624; color: white; }
+.greeting-header > p { color: #737976; font-size: 13px; line-height: 1.4; text-align: center; }
+.greeting-header h1 { display: -webkit-box; max-width: 320px; align-self: center; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; margin-top: 18px; font-size: 22px; font-weight: 600; line-height: 1.35; text-align: center; text-wrap: balance; word-break: keep-all; overflow-wrap: anywhere; }
 .greeting-scene {
   /* 유형을 확인하기 전에는 중립적인 색을 사용합니다. */
   --envelope-top: #f0ede8;
@@ -50,7 +51,6 @@
   --envelope-back-lift: 36cqw;
   --envelope-flap-overlap: 10px;
   --greeting-heart-size: 58px;
-  --greeting-reader-top: 16px;
   position: relative;
   isolation: isolate;
   container-type: inline-size;
@@ -62,14 +62,19 @@
 .greeting-scene[data-quest-type="GENERAL"] { --envelope-top: #fff2bd; --envelope-bottom: #f2d98e; --paper-top: #fffdf3; --paper-bottom: #fff4dc; --paper-edge: #dfd2b4; --paper-shadow: #67532c14; }
 .greeting-scene[data-quest-type="IMAGE"] { --envelope-top: #ece2fa; --envelope-bottom: #cdb7e6; --paper-top: #fdfbff; --paper-bottom: #f1eaf9; --paper-edge: #d9cbe6; --paper-shadow: #59416e14; }
 /* 첫 프레임에도 편지지 윗변이 봉투 입구에 놓이며, 같은 편지지가 최종 위치까지 올라옵니다. */
-.greeting-reader { position: relative; z-index: 2; min-height: 0; flex: 1; overflow-y: auto; overscroll-behavior-y: contain; padding: var(--greeting-reader-top) 20px 0; scroll-padding-bottom: calc(var(--envelope-fold-height) + 20px); transform: translateY(calc((100% - var(--envelope-fold-height) - var(--greeting-reader-top)) * var(--greeting-paper-offset, 0))); }
-.greeting-scene[data-opening="true"] .greeting-reader { overflow-y: hidden; pointer-events: none; }
+.greeting-reader { position: relative; z-index: 2; min-height: 0; flex: 1; padding: 0 20px; transform: translateY(calc((100% - var(--envelope-fold-height)) * var(--greeting-paper-offset, 0))); }
+.greeting-scene[data-opening="true"] .greeting-reader { pointer-events: none; }
 /* 테두리를 그림자로 그려 사진 크기와 내부 여백을 유지합니다. */
-.greeting-letter { position: relative; display: flex; min-height: 100%; flex-direction: column; align-items: center; padding: 16px 16px calc(var(--envelope-fold-height) + 20px); border-radius: 12px 12px 0 0; background: radial-gradient(ellipse at 20% 5%, #ffffff70, transparent 65%), linear-gradient(var(--paper-top), var(--paper-bottom)); box-shadow: 0 0 0 1px var(--paper-edge), 0 6px 18px var(--paper-shadow); }
+.greeting-letter { position: relative; display: flex; height: 100%; min-height: 0; flex-direction: column; padding: 16px 16px calc(var(--envelope-fold-height) + 16px); border-radius: 12px 12px 0 0; background: radial-gradient(ellipse at 20% 5%, #ffffff70, transparent 65%), linear-gradient(var(--paper-top), var(--paper-bottom)); box-shadow: 0 0 0 1px var(--paper-edge), 0 6px 18px var(--paper-shadow); }
+/* 본문이 V자 앞면에 가려지지 않도록 스크롤 영역은 봉투 입구 위에서 끝냅니다. */
+.greeting-letter-content { display: flex; min-height: 0; flex: 1; flex-direction: column; align-items: center; overflow-y: auto; overscroll-behavior-y: contain; scrollbar-width: thin; scrollbar-color: var(--paper-edge) transparent; padding-bottom: 4px; }
+.greeting-scene[data-opening="true"] .greeting-letter-content { overflow-y: hidden; }
 .greeting-photo { width: 100%; aspect-ratio: 16 / 10; flex: none; border-radius: 14px; }
 .greeting-text { width: 100%; flex: none; margin-top: 26px; font-size: 20px; font-weight: 500; line-height: 1.5; text-align: center; white-space: pre-wrap; overflow-wrap: anywhere; }
+.greeting-text[data-long="true"] { font-size: 16px; font-weight: 400; line-height: 1.65; text-align: left; }
+.greeting-letter-content > .greeting-text:first-child { margin-top: 4px; }
 .greeting-sender { flex: none; margin-top: 16px; color: #727875; font-size: 12px; text-align: center; overflow-wrap: anywhere; }
-.greeting-envelope-bottom { position: relative; z-index: auto; display: flex; min-height: clamp(180px, 26dvh, 228px); flex: none; flex-direction: column; }
+.greeting-envelope-bottom { position: relative; z-index: auto; display: flex; min-height: clamp(156px, 18.5dvh, 176px); flex: none; flex-direction: column; }
 .greeting-envelope-lining { position: absolute; inset: calc(0px - var(--envelope-fold-height)) 0 0; z-index: 0; border-radius: 12px; background: linear-gradient(135deg, var(--envelope-bottom), var(--envelope-top)); pointer-events: none; }
 .greeting-envelope-flap {
   position: absolute;
@@ -133,5 +138,5 @@
 @media (max-height: 740px) {
   .mypage-page, .mypage-history-header { padding-top: 16px; }
   .mypage-stats > a { min-height: 112px; }
-  .greeting-header { padding-top: 16px; }
+  .greeting-header > a { top: 22px; }
 }

@@ -205,11 +205,8 @@ export default function MyPage() {
     return (
       <section className="memory-page mypage-greeting">
         <header ref={messageTop} className="greeting-header">
-          <div className="greeting-tools">
-            <Back to={backTo} />
-            <p>{fromRecords ? "수행한 퀘스트의 안부" : "도착한 안부"} {greeting ? index + 1 : 0}/{greetings.length}</p>
-            <span aria-hidden="true" />
-          </div>
+          <Back to={backTo} />
+          <p>{fromRecords ? "수행한 퀘스트의 안부" : "도착한 안부"} {greeting ? index + 1 : 0}/{greetings.length}</p>
           <h1>{selected?.title ?? (loading ? "불러오는 중…" : "퀘스트를 찾을 수 없어요")}</h1>
         </header>
         <GreetingEnvelope

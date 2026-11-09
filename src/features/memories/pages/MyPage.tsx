@@ -198,6 +198,8 @@ export default function MyPage() {
     const failed = Boolean(token && (sourceQuery.isError || greetingQuery?.isError));
     return (
       <section className="memory-page mypage-greeting">
+        {/* 화면 전체를 기준으로 깔아 스크롤 본문과 하단 버튼 뒤까지 이어집니다. */}
+        {greeting && <div className="greeting-envelope" aria-hidden="true" />}
         <header ref={messageTop} className="greeting-header">
           <div className="greeting-tools">
             <Back to={backTo} />

@@ -35,7 +35,6 @@ export default function GreetingLetter({
         From. {greeting.senderName}
         {greeting.createdAt && <> | <time dateTime={greeting.createdAt}>{greeting.createdAt.slice(0, 10)}</time></>}
       </p>
-      <div className="greeting-envelope" aria-hidden="true" />
       {canLike && (
         <div className="greeting-reaction">
           <button type="button" className="greeting-like" aria-label="안부 좋아요" aria-pressed={liked} disabled={pending} onClick={onLike}>

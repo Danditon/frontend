@@ -96,6 +96,10 @@ test('안부 하단 목록 없이 다음 버튼으로 최신순 이동·순환�
   const f = fixture('/me/memories', 'source=records&record=101&quest=22&submission=1&message=0&returnOthers=1')
   let tree = f.render()
   assert.equal(find(tree, 'GreetingLetter').props.greeting.id, '1')
+  const backdrop = find(tree, 'div', props => props.className === 'greeting-envelope')
+  assert.ok(tree.props.children.includes(backdrop))
+  assert.equal(backdrop.props['aria-hidden'], 'true')
+  assert.ok(find(tree, 'footer', props => props.className === 'greeting-footer'))
   assert.equal(find(tree, 'Back').props.to, '/me/history?showOthers=1')
   assert.equal(find(tree, 'section', props => props['aria-label'] === '수행 글 목록'), undefined)
   assert.equal(all(tree, 'ol').length, 0)
@@ -167,6 +171,7 @@ test('편지는 사진 없는 안부·좋아요 잠금·실패 상태를 표시�
   const Letter = load('features/memories/components/GreetingLetter.tsx', { 'lucide-react': { Heart: 'Heart' }, '@/shared/components/RemotePhoto': photo })
   const props = { greeting: { greeting: '긴 안부\n둘째 줄', photoUrl: '/greeting.jpg', senderName: '보낸 사람', createdAt: '2026-11-01' }, canLike: true, liked: true, pending: true, likeError: true }
   let tree = Letter(props)
+  assert.equal(find(tree, 'div', props => props.className === 'greeting-envelope'), undefined)
   assert.equal(find(tree, 'RemotePhoto').props.photoUrl, '/greeting.jpg')
   assert.equal(find(tree, 'button').props['aria-pressed'], true)
   assert.equal(find(tree, 'button').props.disabled, true)

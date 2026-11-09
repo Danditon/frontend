@@ -9,6 +9,7 @@ export type Greeting = {
 };
 export type Memory = {
   id: string;
+  questType?: "GENERAL" | "IMAGE";
   title: string;
   sub: string;
   passedCount?: number;

@@ -40,6 +40,7 @@ export default function HomeHeader({ regionLabel }: Props) {
         {/* 기존 마이페이지로 이동하며 원형 디자인은 유지합니다. */}
         <Link
           to="/me"
+          viewTransition
           aria-label="마이페이지"
           className="pointer-events-auto grid size-11 place-items-center rounded-full"
         >

@@ -31,6 +31,7 @@ export type KakaoBounds = {
 }
 
 export type KakaoMap = {
+  setLevel(level: number): void // 지도 확대 수준 설정
   setBounds(bounds: KakaoBounds, paddingTop?: number, paddingRight?: number, paddingBottom?: number, paddingLeft?: number): void
   getBounds(): KakaoBounds // 현재 지도 영역
   getCenter(): KakaoLatLng // 현재 지도 중심 좌표

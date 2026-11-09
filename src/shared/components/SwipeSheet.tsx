@@ -2,11 +2,20 @@ import { motion, useReducedMotion } from 'motion/react'
 import { useId, useRef, useState, type ReactNode } from 'react'
 
 /** A non-modal sheet: only the handle captures gestures, leaving content scrollable. */
-export function SwipeSheet({ children, label, collapsed = 0.64, className = '' }: {
+export function SwipeSheet({ children, label, collapsed = 0.64, className = '', expanded: controlledExpanded, onExpandedChange,
+  slideFromBottom = false, onSlideComplete,
+}: {
   children: ReactNode; label: string; collapsed?: number; className?: string
+  expanded?: boolean; onExpandedChange?: (expanded: boolean) => void
+  slideFromBottom?: boolean; onSlideComplete?: () => void
 }) {
   const expandedHeight = 0.94
-  const [expanded, setExpanded] = useState(false)
+  const [localExpanded, setLocalExpanded] = useState(false)
+  const expanded = controlledExpanded ?? localExpanded
+  function setExpanded(value: boolean) {
+    if (controlledExpanded === undefined) setLocalExpanded(value)
+    onExpandedChange?.(value)
+  }
   const [dragHeight, setDragHeight] = useState<number | null>(null)
   const sheet = useRef<HTMLElement>(null)
   const gesture = useRef<{ id: number; y: number; height: number; parentHeight: number; moved: boolean } | null>(null)
@@ -15,8 +24,15 @@ export function SwipeSheet({ children, label, collapsed = 0.64, className = '' }
   const reducedMotion = useReducedMotion()
   const height = dragHeight ?? (expanded ? expandedHeight : collapsed)
   return <motion.section ref={sheet} className={`swipe-sheet ${className}`}
-    aria-label={label} initial={false} animate={{ height: `${height * 100}%` }}
-    transition={dragHeight !== null || reducedMotion ? { duration: 0 } : { type: 'spring', stiffness: 360, damping: 38 }}>
+    aria-label={label}
+    initial={slideFromBottom && !reducedMotion ? { y: '100%', height: `${height * 100}%` } : false}
+    animate={{ height: `${height * 100}%`, ...(slideFromBottom ? { y: 0 } : {}) }}
+    exit={slideFromBottom ? { y: reducedMotion ? 0 : '100%' } : undefined}
+    onAnimationComplete={onSlideComplete}
+    transition={slideFromBottom ? {
+      height: dragHeight !== null || reducedMotion ? { duration: 0 } : { type: 'spring', stiffness: 360, damping: 38 },
+      y: { type: 'tween', duration: reducedMotion ? 0 : 0.3, ease: [0.22, 0.61, 0.36, 1] },
+    } : dragHeight !== null || reducedMotion ? { duration: 0 } : { type: 'spring', stiffness: 360, damping: 38 }}>
     <button type="button" className="swipe-sheet-handle" aria-label={`${label} ${expanded ? '접기' : '펼치기'}`}
       aria-expanded={expanded} aria-controls={contentId}
       onPointerDown={event => {
@@ -53,7 +69,7 @@ export function SwipeSheet({ children, label, collapsed = 0.64, className = '' }
       onLostPointerCapture={() => { if (gesture.current) { gesture.current = null; setDragHeight(null) } }}
       onClick={() => {
         if (ignoreClick.current) { ignoreClick.current = false; return }
-        setExpanded(value => !value)
+        setExpanded(!expanded)
       }}
       onKeyDown={event => {
         if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {

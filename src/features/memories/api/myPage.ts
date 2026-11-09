@@ -33,6 +33,7 @@ export async function getMyQuests(token: string, signal: AbortSignal): Promise<M
   const data = await getMyList('/users/me/quests', token, signal)
   return z.array(myQuest).parse(data).map((quest) => ({
     id: String(quest.questId),
+    questType: quest.questType,
     title: quest.questTitle,
     sub: quest.questType === 'IMAGE' ? '이미지 퀘스트' : '일반 퀘스트',
     passedCount: quest.passedCount,

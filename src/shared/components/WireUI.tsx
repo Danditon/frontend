@@ -2,6 +2,7 @@ import { Link } from "react-router";
 import { ChevronLeft, ChevronsRight, LogOut, MailPlus, House, UserRound } from "lucide-react";
 import type { ReactNode } from "react";
 import NearbyQuestNavItem from "@/features/quests/components/NearbyQuestNavItem";
+import MyPageHomeLink from "./MyPageHomeLink";
 import type { NearbyNavigation } from "@/features/quests/types/nearbyNavigation";
 export function Back({ to = "/me/memories" }: { to?: string }) {
   return (
@@ -41,12 +42,11 @@ export function Bottom({ nearbyNavigation = null }: { nearbyNavigation?: NearbyN
       aria-label="주 메뉴"
     >
       <NearbyQuestNavItem count={nearbyNavigation?.count ?? null} isLoading={nearbyNavigation?.isLoading ?? false} />
-      <Link
-        to="/"
+      <MyPageHomeLink
         className="relative -translate-y-[22px] h-[60px] w-[60px] bg-white text-[#242624] rounded-full grid place-items-center text-[18px]"
       >
         <House size={25} fill="currentColor" aria-hidden="true" /><span className="sr-only">홈</span>
-      </Link>
+      </MyPageHomeLink>
       <Link className="nav-item" to="/quests/new"><span className="nav-icon"><MailPlus size={20} strokeWidth={1.6} aria-hidden="true" /></span><span>그리움 등록</span></Link>
     </nav>
   );

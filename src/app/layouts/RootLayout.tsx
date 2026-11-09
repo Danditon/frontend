@@ -21,6 +21,7 @@ export function RootLayout() {
   );
 
   const isQuestRegistration = pathname.replace(/\/+$/, "") === "/quests/new";
+  const isLogoutPage = pathname.replace(/\/+$/, "") === "/me/logout";
   const isQuestVerificationFlow = /^\/quests\/[^/]+\/(verify|greetings)\/?$/i.test(pathname);
   const scoped = isQuestRegistration || pathname.startsWith("/me") || isQuestVerificationFlow;
 
@@ -30,6 +31,7 @@ export function RootLayout() {
       className="group data-[history=true]:h-dvh data-[history=true]:overflow-hidden [&_button]:cursor-pointer [&_:is(button,a,input,textarea)]:[-webkit-tap-highlight-color:transparent] [&_:is(button,a,input,textarea):focus-visible]:outline-2 [&_:is(button,a,input,textarea):focus-visible]:outline-[#333] [&_:is(button,a,input,textarea):focus-visible]:outline-offset-[3px] min-h-[100dvh] bg-[#444] flex flex-col items-center justify-start p-[24px] text-[#080808] [font-family:Arial,Malgun_Gothic,sans-serif] max-[500px]:p-0 max-[500px]:bg-[#fff]"
     >
       <div
+        data-memories={pathname.startsWith("/me")}
         className={`app-phone ${scoped ? "designed-screen" : ""} w-[390px] min-h-[844px] bg-[#fff] relative flex flex-col [box-shadow:0_0_0_1px_#777] max-[500px]:w-full max-[500px]:min-h-[100dvh] max-[500px]:shadow-none ${scoped ? "" : "pb-[30px] [&_>_h1]:p-[20px]"}`}
       >
         <main
@@ -43,12 +45,12 @@ export function RootLayout() {
               : ""
           }`}
           data-home={pathname === "/" || pathname === "/me/history"}
-          data-mypage={pathname === "/me"}
+          data-mypage={pathname.startsWith("/me")}
         >
           <Outlet context={{ onNearbyNavigationChange: setNearbyNavigation } satisfies QuestMapOutletContext} />
         </main>
 
-        {!greetingScreen && !isAuthPage && !isQuestRegistration && !isQuestVerificationFlow && (
+        {!greetingScreen && !isLogoutPage && !isAuthPage && !isQuestRegistration && !isQuestVerificationFlow && (
           <div
             className={`app-navigation ${
               floatingMemoriesNav

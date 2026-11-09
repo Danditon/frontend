@@ -49,6 +49,7 @@ export type KakaoMarker = {
 
 export type KakaoCustomOverlay = {
   setMap(map: KakaoMap | null): void
+  setPosition(position: KakaoLatLng): void
   setZIndex(zIndex: number): void
 }
 // 상단 지역명 표시에 필요한 행정구역 필드만 선언합니다.

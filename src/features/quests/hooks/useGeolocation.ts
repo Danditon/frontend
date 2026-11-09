@@ -23,7 +23,7 @@ type LocationState = {
 
 // 브라우저의 오류 번호를 앱에서 사용할 오류 코드와 안내 문구로 변환합니다.
 // 1: 권한 거절 / 2: 위치 확인 불가 / 3: 시간 초과
-const locationErrors: Record<number, LocationError> = {
+export const locationErrors: Record<number, LocationError> = {
   1: {
     code: 'PERMISSION_DENIED',
     message: '현재 위치를 확인하려면 위치 권한을 허용해주세요.',

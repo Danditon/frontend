@@ -14,10 +14,12 @@ type QuestMapProps = {
   onVisibleQuestsChange: (quests: NearbyQuest[]) => void
   quests: NearbyQuest[] // 지도에 표시할 퀘스트 배열
   position: UserPosition | null // 홈에서 조회한 현재 위치
+  userPosition?: UserPosition | null // 지도 중심과 별도로 갱신하는 실시간 내 위치
 }
 
 export default function QuestMap({
   position,
+  userPosition = position,
   quests,
   selectedQuestId,
   drawerTop,
@@ -109,7 +111,7 @@ export default function QuestMap({
       className="absolute inset-0 z-0 h-full w-full"
     >
       {/* 지도와 최신 좌표를 전달하면 마커 컴포넌트가 표시·갱신을 담당합니다. */}
-      <UserLocationMarker map={map} position={position} />
+      <UserLocationMarker map={map} position={userPosition} />
       {/* 퀘스트 배열의 좌표별로 마커를 표시합니다. */}
       <QuestMarkers
         map={map}

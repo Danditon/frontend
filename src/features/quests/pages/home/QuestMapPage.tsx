@@ -12,6 +12,7 @@ import NearestQuestBar from './components/NearestQuestBar'
 import HomeHeader from './components/HomeHeader'
 import CurrentLocationButton from './components/CurrentLocationButton'
 import { useGeolocation } from '@/features/quests/hooks/useGeolocation'
+import { useLivePosition } from '@/features/quests/hooks/useLivePosition'
 import { useNearbyQuests } from '@/features/quests/hooks/useNearbyQuests'
 import { useRegionName } from '@/features/quests/hooks/useRegionName'
 import { useNearestQuest } from '@/features/quests/hooks/useNearestQuest'
@@ -26,7 +27,9 @@ export default function QuestMapPage() {
   const navigate = useNavigate()
   const { onNearbyNavigationChange } = useOutletContext<QuestMapOutletContext>()
   // 홈에서 위치 조회 상태를 관리하고, 버튼과 결과 표시에 연결합니다.
-  const { position, isLocating, error, requestLocation } = useGeolocation()
+  const { position: requestedPosition, isLocating, error: locationError, requestLocation } = useGeolocation()
+  const { position, error: liveError } = useLivePosition(requestedPosition)
+  const error = locationError ?? liveError
 
   useEffect(() => {
     let active = true
@@ -42,7 +45,8 @@ export default function QuestMapPage() {
     }
   }, [requestLocation])
 
-  const nearbyQuery = useNearbyQuests(position)
+  // 실시간 GPS 변화는 마커에 반영하고, 검색은 최초 조회·위치 버튼의 좌표를 사용합니다.
+  const nearbyQuery = useNearbyQuests(requestedPosition)
   const nearbyError = nearbyQuery.isError ? getQuestQueryError(nearbyQuery.error, 'nearby') : null
   // 일시적인 갱신 실패는 기존 마커를 유지하고, 인증·권한 거절 결과는 화면에서 제외합니다.
   const nearbyData = nearbyError?.keepPreviousData === false ? undefined : nearbyQuery.data
@@ -59,8 +63,8 @@ export default function QuestMapPage() {
       : nearbyQuery.isError
         ? 'error'
         : 'loading'
-  const regionLabel = useRegionName(position)
-  const nearestQuery = useNearestQuest(nearbyData === undefined ? undefined : nearbyQuests, position)
+  const regionLabel = useRegionName(requestedPosition)
+  const nearestQuery = useNearestQuest(nearbyData === undefined ? undefined : nearbyQuests, requestedPosition)
   const nearestError = nearestQuery.isError ? getQuestQueryError(nearestQuery.error, 'detail') : null
   const nearestQuest = nearbyData === undefined || nearestError?.keepPreviousData === false
     ? undefined
@@ -200,7 +204,8 @@ export default function QuestMapPage() {
 
       {/* 지도 영역을 담당하는 컴포넌트 */}
       <QuestMap
-        position={position}
+        position={requestedPosition}
+        userPosition={position}
         quests={nearbyQuests}
         selectedQuestId={selectedQuestId}
         drawerTop={drawerTop}

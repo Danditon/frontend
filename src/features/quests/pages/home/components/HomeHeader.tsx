@@ -1,5 +1,5 @@
 // 홈 지도 위에 지역명 배지와 알림·MY 버튼을 표시하는 상단 UI입니다.
-import gripdayLogo from '@/assets/auth/gripday-logo.svg'
+import loginLogo from '@/assets/auth/login-logo.svg'
 import { Bell, MapPin } from 'lucide-react'
 import { Link } from 'react-router'
 import { Button } from '@/shared/components/ui/button'
@@ -21,7 +21,16 @@ export default function HomeHeader({ regionLabel }: Props) {
         <span className="truncate" aria-live="polite">{regionLabel}</span>
       </span>
 
-      <img src={gripdayLogo} alt="그립데이" width={573} height={219} className="h-auto w-24" />
+      <span
+        role="img"
+        aria-label="그립데이"
+        className="block aspect-[444/134] w-[88px] bg-black"
+        style={{
+          // 로그인과 같은 그림자 없는 SVG를 사용하고 홈 크기만 따로 지정합니다.
+          mask: `url("${loginLogo}") center / contain no-repeat`,
+          WebkitMask: `url("${loginLogo}") center / contain no-repeat`,
+        }}
+      />
 
       <div className="flex shrink-0 items-center gap-1 justify-self-end">
         {/* 알림은 UI만 표시합니다. 읽지 않은 알림 표시나 팝업은 추가하지 않습니다. */}

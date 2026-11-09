@@ -133,23 +133,7 @@
 /* Finished mobile UI, based on the supplied design reference. */
 .designed-screen { font-family: Arial, 'Malgun Gothic', sans-serif; overflow:hidden; }
 .memory-page { background:linear-gradient(180deg,#fff 38%,#dff2f6 100%); }
-.memory-page:has(.message-envelope),.memory-page:has(>div>h1) {background:#fff;}
-.memory-page>div.grid>a {background:#f3f3f3;}
-.memory-page>div.grid>a.selected {background:#c9eaf5;}
-.memory-page>div.grid>a>span {background:#242624;color:#fff;}
-.memory-page>div.flex>button {background:#c9eaf5;}
-.memory-page>div.flex>button:nth-child(2) {background:#e9d8f6;}
-.memory-page>div.flex>button:nth-child(3) {background:#f9e2d4;}
-.memory-page>div.flex>button>span {background:#242624;color:#fff;}
-.memory-page .message-envelope {background:white; padding:20px 0 0;}
-.message-envelope>div.absolute {background:#c9eaf5;}
-.message-envelope>button {background:#242624;color:white;}
-.message-envelope button[aria-pressed] {background:#242624;color:white;}
-.memory-page:has(h1)>div.absolute {color:white;}
-.memory-page:has(h1)>div.absolute>div>a {color:#fff;background:#999;}
-.memory-page:has(h1)>div.absolute>div>button {color:#242624;background:#fff;}
 .postcard-photo,.memory-thumbnail {background-image:none;background-size:737.5% 1535%;background-position:23.37% 80.95%;}
-.memory-thumbnail {display:block;box-shadow:0 4px 9px #0002;border:3px solid white;}
 .postcard-photo {width:100%;height:210px;border-radius:24px;background-color:#ddd;}
 .record-photo {background-image:none;background-size:610.34% 364.03%;background-position:52.87% 23.65%;border-radius:10px;}
 /* 공용 navbar는 아이콘을 줄여도 메뉴 터치 높이를 48px 이상 확보합니다. */
@@ -191,7 +175,6 @@
  .memory-page,.verify-page{min-height:calc(100dvh - env(safe-area-inset-top));}
  .verify-page{padding-bottom:env(safe-area-inset-bottom);}
  .verify-success>div{min-height:70dvh;}
- .memory-page .message-envelope{min-height:calc(100dvh - 110px);}
 }
 
 /* Dimensions refined against the ten individual mobile references. */
@@ -212,17 +195,6 @@
 .verify-failure>div:last-of-type {padding-top:24px;}
 .verify-checking>.checking-card {bottom:28px;left:15px;padding:20px 22px;}
 .checking-card h1 {font-size:27px;margin-top:14px;}
-.memory-page>div.grid {margin-bottom:24px;}
-.memory-page>div.flex {gap:10px;}
-.memory-page>div.flex>button {height:116px;border-radius:18px;padding:20px 16px;}
-.memory-page .memory-thumbnail {width:65px;height:85px;top:15px;right:18px;}
-.memory-page .message-envelope>p {font-size:20px;line-height:1.35;margin-top:34px;}
-.memory-page .message-envelope>small {font-size:11px;color:#6d7474;}
-.memory-page .message-envelope>div.absolute {inset:42% 0 0;clip-path:polygon(0 0,50% 30%,100% 0,100% 100%,0 100%);}
-.memory-page .message-envelope>button {height:64px;}
-.memory-page:has(>div>h1)>div.absolute {padding:28px 22px 20px;border-radius:30px;bottom:26px;}
-.memory-page:has(>div>h1)>div.absolute h1 {font-size:24px;}
-.memory-page:has(>div>h1)>div.absolute p {max-width:245px;font-size:12px;line-height:1.5;margin:10px 0 28px;color:#ccc;}
 @media(max-width:500px){
  .verify-photo{height:52dvh;min-height:325px;}
  .verify-sheet{min-height:48dvh;}
@@ -234,12 +206,8 @@
 .remote-photo {overflow:hidden;background-color:#eceeed;display:grid;place-items:center;}
 .remote-photo img {display:block;width:100%;height:100%;object-fit:cover;}
 .remote-photo>span {padding:10px;text-align:center;font-size:11px;color:#66716e;font-style:normal;}
-.memory-thumbnail .remote-photo {width:100%;height:100%;}
-.memory-thumbnail .remote-photo>span {font-size:8px;padding:4px;}
-.message-envelope>.postcard-photo {position:relative;z-index:1;}
 .history-map {position:relative;height:280px;border-radius:24px;overflow:hidden;margin-bottom:18px;background:#eef5f3;}
 .history-map>small {position:absolute;bottom:15px;left:15px;background:#242624;color:white;border-radius:20px;padding:5px 10px;font-size:10px;z-index:2;}
-.message-envelope button:disabled {opacity:.5;cursor:default;}
 
 .history-map-placeholder {height:100%;background:#eef5f3;}
 

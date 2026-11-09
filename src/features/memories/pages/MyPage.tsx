@@ -1,35 +1,20 @@
 import { HistoryMap } from "@/features/history/components/HistoryMap";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router";
-import { Heart, LogOut } from "lucide-react";
-import { Back, Profile } from "@/shared/components/WireUI";
+import { LogOut } from "lucide-react";
+import { Back } from "@/shared/components/WireUI";
 import { RemotePhoto } from "@/shared/components/RemotePhoto";
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { getAccessToken } from "@/features/auth/utils/tokenStorage";
 import { getMyQuests, getMySubmissions } from "../api/myPage";
 import { newestFirst } from "../lib/performances";
-import type { Memory } from "../types";
-import { getQuestGreetings, getVerificationQuest, toggleSubmissionLike, type QuestGreetings } from "@/features/quests/api/verification";
+import { getQuestGreetings, toggleSubmissionLike, type QuestGreetings } from "@/features/quests/api/verification";
 
-const profileTabsClass =
-  "grid [grid-template-columns:1fr_1fr] gap-[6px] [&_>_a]:h-[96px] [&_>_a]:rounded-[23px] [&_>_a]:flex [&_>_a]:flex-col [&_>_a]:[padding:16px_14px_12px] [&_>_a]:relative [&_>_a]:justify-end [&_strong]:font-normal [&_strong]:text-[38px] [&_strong]:leading-[1.05] [&_small]:text-[12px] [&_small]:mt-[4px]";
-
-function MemoryThumbnail({ memory, token }: { memory: Memory; token: string | null }) {
-  const detail = useQuery({
-    queryKey: ["verification-quest", memory.id, token],
-    queryFn: ({ signal }) => getVerificationQuest(memory.id, signal),
-    enabled: Boolean(token) && !memory.photoUrl,
-    staleTime: 60_000,
-    retry: false,
-  });
-
-  return (
-    <i className="memory-thumbnail">
-      <RemotePhoto photoUrl={memory.photoUrl ?? detail.data?.photoUrl} alt={memory.title} />
-    </i>
-  );
-}
+import MyPageSummary from "../components/MyPageSummary";
+import MemoryQuestCard from "../components/MemoryQuestCard";
+import GreetingLetter from "../components/GreetingLetter";
+import "../styles/mypage.css";
 
 function ListStatus({ query, enabled, label, empty }: {
   query: { isPending: boolean; isError: boolean; refetch: () => unknown };
@@ -182,145 +167,71 @@ export default function MyPage() {
       setError("로그아웃하지 못했어요. 다시 시도해 주세요.");
     }
   }
+  const summary = (
+    <MyPageSummary
+      nickname={token ? user?.nickname : undefined}
+      email={token ? user?.email : undefined}
+      active={history ? "history" : "memories"}
+      memoryCount={token && questsQuery.data ? memories.length : null}
+      recordCount={token && recordsQuery.data ? recordCount : null}
+      hasGreetings={memories.some((memory) => Boolean(memory.passedCount))}
+    />
+  );
   if (logout)
     return (
-      <section className="memory-page min-h-[790px] flex-1 relative [padding:12px_15px] max-[500px]:[min-height:calc(100dvh_-_54px)]">
+      <section className="memory-page mypage-logout">
         <Back />
-        <div className="absolute left-[15px] right-[15px] bottom-[26px] bg-[#242624] rounded-[29px] [padding:37px_22px_20px] [&_h1]:text-[23px] [&_h1]:font-normal [&_h1]:tracking-[-1px] [&_p]:text-[11px] [&_p]:[margin:5px_0_18px] [&_>_div]:flex [&_>_div]:gap-[16px] [&_>_div_>_*]:bg-[#ddd] [&_>_div_>_*]:rounded-[30px] [&_>_div_>_*]:h-[50px] [&_>_div_>_*]:flex-1 [&_>_div_>_*]:grid [&_>_div_>_*]:place-items-center [&_>_div_>_*]:text-[14px] [&_>_div_>_button]:bg-[#fff]">
+        <div className="mypage-logout-dialog">
           <h1>로그아웃할까요?</h1>
           <p>다시 로그인하면 내 그리움과 기록을 그대로 볼 수 있어요.</p>
           {error && <p role="alert">{error}</p>}
           <div>
             <Link to="/me/memories">취소</Link>
-            <button onClick={signOut}>로그아웃</button>
+            <button type="button" onClick={signOut}>로그아웃</button>
           </div>
         </div>
       </section>
     );
-  if (message)
+  if (message) {
+    const sourceQuery = fromRecords ? recordsQuery : questsQuery;
+    const loading = Boolean(token && (sourceQuery.isPending || greetingQuery?.isPending));
+    const failed = Boolean(token && (sourceQuery.isError || greetingQuery?.isError));
     return (
-      <section className="memory-page flex h-full min-h-0! flex-col overflow-hidden p-0!">
-        <header
-          ref={messageTop}
-          className="flex shrink-0 items-center gap-[10px] px-[15px] pt-3 mb-[15px] [&_>_div]:flex-1 [&_small]:text-[10px] [&_small]:block [&_strong]:text-[15px] [&_strong]:block [&_strong]:tracking-[-0.5px]"
-        >
-          <Back to={backTo} />
-          <div>
-            <small>
-              {fromRecords
-                ? "수행한 퀘스트의 안부"
-                : "내 그리움에 도착한 안부"}{" "}
-              {greeting ? index + 1 : 0}/{greetings.length}
-            </small>
-            <strong>{selected?.title ?? (token && (fromRecords ? recordsQuery : questsQuery).isPending ? "불러오는 중…" : "퀘스트를 찾을 수 없어요")}</strong>
+      <section className="memory-page mypage-greeting">
+        <header ref={messageTop} className="greeting-header">
+          <div className="greeting-tools">
+            <Back to={backTo} />
+            <p>{fromRecords ? "수행한 퀘스트의 안부" : "도착한 안부"} {greeting ? index + 1 : 0}/{greetings.length}</p>
+            <Link to="/me/logout" aria-label="로그아웃"><LogOut size={20} /></Link>
           </div>
-          <Link
-            className="h-[54px] w-[54px] rounded-full bg-[#c9eaf5] inline-flex items-center justify-center shrink-0 [&_svg]:[stroke-width:1.25]"
-            to="/me/logout"
-            aria-label="로그아웃"
-          >
-            <LogOut size={21} />
-          </Link>
+          <h1>{selected?.title ?? (loading ? "불러오는 중…" : "퀘스트를 찾을 수 없어요")}</h1>
         </header>
-        <div ref={greetingBody} className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-[15px] pb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-
-        <article className="message-envelope rounded-[24px] bg-[#fff] flex-1 relative overflow-hidden [padding:20px_14px] flex flex-col items-center min-h-[650px] [&_>_small]:text-[10px] [&_>_small]:z-[1]">
-          <RemotePhoto
-            className="postcard-photo"
-            photoUrl={greeting?.photoUrl}
-            alt="도착한 안부 사진"
-          />
-          <p className="text-[20px] leading-[1.3] whitespace-pre-line text-center [margin:22px_0_10px] z-[1]">
-            {greeting?.greeting ?? (greetingQuery?.isPending ? "안부를 불러오는 중이에요." : greetingQuery?.isError ? "안부를 불러오지 못했어요." : "아직 도착한 안부가 없어요.")}
-          </p>
-          <small>
-            {greeting
-              ? `From. ${greeting.senderName}${greeting.createdAt ? ` | ${greeting.createdAt.slice(0, 10)}` : ""}`
-              : ""}
-          </small>
-          <div className="absolute [inset:38%_0_0] bg-[#c9eaf5] [clip-path:polygon(0_0,_50%_37%,_100%_0,_100%_100%,_0_100%)]" />
-          {canLike && <div className="relative mt-auto z-[1] text-center pt-[90px] [&_:is(a,button)]:h-[66px] [&_:is(a,button)]:w-[66px] [&_:is(a,button)]:bg-[#242624] [&_.liked]:bg-[#999] [&_p]:text-[11px] [&_p]:[margin:12px_0_34px]">
-            <button
-              className={`h-[54px] w-[54px] rounded-full bg-[#c9eaf5] inline-flex items-center justify-center shrink-0 [&_svg]:[stroke-width:1.25] ${liked ? "liked" : ""}`}
-              aria-label="안부 좋아요"
-              aria-pressed={liked}
-              disabled={likeMutation.isPending}
-              onClick={() => {
-                if (token && greeting && selectedQuestId && !likeMutation.isPending) {
-                  likeMutation.mutate({ submissionId: greeting.submissionId, questId: selectedQuestId, token });
-                }
-              }}
-            >
-              <Heart fill={liked ? "currentColor" : "none"} />
-            </button>
-            <p>
-              {liked
-                ? "고마운 마음을 전했어요"
-                : "좋아요로 고마움을 전해보세요"}
-            </p>
-            {likeMutation.isError && likeMutation.variables.submissionId === greeting?.submissionId && (
-              <p role="alert">좋아요를 변경하지 못했어요. 다시 시도해 주세요.</p>
-            )}
-          </div>}
-
-        </article>
-        <section
-          aria-label="수행 글 목록"
-          className="mt-4 rounded-2xl bg-white p-3 text-[#242624]"
-        >
-          <h2 className="mb-2 text-sm font-semibold">
-            {fromRecords
-              ? "나와 다른 수행자의 안부 · 최신순"
-              : "도착한 수행 안부 · 최신순"}
-          </h2>
-          {greetings.length ? (
-            <ol className="flex flex-col gap-2">
-              {greetings.map((item, position) => (
-                <li key={item.id}>
-                  <button
-                    className={`w-full rounded-xl p-3 text-left text-sm ${position === index ? "bg-[#c9eaf5]" : "bg-neutral-100"}`}
-                    aria-current={position === index ? "true" : undefined}
-                    onClick={() => openGreeting(position)}
-                  >
-                    <span className="block font-medium">
-                      {item.senderName}
-                      {item.isMine && (
-                        <span className="ml-2 rounded-full bg-white px-2 py-0.5 text-[10px]">
-                          내가 보낸 안부
-                        </span>
-                      )}
-                    </span>
-                    <span className="block truncate">{item.greeting}</span>
-                    <time
-                      className="text-xs text-neutral-500"
-                      dateTime={item.createdAt}
-                    >
-                      {item.createdAt
-                        ? item.createdAt.slice(0, 10)
-                        : "등록일 정보 없음"}
-                    </time>
-                  </button>
-                </li>
-              ))}
-            </ol>
-          ) : (
-            <ListStatus query={greetingQuery ?? (fromRecords ? recordsQuery : questsQuery)} enabled={Boolean(token)} label="안부를" empty="아직 등록된 수행 글이 없어요." />
-          )}
-        </section>
-        </div>
-        <footer aria-label="안부 이동" className="shrink-0 px-[15px] pt-3 pb-[max(26px,env(safe-area-inset-bottom,0px))]">
-          <button
-            className="h-[62px] w-full rounded-[36px] bg-[#242624] text-[15px] text-white disabled:cursor-default disabled:opacity-50"
-            disabled={greetings.length < 2}
-            onClick={() => {
-              openGreeting((index + 1) % greetings.length);
+        <div ref={greetingBody} className="greeting-reader">
+          <GreetingLetter
+            greeting={greeting}
+            statusMessage={loading ? "안부를 불러오는 중이에요." : failed ? "안부를 불러오지 못했어요." : "아직 도착한 안부가 없어요."}
+            loading={loading}
+            failed={failed}
+            onRetry={() => { void (sourceQuery.isError ? sourceQuery.refetch() : greetingQuery?.refetch()); }}
+            canLike={canLike}
+            liked={liked}
+            pending={likeMutation.isPending}
+            likeError={likeMutation.isError && likeMutation.variables?.submissionId === greeting?.submissionId}
+            onLike={() => {
+              if (canLike && token && greeting && selectedQuestId && !likeMutation.isPending) {
+                likeMutation.mutate({ submissionId: greeting.submissionId, questId: selectedQuestId, token });
+              }
             }}
-          >
+          />
+        </div>
+        <footer className="greeting-footer" aria-label="안부 이동">
+          <button type="button" disabled={greetings.length < 2} onClick={() => openGreeting((index + 1) % greetings.length)}>
             다음 안부 보기
           </button>
         </footer>
       </section>
     );
+  }
   if (history) {
     const peerRecords = showOthers
       ? newestFirst(peerQuestIds.flatMap((questId, index) => {
@@ -351,40 +262,24 @@ export default function MyPage() {
     return (
       <section
         aria-label="내 수행 기록 지도 화면"
-        className="absolute inset-0 isolate flex flex-col overflow-hidden bg-white"
+        className="mypage-history"
       >
-        <div className="relative z-10 shrink-0 bg-white px-[15px] pb-3 pt-3">
-          <Profile nickname={token ? user?.nickname : undefined} email={token ? user?.email : undefined} />
-          <div className={profileTabsClass + " [&_>_a]:bg-white/95 [&_>_a.selected]:bg-[#c9eaf5]"}>
-            <Link to="/me/memories" className="bg-[#e5e5e5]! text-[#242624]">
-              <span className="text-[10px] absolute right-[12px] top-[14px] rounded-[15px] [padding:4px_7px] bg-[#dedede]">
-                도착한 안부
-              </span>
-              <strong>{questsQuery.data ? memories.length : "–"}</strong>
-              <small>내 그리움</small>
-            </Link>
-            <Link to="/me/history" className={history ? "selected" : ""}>
-              <strong>{recordsQuery.data ? recordCount : "–"}</strong>
-              <small>내 기록</small>
-            </Link>
-          </div>
-        </div>
-        <div className="relative min-h-0 flex-1">
+        <div className="mypage-history-header">{summary}</div>
+        <div className="mypage-history-map">
           <HistoryMap records={visibleRecords} source="records" token={token} />
           <div
             ref={historyPanel}
-            className="absolute inset-x-4 bottom-[124px] z-10 max-h-[min(max(120px,calc(100%_-_190px)),max(0px,calc(100%_-_136px)))] overflow-x-hidden overflow-y-auto overscroll-y-contain rounded-2xl bg-white/95 p-3 shadow-lg backdrop-blur-sm"
+            className="mypage-history-panel"
           >
             {historyQuestId && (
               <Link to="/me/history" className="block py-2 text-sm underline">
                 내 기록 전체 보기
               </Link>
             )}
-            <header className="mb-2 flex flex-wrap items-center justify-between gap-2">
-              <h2 className="text-[11px] font-medium">{showOthers ? "다른 수행자 기록" : "수행 기록"} · 최신순</h2>
+            <header>
+              <h2>{showOthers ? "다른 수행자 기록" : "수행 기록"} · 최신순</h2>
               <button
                 aria-controls="history-record-list"
-                className="rounded-full bg-[#242624] px-3 py-2 text-xs text-white"
                 onClick={() =>
                   setParams((previous) => {
                     if (showOthers) previous.delete("showOthers");
@@ -405,12 +300,12 @@ export default function MyPage() {
               role="region"
               tabIndex={0}
               aria-label={showOthers ? "다른 수행자 기록 목록" : "내 수행 퀘스트 목록"}
-              className="relative grid w-full min-w-0 grid-flow-col auto-cols-[calc((100%_-_1rem)/3)] snap-x snap-proximity gap-2 overflow-x-auto overscroll-x-contain pb-2 [scrollbar-width:thin]"
+              className="mypage-record-list"
             >
               {historyCards.map(({ key, record, photoUrl, submissionId, performerName }) => (
                 <Link
                   key={key}
-                  className="min-w-0 snap-start rounded-xl bg-[#edf4f6] p-2 text-[#242624]"
+                  className="mypage-record-card"
                   to={`/me/memories?${new URLSearchParams({
                     source: "records",
                     record: record.id,
@@ -420,8 +315,8 @@ export default function MyPage() {
                     ...(submissionId === undefined ? {} : { submission: String(submissionId) }),
                   })}`}
                 >
-                  <RemotePhoto className="h-16 w-full rounded-lg!" photoUrl={photoUrl} alt={record.title} />
-                  <h3 className="mt-1 text-xs font-medium leading-snug [overflow-wrap:anywhere]">
+                  <RemotePhoto photoUrl={photoUrl} alt={record.title} />
+                  <h3>
                     {record.title}
                   </h3>
                   {performerName && <p className="truncate text-[10px] text-neutral-600">{performerName} 님</p>}
@@ -430,7 +325,7 @@ export default function MyPage() {
               ))}
               {!showOthers && (
                 <Link
-                  className="grid min-w-0 snap-start place-items-center rounded-lg border border-dotted border-neutral-400 bg-white/80 p-2 text-center text-xs"
+                  className="mypage-record-next"
                   to="/"
                 >
                   다음 퀘스트 찾기
@@ -451,46 +346,19 @@ export default function MyPage() {
     );
   }
   return (
-    <section className="memory-page [padding:12px_15px_100px] min-h-[790px] relative flex-1 max-[500px]:[min-height:calc(100dvh_-_54px)]">
-      <Profile nickname={token ? user?.nickname : undefined} email={token ? user?.email : undefined} />
-      <div className={profileTabsClass + " mb-[16px] [&_>_a]:bg-[#c9eaf5] [&_>_a.selected]:bg-[#242624]"}>
-        <Link to="/me/memories" className={!history ? "selected" : ""}>
-          <span className="text-[10px] absolute right-[12px] top-[14px] rounded-[15px] [padding:4px_7px] bg-[#dedede]">
-            도착한 안부
-          </span>
-          <strong>{questsQuery.data ? memories.length : "–"}</strong>
-          <small>내 그리움</small>
-        </Link>
-        <Link to="/me/history" className="bg-[#e5e5e5]! text-[#242624]">
-          <strong>{recordsQuery.data ? recordCount : "–"}</strong>
-          <small>내 기록</small>
-        </Link>
-      </div>
-
-      <div className="flex flex-col gap-[8px] [&_>_button]:rounded-[23px] [&_>_button]:h-[113px] [&_>_button]:bg-[#c9eaf5] [&_>_button]:text-left [&_>_button]:[padding:21px_14px] [&_>_button]:relative [&_strong]:text-[15px] [&_strong]:font-medium [&_strong]:block [&_strong]:max-w-[76%] [&_strong]:tracking-[-0.5px] [&_small]:text-[10px] [&_small]:text-[#666] [&_small]:block [&_small]:mt-[2px] [&_button_>_span]:inline-block [&_button_>_span]:bg-[#bbb] [&_button_>_span]:rounded-[20px] [&_button_>_span]:text-[9px] [&_button_>_span]:[padding:4px_10px] [&_button_>_span]:mt-[11px] [&_i]:absolute [&_i]:right-[21px] [&_i]:top-[13px] [&_i]:w-[60px] [&_i]:h-[79px] [&_i]:bg-[#fff] [&_i]:[transform:rotate(10deg)] [&_button:nth-child(2)_i]:[transform:rotate(-10deg)]">
-        {memories.map((x) => (
-          <button
-            key={x.id}
-            onClick={() => {
-              if (x.passedCount) {
-                setParams({ quest: x.id, message: "0" });
-              } else setError("아직 도착한 안부가 없어요.");
-            }}
-          >
-            <strong>{x.title}</strong>
-            <small>{x.sub}</small>
-            {Boolean(x.passedCount) && (
-              <span>안부 {x.passedCount}통 도착</span>
-            )}
-            <MemoryThumbnail memory={x} token={token} />
-          </button>
+    <section className="memory-page mypage-page">
+      {summary}
+      <div className="mypage-quest-list">
+        {memories.map((memory) => (
+          <MemoryQuestCard key={memory.id} memory={memory} token={token} onOpen={(item) => {
+            if (item.passedCount) {
+              setError("");
+              setParams({ quest: item.id, message: "0" });
+            } else setError("아직 도착한 안부가 없어요.");
+          }} />
         ))}
         {memories.length === 0 && <ListStatus query={questsQuery} enabled={Boolean(token)} label="내 그리움을" empty="등록한 그리움이 없어요." />}
-        {error && (
-          <p className="text-[12px] p-[12px]" role="status">
-            {error}
-          </p>
-        )}
+        {error && <p className="p-3 text-sm" role="status">{error}</p>}
       </div>
     </section>
   );

@@ -23,7 +23,8 @@ function focusLocation(
     parseFloat(
       getComputedStyle(element).getPropertyValue("--history-panel-height"),
     ) || 170;
-  const visibleHeight = Math.max(64, element.clientHeight - panelHeight - 136);
+  const navHeight = element.closest(".app-phone")?.querySelector(".app-navigation")?.getBoundingClientRect().height ?? 124;
+  const visibleHeight = Math.max(64, element.clientHeight - panelHeight - navHeight - 12);
   const projection = map.getProjection();
   const point = projection.containerPointFromCoords(new maps.LatLng(lat, lng));
   map.panTo(
@@ -177,10 +178,8 @@ export function HistoryMap({
                   "--history-panel-height",
                 ),
               ) || 170;
-            const bottom = Math.min(
-              element.clientHeight - 80,
-              panelHeight + 136,
-            );
+            const navHeight = element.closest(".app-phone")?.querySelector(".app-navigation")?.getBoundingClientRect().height ?? 124;
+            const bottom = Math.min(element.clientHeight - 80, panelHeight + navHeight + 12);
             if (points.length > 1) map.setBounds(bounds, 64, 40, bottom, 40);
             else focusLocation(map, first.lat, first.lng, element);
           };
@@ -245,7 +244,7 @@ export function HistoryMap({
             </p>
           )
         )}
-        <span className="pointer-events-none absolute [bottom:calc(var(--history-panel-height,180px)_+_136px)] left-4 z-10 rounded-full bg-[#242624] px-3 py-1.5 text-[10px] text-white">
+        <span className="mypage-history-count">
           미션 다녀온 곳 {points.length}
         </span>
       </div>
@@ -263,7 +262,7 @@ export function HistoryMap({
         </div>
       )}
       {selected && (
-        <div className="absolute [bottom:calc(var(--history-panel-height,180px)_+_136px)] left-4 right-4 z-20 rounded-xl bg-white p-3 pr-9 text-xs shadow-lg">
+        <div className="mypage-history-place">
           <button
             className="absolute right-3 top-2 p-1 text-neutral-500"
             aria-label="장소 정보 닫기"
@@ -273,18 +272,17 @@ export function HistoryMap({
           >
             ×
           </button>
-          <h3 className="font-semibold">
+          <h3>
             {selected.location.placeName || selected.title}
           </h3>
-          <p className="mt-1 text-[10px] text-neutral-500">
+          <p>
             {selected.location.address ?? selected.title}
           </p>
-          <div className="mt-2 flex gap-4">
-            <Link className="underline" to={greetingPath(selected, source)}>
+          <div>
+            <Link to={greetingPath(selected, source)}>
               이곳의 안부 보기
             </Link>
             <a
-              className="inline-flex items-center gap-1 text-neutral-500"
               href={`https://map.kakao.com/link/map/${encodeURIComponent(selected.location.placeName || selected.title)},${selected.location.lat},${selected.location.lng}`}
               target="_blank"
               rel="noreferrer"
@@ -296,7 +294,7 @@ export function HistoryMap({
         </div>
       )}
       {records.length > points.length && (
-        <p className="absolute [bottom:calc(var(--history-panel-height,180px)_+_170px)] left-4 right-4 z-10 rounded-lg bg-white/90 px-3 py-1 text-[10px] text-neutral-500">
+        <p className="mypage-history-missing">
           위치 정보가 없는 기록 {records.length - points.length}건은 지도에
           표시하지 않았어요.
         </p>

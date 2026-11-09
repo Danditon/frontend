@@ -1,0 +1,91 @@
+.app-phone[data-memories="true"] {
+  --mypage-nav-space: calc(124px + env(safe-area-inset-bottom, 0px));
+  --history-overlay-space: calc(var(--mypage-nav-space) + 12px);
+  font-family: "Pretendard", system-ui, sans-serif;
+  color: #242624;
+  -webkit-font-smoothing: antialiased;
+}
+.app-phone[data-memories="true"] :where(button, input, textarea, select) { font-family: inherit; }
+.mypage-page { padding: 20px 20px 24px; background: linear-gradient(#fff 38%, #e4f2f6); }
+.mypage-summary { min-width: 0; }
+.mypage-summary > header { height: 56px; gap: 12px; margin-bottom: 20px; }
+.mypage-summary > header > span, .mypage-summary > header > a { width: 48px; height: 48px; }
+.mypage-summary > header > div { min-width: 0; font-size: 16px; font-weight: 500; }
+.mypage-summary > header small { overflow: hidden; color: #6d7474; font-size: 12px; font-weight: 400; text-overflow: ellipsis; white-space: nowrap; }
+.mypage-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 24px; }
+.mypage-stats > a { position: relative; display: flex; min-width: 0; min-height: 120px; flex-direction: column; justify-content: flex-end; gap: 6px; padding: 18px 16px; border-radius: 24px; background: #f3f3f3; }
+.mypage-stats > a[aria-current="page"] { background: #d1e7f2; }
+.mypage-stats strong { font-size: 40px; font-weight: 500; line-height: 1; }
+.mypage-stats small { font-size: 13px; }
+.mypage-greeting-badge { position: absolute; top: 12px; right: 12px; padding: 4px 8px; border-radius: 999px; background: #242624; color: white; font-size: 11px; }
+.mypage-quest-list { display: grid; gap: 12px; }
+.mypage-quest-card { display: grid; grid-template-columns: minmax(0, 1fr) 72px; align-items: center; gap: 16px; min-height: 120px; padding: 16px 18px; border-radius: 24px; background: #dceef5; text-align: left; }
+.mypage-quest-card:nth-child(3n + 2) { background: #e6ddf1; }
+.mypage-quest-card:nth-child(3n) { background: #f2e3d8; }
+.mypage-quest-copy { min-width: 0; }
+.mypage-quest-copy strong { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; font-size: 16px; font-weight: 500; line-height: 1.45; overflow-wrap: anywhere; }
+.mypage-quest-copy small { display: block; margin-top: 6px; color: #69716e; font-size: 12px; }
+.mypage-quest-copy > span { display: inline-block; margin-top: 10px; padding: 4px 8px; border-radius: 999px; background: #242624; color: white; font-size: 11px; }
+.mypage-quest-photo { width: 72px; height: 92px; border: 4px solid white; background: #eceeed; box-shadow: 0 4px 10px #00000012; transform: rotate(8deg); }
+.mypage-quest-card:nth-child(even) .mypage-quest-photo { transform: rotate(-8deg); }
+.mypage-quest-photo .remote-photo { width: 100%; height: 100%; }
+.mypage-quest-photo .remote-photo > span { padding: 4px; font-size: 10px; }
+
+.memory-page.mypage-greeting { display: flex; height: 100%; min-height: 0; flex-direction: column; overflow: hidden; background: white; }
+.greeting-header { flex: none; padding: 20px 20px 16px; }
+.greeting-tools { display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px; align-items: center; gap: 12px; }
+.greeting-tools > a { display: grid; width: 44px; height: 44px; place-items: center; border-radius: 50%; background: #242624; color: white; }
+.greeting-tools > p { color: #69716e; font-size: 12px; text-align: center; }
+.greeting-header h1 { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; margin-top: 16px; font-size: 18px; font-weight: 600; line-height: 1.4; text-align: center; overflow-wrap: anywhere; }
+.greeting-reader { display: flex; min-height: 0; flex: 1; flex-direction: column; overflow-y: auto; overscroll-behavior-y: contain; padding-inline: 20px; }
+.greeting-letter { position: relative; isolation: isolate; display: flex; flex: 1 0 auto; flex-direction: column; align-items: center; overflow: hidden; padding: 16px 12px 24px; border-radius: 24px; background: white; }
+.greeting-photo { position: relative; z-index: 1; width: 100%; aspect-ratio: 16 / 10; flex: none; border-radius: 20px; }
+.greeting-text { position: relative; z-index: 1; width: 100%; flex: none; margin-top: 26px; font-size: 20px; font-weight: 500; line-height: 1.5; text-align: center; white-space: pre-wrap; overflow-wrap: anywhere; }
+.greeting-sender { position: relative; z-index: 1; flex: none; margin-top: 14px; color: #727875; font-size: 12px; text-align: center; overflow-wrap: anywhere; }
+/* 배경 장식은 독립된 레이어로 두어 본문과 버튼을 가리지 않습니다. */
+.greeting-envelope { position: absolute; inset: 48% 0 0; z-index: -1; background: #d1e7f2; clip-path: polygon(0 0, 50% 28%, 100% 0, 100% 100%, 0 100%); pointer-events: none; }
+.greeting-reaction { position: relative; z-index: 1; flex: none; margin-top: auto; padding-top: 32px; text-align: center; }
+.greeting-like { display: grid; width: 64px; height: 64px; margin-inline: auto; place-items: center; border-radius: 50%; background: #242624; color: white; }
+.greeting-like:disabled { opacity: 0.5; cursor: default; }
+.greeting-reaction p { margin-top: 12px; font-size: 12px; }
+.greeting-reaction [role="alert"] { color: #8a3441; }
+.greeting-empty { display: grid; flex: 1; align-content: center; justify-items: center; gap: 12px; min-height: 180px; text-align: center; font-size: 14px; }
+.greeting-empty button { min-height: 44px; padding: 8px 16px; text-decoration: underline; }
+.greeting-footer { flex: none; padding: 16px 20px max(20px, env(safe-area-inset-bottom, 0px)); }
+.greeting-footer button { width: 100%; min-height: 52px; padding: 12px 18px; border-radius: 999px; background: #242624; color: white; font-size: 15px; }
+.greeting-footer button:disabled { opacity: 0.5; cursor: default; }
+
+.mypage-history { position: absolute; inset: 0; isolation: isolate; display: flex; flex-direction: column; overflow: hidden; background: white; }
+.mypage-history-header { position: relative; z-index: 10; flex: none; padding: 20px 20px 12px; background: white; }
+.mypage-history-header .mypage-stats { margin-bottom: 0; }
+.mypage-history-map { position: relative; min-height: 0; flex: 1; }
+.mypage-history-panel { position: absolute; inset-inline: 16px; bottom: var(--mypage-nav-space); z-index: 10; max-height: min(260px, max(120px, calc(100% - var(--mypage-nav-space) - 140px))); overflow-x: hidden; overflow-y: auto; overscroll-behavior-y: contain; padding: 12px; border-radius: 20px; background: #fffffff5; box-shadow: 0 8px 24px #00000012; }
+.mypage-history-panel > header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
+.mypage-history-panel h2 { font-size: 14px; font-weight: 500; }
+.mypage-history-panel > header button { min-height: 36px; padding: 8px 12px; border-radius: 999px; background: #242624; color: white; font-size: 12px; }
+.mypage-record-list { display: grid; grid-auto-flow: column; grid-auto-columns: 152px; gap: 10px; width: 100%; min-width: 0; overflow-x: auto; overscroll-behavior-x: contain; padding-bottom: 6px; scroll-snap-type: x proximity; scrollbar-width: thin; }
+.mypage-record-card { min-width: 0; padding: 10px; border-radius: 16px; background: #edf4f6; scroll-snap-align: start; }
+.mypage-record-card .remote-photo { height: 88px; border-radius: 10px; }
+.mypage-record-card h3 { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; margin-top: 8px; font-size: 14px; font-weight: 500; line-height: 1.4; overflow-wrap: anywhere; }
+.mypage-record-next { display: grid; min-height: 156px; place-items: center; padding: 12px; border: 1px dashed #a8afad; border-radius: 16px; font-size: 13px; text-align: center; scroll-snap-align: start; }
+.mypage-history-place { position: absolute; inset-inline: 16px; bottom: calc(var(--history-panel-height, 180px) + var(--history-overlay-space)); z-index: 20; padding: 14px 38px 14px 14px; border-radius: 16px; background: white; box-shadow: 0 8px 24px #00000012; }
+.mypage-history-place h3 { font-size: 15px; font-weight: 600; overflow-wrap: anywhere; }
+.mypage-history-place > p { margin-top: 6px; color: #69716e; font-size: 12px; }
+.mypage-history-place > div { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.mypage-history-place > div > a { display: inline-flex; min-height: 36px; align-items: center; gap: 6px; padding: 8px 10px; border-radius: 999px; background: #edf4f6; font-size: 12px; text-decoration: none; }
+.mypage-history-count { position: absolute; left: 16px; bottom: calc(var(--history-panel-height, 180px) + var(--history-overlay-space)); z-index: 10; padding: 6px 10px; border-radius: 999px; background: #242624; color: white; font-size: 11px; pointer-events: none; }
+.mypage-history-missing { position: absolute; inset-inline: 16px; top: 12px; z-index: 10; padding: 6px 10px; border-radius: 12px; background: #fffffff0; color: #69716e; font-size: 11px; pointer-events: none; }
+
+.memory-page.mypage-logout { display: flex; height: 100%; min-height: 0; flex-direction: column; padding: 20px 20px max(20px, env(safe-area-inset-bottom, 0px)); background: white; }
+.mypage-logout > a { width: 44px; height: 44px; }
+.mypage-logout-dialog { margin-top: auto; padding: 24px; border-radius: 28px; background: #242624; color: white; }
+.mypage-logout-dialog h1 { font-size: 22px; font-weight: 600; }
+.mypage-logout-dialog p { margin-top: 12px; color: #ccc; font-size: 14px; line-height: 1.6; }
+.mypage-logout-dialog > div { display: flex; gap: 12px; margin-top: 28px; }
+.mypage-logout-dialog :is(button, a) { display: grid; min-height: 50px; min-width: 0; flex: 1; place-items: center; border-radius: 999px; background: white; color: #242624; font-size: 14px; }
+.mypage-logout-dialog a { background: #666; color: white; }
+@media (max-height: 740px) {
+  .mypage-page, .mypage-history-header { padding-top: 16px; }
+  .mypage-stats > a { min-height: 112px; }
+  .greeting-header { padding-top: 16px; }
+}

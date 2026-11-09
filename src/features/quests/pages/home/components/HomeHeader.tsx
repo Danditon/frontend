@@ -1,4 +1,5 @@
 // 홈 지도 위에 지역명 배지와 알림·MY 버튼을 표시하는 상단 UI입니다.
+import gripdayLogo from '@/assets/auth/gripday-logo.svg'
 import { Bell, MapPin } from 'lucide-react'
 import { Link } from 'react-router'
 import { Button } from '@/shared/components/ui/button'
@@ -9,9 +10,9 @@ type Props = {
 
 export default function HomeHeader({ regionLabel }: Props) {
   return (
-    <header className="flex min-w-0 items-center justify-between gap-3 [font-family:Pretendard,system-ui,sans-serif]">
+    <header className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 [font-family:Pretendard,system-ui,sans-serif]">
       {/* 지역명 조회는 훅이 담당하고, Header는 전달받은 문구만 표시합니다. */}
-      <span className="inline-flex h-9 min-w-0 items-center gap-1.5 rounded-full border border-white/80 bg-white/90 px-3 text-[11px] font-semibold text-[#242624] shadow-sm backdrop-blur-sm">
+      <span className="inline-flex h-9 min-w-0 justify-self-start items-center gap-1.5 rounded-full border border-white/80 bg-white/90 px-3 text-[11px] font-semibold text-[#242624] shadow-sm backdrop-blur-sm">
         <MapPin
           className="size-3.5 shrink-0 fill-current [&_circle]:fill-white [&_circle]:stroke-white"
           strokeWidth={1.8}
@@ -20,7 +21,9 @@ export default function HomeHeader({ regionLabel }: Props) {
         <span className="truncate" aria-live="polite">{regionLabel}</span>
       </span>
 
-      <div className="flex shrink-0 items-center gap-1">
+      <img src={gripdayLogo} alt="그립데이" width={573} height={219} className="h-auto w-24" />
+
+      <div className="flex shrink-0 items-center gap-1 justify-self-end">
         {/* 알림은 UI만 표시합니다. 읽지 않은 알림 표시나 팝업은 추가하지 않습니다. */}
         <Button
           type="button"

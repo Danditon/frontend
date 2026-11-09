@@ -1098,7 +1098,7 @@ test('빠른 인증 성공은 완료 상태를 갱신하되 스캔 화면은 3�
   } finally { f.unmount() }
 })
 
-test('인증 완료를 같은 사진에 표시한 뒤 전달 애니메이션 종료·완료 안내 순서로 홈에 복귀한다', async () => {
+test('인증 완료·전달 연출 뒤 완료 화면에 머물며 홈 버튼을 눌러야 복귀한다', async () => {
   const f = verificationFlowFixture()
   try {
     await f.prepare()
@@ -1119,20 +1119,24 @@ test('인증 완료를 같은 사진에 표시한 뒤 전달 애니메이션 종
     assert.ok(findNode(delivering, 'section', item => item.className === 'qv-delivery'))
     assert.equal(findNode(delivering, 'section', item => item.className === 'qv-progress'), null)
     assert.match(textOf(delivering), /안부를 전하고 있어요/)
+    assert.equal(findNode(delivering, 'Button'), null)
     const flight = findNode(delivering, 'motion.g')
     assert.equal(flight.props.transition.duration, 1.2)
     f.advance(5000)
     assert.match(textOf(f.render()), /안부를 전하고 있어요/)
     assert.equal(f.navigations.length, 0)
     flight.props.onAnimationComplete()
-    assert.match(textOf(f.render()), /안부가 전달됐어요/)
-    f.advance(400)
-    // 중복 완료 이벤트가 홈 복귀 타이머를 다시 시작하면 안 됩니다.
+    const delivered = f.render()
+    assert.match(textOf(delivered), /안부가 전달됐어요/)
+    assert.doesNotMatch(textOf(delivered), /잠시 후 홈으로/)
+    assert.equal(f.pendingTimers, 0)
     flight.props.onAnimationComplete()
     f.render()
-    f.advance(399)
+    f.advance(10000)
     assert.equal(f.navigations.length, 0)
-    f.advance(1)
+    const home = findNode(f.render(), 'Button')
+    assert.equal(textOf(home), '홈으로 돌아가기')
+    home.props.onClick()
     assert.equal(f.navigations.length, 1)
     assert.equal(f.navigations[0].to, '/')
     assert.equal(f.navigations[0].options.replace, true)
@@ -1142,7 +1146,7 @@ test('인증 완료를 같은 사진에 표시한 뒤 전달 애니메이션 종
   } finally { f.unmount() }
 })
 
-test('동작 줄이기에서는 봉투를 움직이지 않고 일반 퀘스트도 전달 완료 후 홈에 복귀한다', async () => {
+test('동작 줄이기에서도 일반 퀘스트의 전달 완료 화면을 유지하고 홈 버튼으로 복귀한다', async () => {
   const f = verificationFlowFixture({ reducedMotion: true, questType: 'GENERAL', photoUrl: null })
   try {
     await f.prepare()
@@ -1159,7 +1163,10 @@ test('동작 줄이기에서는 봉투를 움직이지 않고 일반 퀘스트�
     assert.match(textOf(f.render()), /안부를 전하고 있어요/)
     f.advance(1)
     assert.match(textOf(f.render()), /안부가 전달됐어요/)
-    f.advance(800)
+    f.advance(10000)
+    assert.equal(f.navigations.length, 0)
+    assert.equal(f.pendingTimers, 0)
+    findNode(f.render(), 'Button').props.onClick()
     assert.equal(f.navigations.length, 1)
     assert.equal(f.navigations[0].to, '/')
     assert.equal(f.navigations[0].options.replace, true)
@@ -1167,7 +1174,7 @@ test('동작 줄이기에서는 봉투를 움직이지 않고 일반 퀘스트�
   } finally { f.unmount() }
 })
 
-test('완료·전달 도중 화면을 떠나면 남은 타이머와 홈 자동 이동을 취소한다', async () => {
+test('완료·전달 도중 화면을 떠나면 남은 연출 타이머를 취소한다', async () => {
   for (const phase of ['verified', 'delivering', 'delivered']) {
     const f = verificationFlowFixture({ reducedMotion: true, questType: 'GENERAL' })
     try {
@@ -1177,7 +1184,7 @@ test('완료·전달 도중 화면을 떠나면 남은 타이머와 홈 자동 �
       f.render()
       if (phase !== 'verified') { f.advance(700); f.render() }
       if (phase === 'delivered') { f.advance(1200); f.render() }
-      assert.equal(f.pendingTimers, 1)
+      assert.equal(f.pendingTimers, phase === 'delivered' ? 0 : 1)
     } finally { f.unmount() }
     assert.equal(f.pendingTimers, 0)
     f.advance(10000)

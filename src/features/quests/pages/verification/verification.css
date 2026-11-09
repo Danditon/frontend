@@ -117,3 +117,4 @@
 .qv-delivery-scene { display: block; width: 280px; max-width: 100%; height: auto; flex: none; }
 .qv-delivery h1 { font-size: 26px; font-weight: 700; line-height: 1.35; letter-spacing: -0.5px; }
 .qv-delivery p { margin-top: 10px; font-size: 15px; line-height: 1.6; }
+.qv-delivery-home { max-width: 320px; }

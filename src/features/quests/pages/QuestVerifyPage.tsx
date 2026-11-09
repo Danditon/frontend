@@ -47,17 +47,15 @@ function VerificationScreen({ questId }: { questId: string }) {
   useEffect(() => () => request.current?.abort(), []);
   useEffect(() => {
     const delay = phase === "verified" ? 700
-      : phase === "delivered" ? 800
       : phase === "delivering" && reducedMotion ? 1200 : null;
     if (delay === null) return;
     const timer = window.setTimeout(() => {
       if (phase === "verified") setPhase("delivering");
-      else if (phase === "delivering") setPhase("delivered");
-      else navigate('/', { replace: true });
+      else setPhase("delivered");
     }, delay);
-    // 화면 이탈과 단계 변경 시 이전 이동 타이머를 정리합니다.
+    // 화면 이탈과 단계 변경 시 이전 연출 타이머를 정리합니다.
     return () => window.clearTimeout(timer);
-  }, [phase, reducedMotion, navigate]);
+  }, [phase, reducedMotion]);
 
   function invalidateCompletedQuest() {
     void queryClient.invalidateQueries({ queryKey: ['quest-greetings', questId] });
@@ -245,6 +243,7 @@ function VerificationScreen({ questId }: { questId: string }) {
       photoUrl={photo || quest.photoUrl}
       reducedMotion={reducedMotion}
       onComplete={() => setPhase(current => current === "delivering" ? "delivered" : current)}
+      onHome={() => navigate('/', { replace: true })}
     />;
   } else if (phase === "failed" || phase === "out-of-range" || phase === "location-error" || phase === "request-error") {
     screen = (

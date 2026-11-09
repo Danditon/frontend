@@ -1,6 +1,7 @@
 // 전송은 인증 요청에서 완료됐으며, 이 화면은 도착 연출만 표시합니다.
 import { motion } from "motion/react";
 import { MapPin } from "lucide-react";
+import { Button } from "@/shared/components/ui/button";
 import "./verification.css";
 
 type Props = {
@@ -8,6 +9,7 @@ type Props = {
   photoUrl: string | null;
   reducedMotion: boolean;
   onComplete: () => void;
+  onHome: () => void;
 };
 
 const envelope = (
@@ -20,7 +22,7 @@ const envelope = (
   </g>
 );
 
-export default function GreetingDelivery({ phase, photoUrl, reducedMotion, onComplete }: Props) {
+export default function GreetingDelivery({ phase, photoUrl, reducedMotion, onComplete, onHome }: Props) {
   const delivered = phase === "delivered";
   return (
     <section className="qv-delivery" aria-labelledby="delivery-title">
@@ -50,8 +52,9 @@ export default function GreetingDelivery({ phase, photoUrl, reducedMotion, onCom
       </svg>
       <div role="status">
         <h1 id="delivery-title">{delivered ? "안부가 전달됐어요" : "안부를 전하고 있어요"}</h1>
-        <p>{delivered ? "잠시 후 홈으로 돌아가요" : "그리운 곳에 지금의 모습을 전해요"}</p>
+        {!delivered && <p>그리운 곳에 지금의 모습을 전해요</p>}
       </div>
+      {delivered && <Button className="qv-submit qv-delivery-home" onClick={onHome}>홈으로 돌아가기</Button>}
     </section>
   );
 }

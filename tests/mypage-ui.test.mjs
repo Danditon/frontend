@@ -38,24 +38,30 @@ const submission = (id, createdAt, extra = {}) => ({ submissionId: id, createdAt
   isLiked: false, verifyStatus: 'PASSED', performer: { userId: 8, nickname: '보낸 사람' }, ...extra })
 
 function envelopeFixture(reducedMotion = false) {
-  let cursor = 0
-  const states = []
+  let cursor = 0, idCursor = 0, motionCursor = 0
+  const states = [], motionValues = []
   const f = { reducedMotion }
   const Envelope = load('features/memories/components/GreetingEnvelope.tsx', {
-    react: { useState(initial) {
+    react: { useId: () => `flap-${idCursor++}`, useState(initial) {
       const i = cursor++
       if (!(i in states)) states[i] = initial
       return [states[i], value => { states[i] = value }]
     } },
     'motion/react': {
       motion: { div: 'div', footer: 'footer' }, useReducedMotion: () => f.reducedMotion,
-      useMotionValue: value => ({ get: () => value, set: next => { value = next } }),
+      useMotionValue: value => motionValues[motionCursor++] ??= { get: () => value, set: next => { value = next } },
       useTransform: (source, convert) => ({ get: () => convert(source.get()) }),
     },
     'lucide-react': { Heart: 'Heart' },
     './GreetingLetter': { __esModule: true, default: 'GreetingLetter' },
   })
-  return Object.assign(f, { render(props) { cursor = 0; return Envelope(props) } })
+  function expand(tree) {
+    if (Array.isArray(tree)) return tree.map(expand)
+    if (!tree || typeof tree !== 'object') return tree
+    if (typeof tree.type === 'function') return expand(tree.type(tree.props))
+    return { ...tree, props: { ...tree.props, children: expand(tree.props?.children) } }
+  }
+  return Object.assign(f, { render(props) { cursor = 0; idCursor = 0; motionCursor = 0; return expand(Envelope(props)) } })
 }
 
 function fixture(path = '/me', search = '') {
@@ -129,18 +135,19 @@ test('뚜껑은 수직에서만 편지지 뒤로 넘어가며 회전축은 봉�
   }
 })
 
-test('뚜껑 뒷면을 뒤집으면 앞면과 일치하고 열린 상태의 밑변이 회전축에 붙는다', () => {
+test('둥근 뚜껑의 앞뒷면은 같은 경로를 겹치며 그라데이션 ID가 충돌하지 않는다', () => {
+  const tree = envelopeFixture().render({ greeting: { id: '2' } })
+  const faces = all(tree, 'svg').filter(node => node.props.className?.includes('greeting-envelope-flap-face'))
+  assert.equal(faces.length, 2)
+  assert.equal(find(faces[0], 'path').props.d, find(faces[1], 'path').props.d)
+  assert.match(find(faces[0], 'path').props.d, /Q/)
+  assert.equal(find(faces[0], 'g').props.transform, undefined)
+  assert.equal(find(faces[1], 'g').props.transform, 'translate(0 130) scale(1 -1)')
+  const gradients = faces.map(face => find(face, 'linearGradient').props.id)
+  assert.notEqual(gradients[0], gradients[1])
+  faces.forEach((face, index) => assert.equal(find(face, 'path').props.fill, `url(#${gradients[index]})`))
   const css = readFileSync(new URL('../src/features/memories/styles/mypage.css', import.meta.url), 'utf8')
-  const points = selector => {
-    const body = css.slice(css.indexOf(`${selector} {`)).split('}')[0]
-    return body.match(/clip-path:\s*polygon\(([^)]+)\)/)[1].split(',').map(point => point.trim().split(/\s+/).map(parseFloat))
-  }
-  const front = points('.greeting-envelope-flap-face')
-  const back = points('.greeting-envelope-flap-inside')
-  const reflectedBack = back.map(([x, y]) => [x, 100 - y])
-  assert.deepEqual(reflectedBack, front)
-  const opened = reflectedBack.map(([x, y]) => [x, y === 0 ? 0 : -y])
-  assert.deepEqual(opened, [[0, 0], [100, 0], [50, -100]])
+  assert.match(css, /\.greeting-envelope-flap-inside\s*\{\s*transform:\s*rotateX\(180deg\)/)
 })
 
 test('뚜껑이 열리기 전부터 안감과 실제 편지지가 있고 같은 편지지를 위로 꺼낸다', () => {
@@ -151,13 +158,13 @@ test('뚜껑이 열리기 전부터 안감과 실제 편지지가 있고 같은 
   const lining = find(tree, 'div', props => props.className === 'greeting-envelope-lining')
   assert.ok(lining)
   assert.equal(lining.props['aria-hidden'], 'true')
-  assert.equal(find(tree, 'div', props => props.className === 'greeting-envelope-back').props.style.visibility, 'hidden')
+  assert.equal(find(tree, 'div', props => props.className === 'greeting-envelope-back'), undefined)
   const reader = find(tree, 'div', props => props.className === 'greeting-reader')
   assert.equal(reader.props.initial['--greeting-paper-offset'], 1)
   assert.equal(reader.props.animate['--greeting-paper-offset'], 0)
   assert.equal(all(tree, 'GreetingLetter').length, 1)
   assert.equal(find(tree, 'GreetingLetter').props.greeting, greeting)
-  find(tree, 'div', props => props.className === 'greeting-envelope-flap').props.onAnimationComplete()
+  find(tree, 'div', props => props.className === 'greeting-envelope-flap').props.style.rotateX.set(-180)
   tree = f.render(props)
   assert.ok(find(tree, 'div', props => props.className === 'greeting-envelope-lining'))
   assert.equal(all(tree, 'GreetingLetter').length, 1)
@@ -181,14 +188,18 @@ test('봉투가 열리는 동안 내용을 숨기고 입력을 막으며 완료 
   nextButton(tree).props.onClick()
   assert.equal(likes + next, 0)
 
-  find(tree, 'div', props => props.className === 'greeting-envelope-flap').props.onAnimationComplete()
+  const flap = find(tree, 'div', props => props.className === 'greeting-envelope-flap')
+  assert.equal(flap.props.initial['--flap-open-progress'], 0)
+  assert.equal(flap.props.animate['--flap-open-progress'], 1)
+  flap.props.style.rotateX.set(-180)
   tree = f.render(props)
-  assert.equal(find(tree, 'div', props => props.className === 'greeting-envelope-flap'), undefined)
-  assert.equal(find(tree, 'div', props => props.className === 'greeting-envelope-back').props.style.visibility, 'visible')
+  assert.equal(find(tree, 'div', props => props.className === 'greeting-envelope-flap').props.style.zIndex.get(), 1)
+  assert.equal(find(tree, 'div', props => props.className === 'greeting-envelope-back'), undefined)
   assert.equal(nextButton(tree).props.disabled, true)
 
   find(tree, 'footer').props.onAnimationComplete()
   tree = f.render(props)
+  assert.ok(find(tree, 'div', props => props.className === 'greeting-envelope-flap'))
   assert.equal(tree.props['aria-busy'], false)
   assert.equal(find(tree, 'div', props => props.className === 'greeting-reader').props.inert, false)
   assert.equal(likeButton(tree).props.disabled, false)
@@ -206,7 +217,10 @@ test('동작 줄이기와 안부 없음에서는 열림을 기다리지 않고 �
   assert.equal(tree.props['aria-busy'], false)
   assert.equal(nextButton(tree).props.disabled, false)
   assert.equal(find(tree, 'div', props => props.className === 'greeting-reader').props.initial, false)
-  assert.equal(find(tree, 'div', props => props.className === 'greeting-envelope-flap'), undefined)
+  const flap = find(tree, 'div', props => props.className === 'greeting-envelope-flap')
+  assert.equal(flap.props.initial, false)
+  assert.equal(flap.props.style.rotateX.get(), -180)
+  assert.equal(flap.props.style.zIndex.get(), 1)
   tree = envelopeFixture().render({ loading: true, hasNext: false })
   assert.equal(tree.props['aria-busy'], false)
   assert.equal(find(tree, 'GreetingLetter').props.loading, true)
@@ -249,7 +263,7 @@ test('안부 하단 목록 없이 다음 버튼으로 최신순 이동·순환�
   assert.equal(find(tree, 'GreetingLetter').props.greeting.id, '1')
   const bottom = find(tree, 'div', props => props.className === 'greeting-envelope-bottom')
   const backdrop = find(bottom, 'div', props => props.className === 'greeting-envelope-front')
-  const back = find(bottom, 'div', props => props.className === 'greeting-envelope-back')
+  const back = find(bottom, 'div', props => props.className === 'greeting-envelope-flap')
   assert.ok(back)
   assert.equal(back.props['aria-hidden'], 'true')
   assert.ok(backdrop)
@@ -279,7 +293,7 @@ test('안부 0·1개에서는 다음을 잠그며 조회 실패 안내와 재시
     f.client.setQueryData(['quest-greetings', '22', 'token'], { viewerRole: 'AUTHOR', submissions })
     const tree = f.render()
     assert.equal(nextButton(tree).props.disabled, true)
-    assert.equal(Boolean(find(tree, 'div', props => props.className === 'greeting-envelope-back')), submissions.length > 0)
+    assert.equal(Boolean(find(tree, 'div', props => props.className === 'greeting-envelope-flap')), submissions.length > 0)
   }
   f.client.setQueryData(['quest-greetings', '22', 'token'], { submissions: [] })
   f.greetingError = true

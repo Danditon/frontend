@@ -46,6 +46,7 @@
   /* 봉투 폭에 비례해야 화면 크기가 달라도 접힘 각도가 유지됩니다. */
   --envelope-fold-height: 28cqw;
   --envelope-back-lift: 36cqw;
+  --envelope-flap-overlap: 10px;
   --greeting-heart-size: 58px;
   --greeting-reader-top: 16px;
   position: relative;
@@ -66,25 +67,21 @@
 .greeting-text { width: 100%; flex: none; margin-top: 26px; font-size: 20px; font-weight: 500; line-height: 1.5; text-align: center; white-space: pre-wrap; overflow-wrap: anywhere; }
 .greeting-sender { flex: none; margin-top: 16px; color: #727875; font-size: 12px; text-align: center; overflow-wrap: anywhere; }
 .greeting-envelope-bottom { position: relative; z-index: auto; display: flex; min-height: clamp(180px, 26dvh, 228px); flex: none; flex-direction: column; }
-.greeting-envelope-lining { position: absolute; inset: calc(0px - var(--envelope-fold-height)) 0 0; z-index: 0; background: linear-gradient(135deg, var(--envelope-bottom), var(--envelope-top)); pointer-events: none; }
-/* 하단 전체를 앞쪽 레이어로 묶지 않아야 뒷면이 편지지 뒤로 들어갑니다. */
-.greeting-envelope-back {
+.greeting-envelope-lining { position: absolute; inset: calc(0px - var(--envelope-fold-height)) 0 0; z-index: 0; border-radius: 12px; background: linear-gradient(135deg, var(--envelope-bottom), var(--envelope-top)); pointer-events: none; }
+.greeting-envelope-flap {
   position: absolute;
-  inset: calc(0px - var(--envelope-fold-height) - var(--envelope-back-lift)) 0 0;
-  z-index: 0;
-  background: #ffffffb3;
-  clip-path: polygon(0 var(--envelope-back-lift), 50% 0, 100% var(--envelope-back-lift), 100% 100%, 0 100%);
+  top: calc(0px - var(--envelope-fold-height));
+  left: 0;
+  width: 100%;
+  /* 닫힐 때는 앞면을 덮고, 열리면 기존 뚜껑 깊이에 맞춥니다. */
+  height: calc(var(--envelope-fold-height) + var(--envelope-flap-overlap) + (var(--envelope-back-lift) - var(--envelope-fold-height) - var(--envelope-flap-overlap)) * var(--flap-open-progress, 1));
+  transform-style: preserve-3d;
   pointer-events: none;
 }
-.greeting-envelope-back::before { content: ""; position: absolute; inset: 3px 0 0; background: linear-gradient(135deg, var(--envelope-bottom), var(--envelope-top)); clip-path: inherit; }
-.greeting-envelope-flap { position: absolute; top: calc(0px - var(--envelope-fold-height)); left: 0; width: 100%; height: var(--envelope-back-lift); transform-style: preserve-3d; pointer-events: none; }
-.greeting-envelope-flap-face { position: absolute; inset: 0; backface-visibility: hidden; background: #ffffffb3; clip-path: polygon(0 0, 100% 0, 50% 100%); }
-.greeting-envelope-flap-face::before { content: ""; position: absolute; inset: 0 0 3px; background: linear-gradient(var(--envelope-top), var(--envelope-bottom)); clip-path: inherit; }
-/* 뒷면을 가운데에서 뒤집어도 앞면과 같은 영역을 차지하도록 삼각형과 테두리를 반전합니다. */
-.greeting-envelope-flap-inside { transform: rotateX(180deg); clip-path: polygon(0 100%, 100% 100%, 50% 0); }
-.greeting-envelope-flap-inside::before { inset: 3px 0 0; background: linear-gradient(135deg, var(--envelope-bottom), var(--envelope-top)); }
+.greeting-envelope-flap-face { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; transform-origin: 50% 50%; backface-visibility: hidden; filter: drop-shadow(0 2px 2px #806b281a); }
+.greeting-envelope-flap-inside { transform: rotateX(180deg); }
 /* 앞면의 V자 꼭짓점은 하단 영역의 시작점이며, 하트 중심도 이 선에 놓입니다. */
-.greeting-envelope-front { position: absolute; inset: calc(0px - var(--envelope-fold-height)) 0 0; z-index: 3; background: linear-gradient(var(--envelope-top), var(--envelope-bottom)); clip-path: polygon(0 0, 50% var(--envelope-fold-height), 100% 0, 100% 100%, 0 100%); pointer-events: none; }
+.greeting-envelope-front { position: absolute; inset: calc(0px - var(--envelope-fold-height)) 0 0; z-index: 3; border-radius: 12px; background: linear-gradient(var(--envelope-top), var(--envelope-bottom)); clip-path: polygon(0 0, 50% var(--envelope-fold-height), 100% 0, 100% 100%, 0 100%); pointer-events: none; }
 /* 아래 덮개가 하트 뒤로 더 올라오도록 접힘선을 올려, V자와 한 점에서 교차하지 않게 합니다. */
 .greeting-envelope-front::before, .greeting-envelope-front::after { content: ""; position: absolute; inset: 0; transform: translateY(calc(var(--greeting-heart-size) / -3 - 2px)); }
 .greeting-envelope-front::before { clip-path: polygon(0 0, 50% var(--envelope-fold-height), 0 calc(var(--envelope-fold-height) * 2)); background: linear-gradient(110deg, #ffffff30, transparent); }

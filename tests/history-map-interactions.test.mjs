@@ -174,3 +174,22 @@ test('위치가 없는 기록을 선택하면 기존 지도의 확대 수준과 
   assert.equal(f.maps[0].pans.length, before)
   f.unmount()
 })
+
+test('다른 안부 Drawer를 열고 높이를 바꿔도 지도와 확대 수준을 유지하며 가리지 않는 중앙으로 이동한다', () => {
+  const f = fixture()
+  f.render({ selectedRecordId: '101' }); f.ready(); f.render()
+  const oldOverlayObserver = f.observers.at(-1)
+  f.maps[0].level = 6
+  f.panel.top = 280
+  f.render({ overlayKey: 'peers' })
+  assert.equal(oldOverlayObserver.disconnected, true)
+  assert.equal(f.maps.length, 1)
+  assert.equal(f.maps[0].level, 6)
+  assert.equal(f.maps[0].pans.at(-1).y, 35 + 166)
+  f.panel.top = 180
+  f.observers.at(-1).resize()
+  assert.equal(f.maps[0].pans.at(-1).y, 35 + 216)
+  f.render({ overlayKey: 'records' })
+  assert.equal(f.maps.length, 1)
+  f.unmount()
+})

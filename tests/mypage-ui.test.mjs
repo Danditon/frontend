@@ -94,7 +94,7 @@ function fixture(path = '/me', search = '') {
     react: {
       useState(initial) { const i = cursor++; if (!(i in states)) states[i] = initial; return [states[i], value => { states[i] = typeof value === 'function' ? value(states[i]) : value }] },
       useMemo: fn => fn(),
-      useRef() { const i = refCursor++; return refs[i] ??= { current: i === 0 ? { scrollIntoView: () => f.scrolls.push('top') } : null } },
+      useRef(initial) { const i = refCursor++; return refs[i] ??= { current: i === 0 ? { scrollIntoView: () => f.scrolls.push('top') } : initial } },
       useEffect(run, deps) { const i = effectCursor++; if (!effects[i] || deps.some((value, j) => !Object.is(value, effects[i][j]))) { effects[i] = deps; run() } },
     },
     'react-router': { ...router, useLocation: () => ({ pathname: f.pathname }), useSearchParams: () => [params, update => {
@@ -103,6 +103,7 @@ function fixture(path = '/me', search = '') {
     'lucide-react': { Heart: 'Heart', ExternalLink: 'ExternalLink' }, '@/shared/components/WireUI': wire, '@/shared/components/RemotePhoto': photo,
     '@/features/history/components/HistoryMap': { HistoryMap: 'HistoryMap' },
     '@/features/history/components/HistoryRecordCard': { HistoryRecordCard: 'HistoryRecordCard' },
+    '@/features/history/components/PeerGreetingsDrawer': { __esModule: true, default: 'PeerGreetingsDrawer' },
     '@/features/history/lib/locations': load('features/history/lib/locations.ts'),
     '@/features/auth/hooks/useAuth': { useAuth: () => ({ user: { userId: 7, nickname: '사용자', email: 'user@example.com' }, retrySession: async () => {} }) },
     '@/features/auth/utils/tokenStorage': { getAccessToken: () => 'token' },
@@ -120,12 +121,13 @@ function fixture(path = '/me', search = '') {
     },
     '../api/myPage': { getMyQuests: () => {}, getMySubmissions: () => {} },
     '../lib/performances': load('features/memories/lib/performances.ts'),
+    '../lib/greetingViews': load('features/memories/lib/greetingViews.ts', { './performances.ts': load('features/memories/lib/performances.ts') }),
     '@/features/quests/api/verification': { getQuestGreetings: () => {}, toggleSubmissionLike: () => {}, getVerificationQuest: (...args) => { f.requestedDetail = args } },
     '../components/MyPageSummary': { __esModule: true, default: 'MyPageSummary' },
     '../components/MemoryQuestCard': { __esModule: true, default: 'MemoryQuestCard' },
     '../components/GreetingEnvelope': { __esModule: true, default: 'GreetingEnvelope' },
     '../components/MyPageTabs': { __esModule: true, default: 'MyPageTabs' },
-  }, { URLSearchParams, localStorage: { removeItem: key => f.removed.push(key) }, sessionStorage: { removeItem: key => f.removed.push(key) } })
+  }, { URLSearchParams, requestAnimationFrame: fn => fn(), localStorage: { removeItem: key => f.removed.push(key) }, sessionStorage: { removeItem: key => f.removed.push(key) } })
   return Object.defineProperty(Object.assign(f, {
     render() { cursor = 0; refCursor = 0; effectCursor = 0; return expand(Page()) },
     finishLike() { mutationOptions.onSuccess({ submissionId: mutation.variables.submissionId, isLiked: true }, mutation.variables); mutation.isPending = false },
@@ -311,16 +313,16 @@ test('안부 하단 목록 없이 다음 버튼으로 최신순 이동·순환�
   assert.ok(backdrop)
   assert.equal(backdrop.props['aria-hidden'], 'true')
   assert.ok(find(bottom, 'footer', props => props.className === 'greeting-footer'))
-  assert.ok(likeButton(bottom))
+  assert.equal(likeButton(bottom), undefined)
   assert.equal(find(tree, 'Link', props => props['aria-label'] === '로그아웃'), undefined)
-  assert.equal(find(tree, 'Back').props.to, '/me/history?showOthers=1')
+  assert.equal(find(tree, 'Back').props.to, '/me/history?record=101&panel=others')
   assert.equal(find(tree, 'section', props => props['aria-label'] === '수행 글 목록'), undefined)
   assert.equal(all(tree, 'ol').length, 0)
   assert.equal(nextButton(tree).props.disabled, false)
   nextButton(tree).props.onClick()
   tree = f.render()
   assert.equal(find(tree, 'GreetingLetter').props.greeting.id, '2')
-  assert.equal(f.params.has('submission'), false)
+  assert.equal(f.params.get('submission'), '2')
   assert.equal(f.params.get('record'), '101')
   assert.equal(f.params.get('quest'), '22')
   assert.equal(f.params.get('source'), 'records')
@@ -364,28 +366,6 @@ test('좋아요는 작성자에게만 허용하고 중복 요청을 막으며 �
   assert.equal(f.likes.length, 1)
 })
 
-test('기록과 다른 수행자 링크는 퀘스트·기록·안부 ID와 돌아올 목록을 유지한다', () => {
-  const f = fixture('/me/history')
-  let tree = f.render()
-  assert.equal(find(tree, 'MyPageSummary').props.active, 'history')
-  assert.equal(find(tree, 'HistoryMap').props.records[0].id, '101')
-  find(tree, 'button', props => props['data-history-key'] === '101').props.onClick()
-  tree = f.render()
-  let link = find(tree, 'Link', props => text({ props }) === '이곳의 안부 보기')
-  assert.equal(new URL(link.props.to, 'https://example.com').searchParams.get('record'), '101')
-  assert.equal(new URL(link.props.to, 'https://example.com').searchParams.get('submission'), '101')
-  find(tree, 'button').props.onClick()
-  tree = f.render()
-  assert.equal(find(tree, 'HistoryMap').props.selectedRecordId, null)
-  find(tree, 'button', props => props['data-history-key'] === 'peer-2').props.onClick()
-  tree = f.render()
-  link = find(tree, 'Link', props => text({ props }) === '이곳의 안부 보기')
-  const params = new URL(link.props.to, 'https://example.com').searchParams
-  assert.equal(params.get('quest'), '22')
-  assert.equal(params.get('submission'), '2')
-  assert.equal(params.get('returnOthers'), '1')
-})
-
 test('카드 클릭은 지도만 선택하고 재클릭·마커 클릭도 같은 선택 상태를 공유한다', () => {
   const f = fixture('/me/history')
   f.records.push({ ...record, id: '102', questId: '23', title: '다른 장소', createdAt: '2026-11-09', location: { lat: 36, lng: 129, placeName: '다른 장소' } })
@@ -406,7 +386,8 @@ test('카드 클릭은 지도만 선택하고 재클릭·마커 클릭도 같은
   tree = f.render()
   assert.equal(card(tree).props['aria-pressed'], false)
   assert.equal(find(tree, 'HistoryMap').props.selectedRecordId, '102')
-  assert.match(find(tree, 'a').props.href, /36,129$/)
+  assert.equal(find(tree, 'a'), undefined)
+  assert.match(find(tree, 'Link', props => props.to.includes('submission=')).props.to, /submission=102/)
   f.records = [record]
   tree = f.render()
   assert.equal(find(tree, 'HistoryMap').props.selectedRecordId, null)
@@ -422,21 +403,129 @@ test('좌표나 사진이 없어도 기록 선택과 안부 조회는 가능하�
   assert.equal(find(tree, 'RemotePhoto').props.photoUrl, null)
   assert.ok(find(tree, 'Link', props => props.to.includes('record=101')))
   assert.equal(find(tree, 'a'), undefined)
-  assert.match(text(tree), /위치 정보가 없어요/)
+  assert.ok(find(tree, 'button', props => text({ props }) === '다른 사람 안부'))
 })
 
-test('같은 장소의 다른 수행자 여러 명은 각 안부 ID를 유지하고 마커는 최신 기록을 선택한다', () => {
-  const f = fixture('/me/history', 'showOthers=1')
+test('내 기록에는 내 카드만 남고 다른 사람 버튼은 선택한 퀘스트 하나의 Drawer를 연다', () => {
+  const f = fixture('/me/history')
+  f.records.push({ ...record, id: '102', questId: '23' })
+  f.client.setQueryData(['quest-greetings', '22', 'token'], { submissions: [
+    submission(101, '2026-11-03', { performer: { userId: 7, nickname: '나' } }),
+    submission(1, '2026-11-01'), submission(2, '2026-11-02'),
+  ] })
   let tree = f.render()
-  find(tree, 'button', props => props['data-history-key'] === 'peer-1').props.onClick()
+  assert.equal(all(tree, 'button').filter(node => node.props['data-history-key']).length, 2)
+  assert.equal(find(tree, 'button', props => text({ props }) === '다른 수행자 기록 보기'), undefined)
+  assert.equal(f.queries.filter(query => query.queryKey[0] === 'quest-greetings' && query.enabled).length, 0)
+  find(tree, 'button', props => props['data-history-key'] === '101').props.onClick()
   tree = f.render()
-  let link = find(tree, 'Link', props => props.to.includes('submission='))
-  assert.match(link.props.to, /submission=1/)
-  find(tree, 'HistoryMap').props.onSelectRecord('101')
+  const ownLink = find(tree, 'Link', props => text({ props }) === '내가 남긴 안부 보기')
+  const ownParams = new URL(ownLink.props.to, 'https://example.com').searchParams
+  assert.equal(ownParams.get('record'), '101')
+  assert.equal(ownParams.get('submission'), '101')
+  assert.equal(ownParams.get('view'), 'mine')
+  assert.equal(find(tree, 'a'), undefined)
+  find(tree, 'button', props => text({ props }) === '다른 사람 안부').props.onClick()
   tree = f.render()
-  link = find(tree, 'Link', props => props.to.includes('submission='))
-  assert.match(link.props.to, /submission=2/)
-  assert.equal(all(tree, 'button').filter(node => node.props['aria-pressed']).length, 1)
+  const drawer = find(tree, 'PeerGreetingsDrawer').props
+  assert.deepEqual(Array.from(drawer.greetings, item => item.id), ['2', '1'])
+  assert.equal(drawer.record.questId, '22')
+  assert.equal(find(tree, 'div', props => props.className === 'mypage-history-panel'), undefined)
+  assert.equal(find(tree, 'HistoryMap').props.selectedRecordId, '101')
+  drawer.onExpandedChange(true)
+  tree = f.render()
+  assert.equal(find(tree, 'PeerGreetingsDrawer').props.expanded, true)
+  const peerUrl = new URL(find(tree, 'PeerGreetingsDrawer').props.greetingPath(2), 'https://example.com')
+  assert.equal(peerUrl.searchParams.get('quest'), '22')
+  assert.equal(peerUrl.searchParams.get('view'), 'others')
+  assert.equal(peerUrl.searchParams.get('submission'), '2')
+  assert.equal(peerUrl.searchParams.get('expanded'), '1')
+  drawer.saveScroll(150)
+  const scroll = { scrollTop: 0 }
+  find(tree, 'PeerGreetingsDrawer').props.restoreScroll(scroll)
+  assert.equal(scroll.scrollTop, 150)
+  drawer.onClose()
+  tree = f.render()
+  assert.equal(find(tree, 'PeerGreetingsDrawer'), undefined)
+  assert.equal(find(tree, 'HistoryMap').props.selectedRecordId, '101')
+})
+
+test('내 편지는 선택한 내 글 한 건만 열고 다음 대신 내 기록으로 돌아간다', () => {
+  const f = fixture('/me/memories', 'source=records&view=mine&record=101&quest=22&submission=101&message=0')
+  f.client.setQueryData(['quest-greetings', '22', 'token'], { viewerRole: 'COMPLETED', submissions: [
+    submission(1, '2026-11-01'), submission(101, '2026-11-02', { performer: { userId: 7, nickname: '나' } }),
+    submission(102, '2026-11-03', { performer: { userId: 7, nickname: '나' } }),
+  ] })
+  const tree = f.render()
+  assert.equal(find(tree, 'GreetingLetter').props.greeting.id, '101')
+  assert.equal(text(nextButton(tree)), '내 기록으로 돌아가기')
+  assert.match(text(tree), /내가 남긴 안부/)
+  assert.doesNotMatch(text(tree), /1\/3/)
+  nextButton(tree).props.onClick()
+  assert.equal(f.navigations[0][0], '/me/history?record=101')
+  assert.equal(f.navigations[0][1].replace, true)
+})
+
+test('누락되거나 다른 작성자의 안부 ID를 대신 열지 않으며 퀘스트·기록 불일치를 차단한다', () => {
+  for (const query of [
+    'source=records&view=mine&record=101&quest=22&submission=1&message=0',
+    'source=records&view=others&record=101&quest=22&submission=999&message=0',
+    'source=records&view=others&record=101&quest=23&submission=1&message=0',
+  ]) {
+    const f = fixture('/me/memories', query)
+    const tree = f.render()
+    const letter = find(tree, 'GreetingLetter').props
+    assert.equal(letter.greeting, undefined)
+    assert.equal(letter.failed, true)
+    assert.equal(letter.loading, false)
+    assert.match(letter.statusMessage, /찾을 수 없어요/)
+  }
+})
+
+test('다른 사람 편지는 내 글을 제외하고 순환하며 펼친 Drawer로 복귀한다', () => {
+  const f = fixture('/me/memories', 'source=records&view=others&record=101&quest=22&submission=1&message=0&expanded=1')
+  f.client.setQueryData(['quest-greetings', '22', 'token'], { viewerRole: 'COMPLETED', submissions: [
+    submission(101, '2026-11-10', { performer: { userId: 7, nickname: '나' } }),
+    submission(1, '2026-11-01'), submission(2, '2026-11-02'),
+  ] })
+  let tree = f.render()
+  assert.equal(find(tree, 'GreetingLetter').props.greeting.id, '1')
+  assert.match(text(tree), /다른 사람이 남긴 안부 2\/2/)
+  assert.equal(text(nextButton(tree)), '다음 사람의 안부 보기')
+  assert.equal(find(tree, 'Back').props.to, '/me/history?record=101&panel=others&expanded=1')
+  nextButton(tree).props.onClick()
+  tree = f.render()
+  assert.equal(find(tree, 'GreetingLetter').props.greeting.id, '2')
+  nextButton(tree).props.onClick()
+  assert.equal(find(f.render(), 'GreetingLetter').props.greeting.id, '1')
+  f.client.setQueryData(['quest-greetings', '22', 'token'], { submissions: [submission(1, '2026-11-01')] })
+  tree = f.render()
+  assert.equal(text(nextButton(tree)), '목록으로 돌아가기')
+  nextButton(tree).props.onClick()
+  assert.equal(f.navigations[0][0], '/me/history?record=101&panel=others&expanded=1')
+})
+
+test('다른 사람 목록 조회 실패·없음은 Drawer 안에서 처리하며 다른 장소로 바꾸면 이전 응답을 쓰지 않는다', () => {
+  const f = fixture('/me/history', 'record=101&panel=others')
+  f.greetingError = true
+  let tree = f.render()
+  find(tree, 'PeerGreetingsDrawer').props.onRetry()
+  assert.equal(f.retried, true)
+  assert.equal(find(tree, 'PeerGreetingsDrawer').props.failed, true)
+  f.greetingError = false
+  f.client.setQueryData(['quest-greetings', '22', 'token'], { submissions: [] })
+  tree = f.render()
+  assert.equal(find(tree, 'PeerGreetingsDrawer').props.greetings.length, 0)
+  f.records.push({ ...record, id: '102', questId: '23' })
+  tree = f.render()
+  find(tree, 'HistoryMap').props.onSelectRecord('102')
+  tree = f.render()
+  assert.equal(find(tree, 'PeerGreetingsDrawer'), undefined)
+  assert.equal(find(tree, 'HistoryMap').props.selectedRecordId, '102')
+  find(tree, 'button', props => text({ props }) === '다른 사람 안부').props.onClick()
+  tree = f.render()
+  assert.equal(find(tree, 'PeerGreetingsDrawer').props.record.questId, '23')
+  assert.equal(find(tree, 'PeerGreetingsDrawer').props.greetings.length, 0)
 })
 
 test('편지지에는 사진·본문·작성자를 함께 표시하고 사진 없음·조회 실패를 처리한다', () => {
@@ -494,7 +583,7 @@ test('편지 테마는 선택한 퀘스트 유형을 따르며 기록 ID가 아�
   const f = fixture('/me/memories', 'quest=22&message=0')
   const sceneType = tree => find(tree, 'div', props => props.className === 'greeting-scene').props['data-quest-type']
   assert.equal(sceneType(f.render()), 'GENERAL')
-  assert.equal(f.queries.at(-1).enabled, false)
+  assert.equal(f.queries.find(query => query.queryKey[0] === 'verification-quest').enabled, false)
   f.memories = [{ ...memory, questType: 'IMAGE' }]
   assert.equal(sceneType(f.render()), 'IMAGE')
 
@@ -637,4 +726,31 @@ test('로그아웃은 목록 요청을 비활성화하고 기존 토큰 제거 �
   assert.deepEqual(f.removed, ['accessToken', 'refreshToken', 'accessToken'])
   assert.equal(f.navigations[0][0], '/login')
   assert.equal(f.navigations[0][1].replace, true)
+})
+
+test('공용 SwipeSheet는 기존 자체 상태와 Drawer의 제어 상태 모두 접기·펼치기를 지원한다', () => {
+  let cursor = 0
+  const states = [], refs = []
+  const { SwipeSheet } = load('shared/components/SwipeSheet.tsx', {
+    react: {
+      useId: () => 'sheet',
+      useState(initial) { const i = cursor++; if (!(i in states)) states[i] = initial; return [states[i], value => { states[i] = value }] },
+      useRef(initial) { const i = cursor++; return refs[i] ??= { current: initial } },
+    },
+    'motion/react': { motion: { section: 'section' }, useReducedMotion: () => true },
+  })
+  const render = props => { cursor = 0; return SwipeSheet({ label: '안부', ...props }) }
+  let tree = render({})
+  assert.equal(tree.props.animate.height, '64%')
+  find(tree, 'button').props.onClick()
+  tree = render({})
+  assert.equal(tree.props.animate.height, '94%')
+  let expanded
+  tree = render({ expanded: true, onExpandedChange: value => { expanded = value } })
+  find(tree, 'button').props.onKeyDown({ key: 'ArrowDown', preventDefault() {} })
+  assert.equal(expanded, false)
+  tree = render({ expanded: false, onExpandedChange: value => { expanded = value } })
+  assert.equal(tree.props.animate.height, '64%')
+  find(tree, 'button').props.onClick()
+  assert.equal(expanded, true)
 })

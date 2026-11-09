@@ -1,15 +1,16 @@
 import { HistoryMap } from "@/features/history/components/HistoryMap";
 import { HistoryRecordCard, type HistoryCardItem } from "@/features/history/components/HistoryRecordCard";
-import { locatedRecords } from "@/features/history/lib/locations";
+import PeerGreetingsDrawer from "@/features/history/components/PeerGreetingsDrawer";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router";
 import { Back } from "@/shared/components/WireUI";
-import { ExternalLink } from "lucide-react";
-import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { getAccessToken } from "@/features/auth/utils/tokenStorage";
 import { getMyQuests, getMySubmissions } from "../api/myPage";
 import { newestFirst } from "../lib/performances";
+import { greetingViewItems, type GreetingView } from "../lib/greetingViews";
+import type { RecordItem } from "../types";
 import { getQuestGreetings, getVerificationQuest, toggleSubmissionLike, type QuestGreetings } from "@/features/quests/api/verification";
 
 import MyPageSummary from "../components/MyPageSummary";
@@ -42,6 +43,8 @@ export default function MyPage() {
   const messageTop = useRef<HTMLElement>(null);
   const historyPanel = useRef<HTMLDivElement>(null);
   const historyList = useRef<HTMLDivElement>(null);
+  const peerTrigger = useRef<HTMLButtonElement>(null);
+  const peerScroll = useRef(new Map<string, number>());
   const [historySelection, setHistorySelection] = useState({ key: "", request: 0 });
   const [previewQuestId, setPreviewQuestId] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -51,7 +54,6 @@ export default function MyPage() {
   const logout = pathname === "/me/logout";
   const history = pathname === "/me/history";
   const message = params.has("message") || params.get("tab") === "messages";
-  const showOthers = params.get("showOthers") === "1";
   const questsQuery = useQuery({
     queryKey: ["my-quests", user?.userId],
     queryFn: ({ signal }) => getMyQuests(token!, signal),
@@ -79,11 +81,23 @@ export default function MyPage() {
   }, [token, recordsQuery.data, historyQuestId]);
   const source = params.get("source");
   const fromRecords = source === "records" || source === "completed";
+  const greetingView: GreetingView = !fromRecords ? "received"
+    : params.get("view") === "others" || source === "completed" || params.get("returnOthers") === "1" ? "others" : "mine";
   const questParam = params.get("quest");
+  const selectedRecord = fromRecords ? records.find((item) =>
+    (params.has("record") ? item.id === params.get("record") : item.questId === questParam)
+    && (!questParam || item.questId === questParam)) : undefined;
   const selected = fromRecords
-    ? records.find((item) => params.has("record") ? item.id === params.get("record") : item.questId === questParam)
+    ? selectedRecord
     : questParam ? memories.find((item) => item.id === questParam) : memories[0];
-  const selectedQuestId = selected && ("questId" in selected ? selected.questId : selected.id);
+  const selectedQuestId = fromRecords ? selectedRecord?.questId : selected?.id;
+  const historyCards: HistoryCardItem[] = newestFirst(visibleRecords).map((record) => ({
+    key: record.id, record, photoUrl: record.photoUrl, createdAt: record.createdAt,
+  }));
+  const selectedHistoryCard = historyCards.find((item) => item.key === (params.get("record") ?? historySelection.key));
+  const selectedHistoryKey = selectedHistoryCard?.key;
+  const peerOpen = Boolean(history && params.get("panel") === "others" && selectedHistoryCard?.record.questId);
+  const peerExpanded = params.get("expanded") === "1";
   // 수행 기록에는 유형이 없을 수 있어 선택한 퀘스트의 상세 정보로 확인합니다.
   const selectedQuest = useQuery({
     queryKey: ["verification-quest", selectedQuestId, token],
@@ -93,64 +107,32 @@ export default function MyPage() {
     retry: false,
   });
   const questType = selected?.questType ?? selectedQuest.data?.questType;
-  const peerQuestIds = history && showOthers
-    ? [...new Set(visibleRecords.map((record) => record.questId).filter((id): id is string => Boolean(id)))]
-    : [];
-  const greetingQuestIds = message && selectedQuestId ? [selectedQuestId] : peerQuestIds;
-  const greetingQueries = useQueries({
-    queries: greetingQuestIds.map((questId) => ({
-      queryKey: ["quest-greetings", questId, token],
-      queryFn: ({ signal }: { signal: AbortSignal }) => getQuestGreetings(questId, signal),
-      enabled: Boolean(token),
-      retry: false,
-    })),
+  const greetingQuestId = message ? selectedQuestId : peerOpen ? selectedHistoryCard?.record.questId : undefined;
+  const greetingQuery = useQuery({
+    queryKey: ["quest-greetings", greetingQuestId, token],
+    queryFn: ({ signal }) => getQuestGreetings(greetingQuestId!, signal),
+    enabled: Boolean(token && greetingQuestId),
+    retry: false,
   });
-  const greetingQuery = message ? greetingQueries[0] : undefined;
-  const peerRecords = showOthers
-    ? newestFirst(peerQuestIds.flatMap((questId, index) => {
-        const record = visibleRecords.find((item) => item.questId === questId);
-        if (!record) return [];
-        return (greetingQueries[index]?.data?.submissions ?? [])
-          .filter((item) => item.verifyStatus === "PASSED" && item.performer.userId !== user?.userId)
-          .map((item) => ({
-            key: `peer-${item.submissionId}`, record,
-            submissionId: item.submissionId, photoUrl: item.photoUrl,
-            createdAt: item.createdAt, performerName: item.performer.nickname,
-          }));
-      }))
-    : [];
-  const historyCards: HistoryCardItem[] = showOthers ? peerRecords : newestFirst(visibleRecords).map((record) => ({
-    key: record.id, record, photoUrl: record.photoUrl, createdAt: record.createdAt,
-    // 내 기록 ID는 /users/me/submissions가 반환한 submissionId입니다.
-    submissionId: Number(record.id),
-  }));
-  const selectedHistoryCard = historyCards.find((item) => item.key === historySelection.key);
-  const selectedHistoryKey = selectedHistoryCard?.key;
-  const selectedLocation = selectedHistoryCard && locatedRecords([selectedHistoryCard.record])[0]?.location;
   function selectHistoryCard(key: string) {
     // 같은 카드를 다시 눌러도 드래그한 지도를 해당 장소로 되돌립니다.
     setHistorySelection((previous) => ({ key, request: previous.request + 1 }));
+    setParams((previous) => {
+      previous.set("record", key);
+      previous.delete("panel");
+      previous.delete("expanded");
+      return previous;
+    }, { replace: true });
   }
-  const greetings = newestFirst((greetingQuery?.data?.submissions ?? [])
-    .filter((item) => item.verifyStatus === "PASSED")
-    .map((item) => ({
-      id: String(item.submissionId),
-      submissionId: item.submissionId,
-      isLiked: item.isLiked,
-      greeting: item.greeting,
-      photoUrl: item.photoUrl,
-      senderName: item.performer.nickname,
-      isMine: item.performer.userId === user?.userId,
-      createdAt: item.createdAt,
-    })));
+  const peerGreetings = greetingViewItems(greetingQuery.data?.submissions ?? [], "others", user?.userId);
+  const greetings = greetingViewItems(greetingQuery.data?.submissions ?? [], greetingView, user?.userId, selectedRecord?.id);
   const requested = Number(params.get("message"));
-  const linkedGreeting = greetings.findIndex((item) => item.id === params.get("submission"));
-  const index = linkedGreeting >= 0 ? linkedGreeting : Number.isFinite(requested)
-    ? Math.max(0, Math.min(greetings.length - 1, Math.trunc(requested)))
-    : 0;
+  const requestedId = params.get("submission") ?? (greetingView === "mine" ? selectedRecord?.id : undefined);
+  const index = requestedId ? greetings.findIndex((item) => item.id === requestedId) : Number.isFinite(requested)
+    ? Math.max(0, Math.min(greetings.length - 1, Math.trunc(requested))) : 0;
   const greeting = greetings[index];
   const liked = greeting?.isLiked ?? false;
-  const canLike = Boolean(token && greeting && selectedQuestId && greetingQuery?.data?.viewerRole === "AUTHOR");
+  const canLike = Boolean(token && greetingView === "received" && greeting && selectedQuestId && greetingQuery.data?.viewerRole === "AUTHOR");
   const likeMutation = useMutation({
     mutationFn: ({ submissionId }: { submissionId: number; questId: string; token: string }) =>
       toggleSubmissionLike(submissionId),
@@ -170,12 +152,14 @@ export default function MyPage() {
       queryClient.invalidateQueries({ queryKey: ["quest-greetings", questId, token] }),
   });
   const recordCount = records.length;
-  const backTo =
-    source === "completed"
-      ? "/me/history?showOthers=1"
-      : source === "records"
-        ? `/me/history${params.get("returnOthers") === "1" ? "?showOthers=1" : ""}`
-        : "/me/memories";
+  const returnParams = new URLSearchParams();
+  if (selectedRecord) returnParams.set("record", selectedRecord.id);
+  if (params.get("historyQuest")) returnParams.set("quest", params.get("historyQuest")!);
+  if (greetingView === "others") {
+    returnParams.set("panel", "others");
+    if (peerExpanded) returnParams.set("expanded", "1");
+  }
+  const backTo = fromRecords ? `/me/history${returnParams.size ? `?${returnParams}` : ""}` : "/me/memories";
   useEffect(() => {
     if (message) {
       messageTop.current?.scrollIntoView({ block: "start" });
@@ -198,7 +182,7 @@ export default function MyPage() {
     observer.observe(panel);
     update();
     return () => observer.disconnect();
-  }, [history]);
+  }, [history, peerOpen]);
   useEffect(() => {
     const list = historyList.current;
     if (!history || !list || !selectedHistoryKey) return;
@@ -208,13 +192,27 @@ export default function MyPage() {
       left: card.offsetLeft - (list.clientWidth - card.offsetWidth) / 2,
       behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth",
     });
-  }, [history, selectedHistoryKey, historySelection.request]);
+  }, [history, selectedHistoryKey, historySelection.request, peerOpen]);
   function openGreeting(next: number) {
     setParams((previous) => {
-      previous.delete("submission");
+      if (greetingView === "others" && greetings[next]) previous.set("submission", greetings[next].id);
+      else previous.delete("submission");
       previous.set("message", String(next));
       return previous;
-    });
+    }, { replace: greetingView === "others" });
+  }
+  function recordGreetingPath(record: RecordItem, view: "mine" | "others", submissionId: string) {
+    const next = new URLSearchParams({ source: "records", view, record: record.id,
+      quest: record.questId!, submission: submissionId, message: "0" });
+    if (historyQuestId) next.set("historyQuest", historyQuestId);
+    if (peerExpanded) next.set("expanded", "1");
+    return `/me/memories?${next}`;
+  }
+  function closePeers() {
+    setParams((previous) => {
+      previous.delete("panel"); previous.delete("expanded"); return previous;
+    }, { replace: true });
+    requestAnimationFrame(() => peerTrigger.current?.focus({ preventScroll: true }));
   }
   async function signOut() {
     try {
@@ -256,23 +254,27 @@ export default function MyPage() {
     );
   if (message) {
     const sourceQuery = fromRecords ? recordsQuery : questsQuery;
-    const loading = Boolean(token && (sourceQuery.isPending || greetingQuery?.isPending));
-    const failed = Boolean(token && (sourceQuery.isError || greetingQuery?.isError));
+    const loading = Boolean(token && (sourceQuery.isPending || (greetingQuestId && greetingQuery.isPending)));
+    const failed = Boolean(token && (sourceQuery.isError || (greetingQuestId && greetingQuery.isError)));
+    const missingRecordGreeting = fromRecords && !loading && !failed && !greeting;
+    const returnOnly = greetingView === "mine" || (greetingView === "others" && (!greeting || greetings.length < 2));
+    const emptyMessage = !selected ? "선택한 기록을 찾을 수 없어요." : greetingView === "mine" ? "내가 남긴 안부를 찾을 수 없어요."
+      : requestedId && !greeting ? "선택한 안부를 찾을 수 없어요." : greetingView === "others" ? "아직 다른 사람의 안부가 없어요." : "아직 도착한 안부가 없어요.";
     return (
       <section className="memory-page mypage-greeting">
         <header ref={messageTop} className="greeting-header">
           <Back to={backTo} />
-          <p>{fromRecords ? "수행한 퀘스트의 안부" : "도착한 안부"} {greeting ? index + 1 : 0}/{greetings.length}</p>
+          <p>{greetingView === "mine" ? "내가 남긴 안부" : <>{greetingView === "others" ? "다른 사람이 남긴 안부" : "도착한 안부"} {greeting ? index + 1 : 0}/{greetings.length}</>}</p>
           <h1>{selected?.title ?? (loading ? "불러오는 중…" : "퀘스트를 찾을 수 없어요")}</h1>
         </header>
         <GreetingEnvelope
           key={`${selectedQuestId ?? "none"}:${greeting?.id ?? "empty"}`}
           greeting={greeting}
           questType={questType}
-          statusMessage={loading ? "안부를 불러오는 중이에요." : failed ? "안부를 불러오지 못했어요." : "아직 도착한 안부가 없어요."}
+          statusMessage={loading ? "안부를 불러오는 중이에요." : failed ? "안부를 불러오지 못했어요." : emptyMessage}
           loading={loading}
-          failed={failed}
-          onRetry={() => { void (sourceQuery.isError ? sourceQuery.refetch() : greetingQuery?.refetch()); }}
+          failed={failed || missingRecordGreeting}
+          onRetry={() => { void (sourceQuery.isError || !selected ? sourceQuery.refetch() : greetingQuery.refetch({ cancelRefetch: false })); }}
           canLike={canLike}
           liked={liked}
           liking={likeMutation.isPending}
@@ -282,15 +284,18 @@ export default function MyPage() {
               likeMutation.mutate({ submissionId: greeting.submissionId, questId: selectedQuestId, token });
             }
           }}
-          hasNext={greetings.length > 1}
-          onNext={() => openGreeting((index + 1) % greetings.length)}
+          actionLabel={greetingView === "mine" ? "내 기록으로 돌아가기" : greetingView === "others"
+            ? returnOnly ? "목록으로 돌아가기" : "다음 사람의 안부 보기" : "다음 안부 보기"}
+          hasNext={returnOnly || greetings.length > 1}
+          onNext={() => {
+            if (returnOnly) void navigate(backTo, { replace: true });
+            else openGreeting((index + 1) % greetings.length);
+          }}
         />
       </section>
     );
   }
   if (history) {
-    const peerStatus = greetingQueries.find((query) => query.isError)
-      ?? greetingQueries.find((query) => query.isPending);
     return (
       <MyPageTabs active="history" summary={summary}>
         <div className="mypage-history-map">
@@ -299,12 +304,25 @@ export default function MyPage() {
             token={token}
             selectedRecordId={selectedHistoryCard?.record.id ?? null}
             focusRequest={historySelection.request}
+            overlayKey={peerOpen ? "peers" : "records"}
             onSelectRecord={(recordId) => {
               const card = historyCards.find((item) => item.record.id === recordId);
               if (card) selectHistoryCard(card.key);
             }}
           />
-          <div
+          {peerOpen && selectedHistoryCard ? (
+            <PeerGreetingsDrawer key={selectedHistoryCard.key} record={selectedHistoryCard.record}
+              greetings={peerGreetings} loading={greetingQuery.isPending} failed={greetingQuery.isError}
+              expanded={peerExpanded} onExpandedChange={(expanded) => setParams((previous) => {
+                if (expanded) previous.set("expanded", "1"); else previous.delete("expanded");
+                return previous;
+              }, { replace: true })}
+              onClose={closePeers} onRetry={() => { void greetingQuery.refetch({ cancelRefetch: false }); }}
+              greetingPath={(id) => recordGreetingPath(selectedHistoryCard.record, "others", String(id))}
+              restoreScroll={(element) => { if (element) element.scrollTop = peerScroll.current.get(selectedHistoryCard.key) ?? 0; }}
+              saveScroll={(top) => { peerScroll.current.set(selectedHistoryCard.key, top); }}
+            />
+          ) : <div
             ref={historyPanel}
             className="mypage-history-panel"
           >
@@ -314,31 +332,14 @@ export default function MyPage() {
               </Link>
             )}
             <header>
-              <h2>{showOthers ? "다른 수행자 기록" : "수행 기록"} · 최신순</h2>
-              <button
-                aria-controls="history-record-list"
-                onClick={() => {
-                  setHistorySelection({ key: "", request: 0 });
-                  setParams((previous) => {
-                    if (showOthers) previous.delete("showOthers");
-                    else previous.set("showOthers", "1");
-                    previous.delete("scope");
-                    return previous;
-                  });
-                }}
-              >
-                {showOthers
-                  ? "내 기록 보기"
-                  : "다른 수행자 기록 보기"}
-              </button>
+              <h2>수행 기록 · 최신순</h2>
             </header>
             <div
               ref={historyList}
-              key={String(showOthers)}
               id="history-record-list"
               role="region"
               tabIndex={0}
-              aria-label={showOthers ? "다른 수행자 기록 목록" : "내 수행 퀘스트 목록"}
+              aria-label="내 수행 퀘스트 목록"
               className="mypage-record-list"
             >
               {historyCards.map((item) => (
@@ -347,41 +348,25 @@ export default function MyPage() {
                   onSelect={() => selectHistoryCard(item.key)}
                 />
               ))}
-              {!showOthers && (
-                <Link
-                  className="mypage-record-next"
-                  to="/"
-                >
-                  다음 퀘스트 찾기
-                </Link>
-              )}
+              <Link className="mypage-record-next" to="/">다음 퀘스트 찾기</Link>
             </div>
             {selectedHistoryCard ? (
               <div className="mypage-history-actions">
-                <Link to={`/me/memories?${new URLSearchParams({
-                  source: "records",
-                  record: selectedHistoryCard.record.id,
-                  quest: selectedHistoryCard.record.questId ?? selectedHistoryCard.record.id,
-                  message: "0", returnOthers: showOthers ? "1" : "0",
-                  ...(selectedHistoryCard.submissionId === undefined ? {} : { submission: String(selectedHistoryCard.submissionId) }),
-                })}`}>이곳의 안부 보기</Link>
-                {selectedLocation ? (
-                  <a href={`https://map.kakao.com/link/map/${encodeURIComponent(selectedLocation.placeName || selectedHistoryCard.record.title)},${selectedLocation.lat},${selectedLocation.lng}`}
-                    target="_blank" rel="noreferrer">지도 열기 <ExternalLink size={13} /></a>
-                ) : <span>위치 정보가 없어요</span>}
+                {selectedHistoryCard.record.questId ? <>
+                  <Link to={recordGreetingPath(selectedHistoryCard.record, "mine", selectedHistoryCard.record.id)}>내가 남긴 안부 보기</Link>
+                  <button ref={peerTrigger} type="button" onClick={() => setParams((previous) => {
+                    previous.set("record", selectedHistoryCard.record.id);
+                    previous.set("panel", "others"); return previous;
+                  })}>다른 사람 안부</button>
+                </> : <span>퀘스트 정보를 찾을 수 없어요.</span>}
               </div>
             ) : historyCards.length > 0 && (
               <p className="mypage-history-hint">기록을 누르면 장소와 안부를 확인할 수 있어요.</p>
             )}
-            {showOthers && visibleRecords.length > 0 && (
-              peerStatus
-                ? <ListStatus query={peerStatus} enabled={Boolean(token)} label="다른 수행 기록을" empty="" />
-                : historyCards.length === 0 && <p role="status" className="py-2 text-xs">다른 수행자의 기록이 아직 없어요.</p>
-            )}
             {visibleRecords.length === 0 && (
               <ListStatus query={recordsQuery} enabled={Boolean(token)} label="수행 기록을" empty="아직 수행한 기록이 없어요." />
             )}
-          </div>
+          </div>}
         </div>
       </MyPageTabs>
     );

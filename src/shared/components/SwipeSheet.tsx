@@ -2,11 +2,17 @@ import { motion, useReducedMotion } from 'motion/react'
 import { useId, useRef, useState, type ReactNode } from 'react'
 
 /** A non-modal sheet: only the handle captures gestures, leaving content scrollable. */
-export function SwipeSheet({ children, label, collapsed = 0.64, className = '' }: {
+export function SwipeSheet({ children, label, collapsed = 0.64, className = '', expanded: controlledExpanded, onExpandedChange }: {
   children: ReactNode; label: string; collapsed?: number; className?: string
+  expanded?: boolean; onExpandedChange?: (expanded: boolean) => void
 }) {
   const expandedHeight = 0.94
-  const [expanded, setExpanded] = useState(false)
+  const [localExpanded, setLocalExpanded] = useState(false)
+  const expanded = controlledExpanded ?? localExpanded
+  function setExpanded(value: boolean) {
+    if (controlledExpanded === undefined) setLocalExpanded(value)
+    onExpandedChange?.(value)
+  }
   const [dragHeight, setDragHeight] = useState<number | null>(null)
   const sheet = useRef<HTMLElement>(null)
   const gesture = useRef<{ id: number; y: number; height: number; parentHeight: number; moved: boolean } | null>(null)
@@ -53,7 +59,7 @@ export function SwipeSheet({ children, label, collapsed = 0.64, className = '' }
       onLostPointerCapture={() => { if (gesture.current) { gesture.current = null; setDragHeight(null) } }}
       onClick={() => {
         if (ignoreClick.current) { ignoreClick.current = false; return }
-        setExpanded(value => !value)
+        setExpanded(!expanded)
       }}
       onKeyDown={event => {
         if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {

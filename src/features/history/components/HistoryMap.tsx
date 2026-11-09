@@ -13,7 +13,7 @@ import { locatedRecords } from "../lib/locations";
 const SELECTED_RECORD_LEVEL = 4;
 
 function coveredHeight(element: HTMLElement) {
-  const panel = element.closest(".mypage-history-map")?.querySelector(".mypage-history-panel");
+  const panel = element.closest(".mypage-history-map")?.querySelector(".mypage-history-panel, .mypage-peer-drawer");
   // 버튼 추가나 작은 화면의 패널 스크롤에도 마커가 실제 가려지지 않는 위치로 이동합니다.
   if (panel) return Math.max(0, element.getBoundingClientRect().bottom - panel.getBoundingClientRect().top + 12);
   return 306;
@@ -46,12 +46,14 @@ export function HistoryMap({
   selectedRecordId,
   focusRequest,
   onSelectRecord,
+  overlayKey = "records",
 }: {
   records: RecordItem[];
   token: string | null;
   selectedRecordId: string | null;
   focusRequest: number;
   onSelectRecord: (recordId: string) => void;
+  overlayKey?: "records" | "peers";
 }) {
   const points = useMemo(() => locatedRecords(records), [records]);
   const offsets = useMemo(() => {
@@ -94,6 +96,30 @@ export function HistoryMap({
     focusLocation(map, point.location.lat, point.location.lng, container.current);
     return true;
   });
+  const fitMap = useEffectEvent(() => {
+    const map = mapRef.current;
+    const element = container.current;
+    const maps = window.kakao?.maps;
+    if (!map || !element || !maps || !points.length) return;
+    map.relayout();
+    if (focusSelected(map)) return;
+    const bounds = new maps.LatLngBounds();
+    points.forEach(({ location }) => bounds.extend(new maps.LatLng(location.lat, location.lng)));
+    const bottom = Math.min(element.clientHeight - 80, coveredHeight(element));
+    if (points.length > 1) map.setBounds(bounds, 64, 40, bottom, 40);
+    else focusLocation(map, points[0].location.lat, points[0].location.lng, element);
+  });
+
+  useEffect(() => {
+    if (status !== "ready") return;
+    const overlay = container.current?.closest(".mypage-history-map")?.querySelector(".mypage-history-panel, .mypage-peer-drawer");
+    if (!overlay) return;
+    // Drawer 전환·드래그 때도 지도를 새로 만들지 않고 보이는 영역만 보정합니다.
+    const observer = new ResizeObserver(() => fitMap());
+    observer.observe(overlay);
+    fitMap();
+    return () => observer.disconnect();
+  }, [overlayKey, status]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -159,13 +185,11 @@ export function HistoryMap({
             level: 3,
           });
           mapRef.current = map;
-          const bounds = new maps.LatLngBounds();
           points.forEach((record) => {
             const position = new maps.LatLng(
               record.location.lat,
               record.location.lng,
             );
-            bounds.extend(position);
             const marker = new maps.Marker({
               map,
               position,
@@ -178,18 +202,9 @@ export function HistoryMap({
             listeners.push({ marker, handler });
           });
           updateMarkerImages();
-          const fit = () => {
-            map.relayout();
-            if (focusSelected(map)) return;
-            const bottom = Math.min(element.clientHeight - 80, coveredHeight(element));
-            if (points.length > 1) map.setBounds(bounds, 64, 40, bottom, 40);
-            else focusLocation(map, first.lat, first.lng, element);
-          };
-          fit();
-          observer = new ResizeObserver(fit);
+          fitMap();
+          observer = new ResizeObserver(() => fitMap());
           observer.observe(element);
-          const panel = element.closest(".mypage-history-map")?.querySelector(".mypage-history-panel");
-          if (panel) observer.observe(panel);
           clearTimeout(timeout);
           setStatus("ready");
         } catch {

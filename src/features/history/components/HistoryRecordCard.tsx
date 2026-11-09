@@ -6,8 +6,6 @@ export type HistoryCardItem = {
   record: RecordItem;
   photoUrl: string | null;
   createdAt?: string;
-  submissionId?: number;
-  performerName?: string;
 };
 
 export function HistoryRecordCard({ item, selected, onSelect }: {
@@ -15,7 +13,7 @@ export function HistoryRecordCard({ item, selected, onSelect }: {
   selected: boolean;
   onSelect: () => void;
 }) {
-  const { record, photoUrl, createdAt, performerName } = item;
+  const { record, photoUrl, createdAt } = item;
   return (
     <button
       type="button"
@@ -28,9 +26,7 @@ export function HistoryRecordCard({ item, selected, onSelect }: {
       <span className="mypage-record-copy">
         <strong>{record.title}</strong>
         <small>{record.location?.placeName || "위치 정보 없음"}</small>
-        {(performerName || createdAt) && (
-          <small>{[performerName && `${performerName} 님`, createdAt?.slice(0, 10)].filter(Boolean).join(" · ")}</small>
-        )}
+        {createdAt && <small>{createdAt.slice(0, 10)}</small>}
       </span>
     </button>
   );

@@ -18,6 +18,7 @@ type Props = {
   onLike: () => void;
   hasNext: boolean;
   onNext: () => void;
+  actionLabel?: string;
 };
 
 const FLAP_PATH = "M6 0 H354 Q360 0 360 3 Q360 5 355 8 L186 126 Q180 132 174 126 L5 8 Q0 5 0 3 Q0 0 6 0 Z";
@@ -49,7 +50,7 @@ function EnvelopeFlapFace({ inside = false }: { inside?: boolean }) {
 
 export default function GreetingEnvelope({
   greeting, questType, loading, failed, statusMessage, onRetry,
-  canLike, liked, liking, likeFailed, onLike, hasNext, onNext,
+  canLike, liked, liking, likeFailed, onLike, hasNext, onNext, actionLabel = "다음 안부 보기",
 }: Props) {
   const reducedMotion = useReducedMotion();
   const [complete, setComplete] = useState(false);
@@ -120,7 +121,7 @@ export default function GreetingEnvelope({
           transition={reveal}
           onAnimationComplete={() => setComplete(true)}
         >
-          <button className="greeting-next" type="button" disabled={opening || !hasNext} onClick={() => { if (!opening && hasNext) onNext(); }}>다음 안부 보기</button>
+          <button className="greeting-next" type="button" disabled={opening || !hasNext} onClick={() => { if (!opening && hasNext) onNext(); }}>{actionLabel}</button>
         </motion.footer>
       </div>
     </div>

@@ -54,10 +54,14 @@
 .qv-distance-notice > div > span:last-child { padding: 2px 8px; border-radius: 999px; background: white; }
 .qv-distance-notice .qv-distance-value { margin: 8px 0 4px; font-size: 14px; font-variant-numeric: tabular-nums; }
 .qv-distance-value strong { font-size: 30px; font-weight: 600; }
-.qv-progress { position: relative; height: 100%; min-height: 420px; overflow: hidden; background: #e4f1f5; }
-.qv-location-marker { position: absolute; top: 40%; left: 50%; display: grid; width: 120px; height: 120px; place-items: center; border: 1px solid #fff9; border-radius: 50%; transform: translate(-50%, -50%); background: #d3e7f455; color: #356978; box-shadow: 0 0 0 24px #d3e7f433; }
-.qv-legacy-scan-line { position: absolute; top: 63%; left: 0; right: 0; height: 3px; background: #111; }
-.qv-status-card { position: absolute; bottom: max(24px, env(safe-area-inset-bottom, 0px)); left: 16px; right: 16px; padding: 20px; border-radius: 28px; background: white; color: #242624; box-shadow: 0 3px 20px #0001; }
+.qv-progress { position: relative; isolation: isolate; display: flex; flex-direction: column; height: 100%; min-height: 420px; overflow: hidden; background: #e4f1f5; }
+.qv-progress-backdrop { position: absolute; inset: 0; z-index: -1; width: 100%; height: 100%; object-fit: cover; filter: blur(16px); transform: scale(1.08); opacity: 0.45; }
+.qv-progress-visual { position: relative; display: grid; flex: 1; min-height: 0; place-items: center; container-type: size; }
+/* 사진을 자르지 않고 맞춘 뒤, 스캔 범위를 실제 표시된 사진 크기에 맞춥니다. */
+.qv-scan-photo { position: relative; width: fit-content; height: fit-content; max-width: 100%; max-height: 100%; }
+.qv-scan-image { display: block; width: auto; height: auto; max-width: 100cqw; max-height: 100cqh; }
+.qv-location-marker { position: absolute; top: 50%; left: 50%; display: grid; width: 120px; height: 120px; place-items: center; border: 1px solid #fff9; border-radius: 50%; transform: translate(-50%, -50%); background: #d3e7f455; color: #356978; box-shadow: 0 0 0 24px #d3e7f433; }
+.qv-status-card { position: relative; flex: none; margin: 16px 16px max(24px, env(safe-area-inset-bottom, 0px)); padding: 20px; border-radius: 28px; background: white; color: #242624; box-shadow: 0 3px 20px #0001; }
 .qv-status-card small { color: #6196a8; font-size: 13px; }
 .qv-status-card h1 { margin-top: 10px; font-size: 22px; font-weight: 600; line-height: 1.35; }
 .qv-status-card p { margin-top: 8px; color: #555d61; font-size: 14px; line-height: 1.5; }
@@ -77,3 +81,32 @@
 .qv-notice-actions { margin-top: auto; padding-top: 28px; text-align: center; }
 .qv-notice-actions > p { margin-bottom: 12px; color: #66757b; font-size: 13px; line-height: 1.5; }
 .qv-notice-return { min-height: 44px; margin-top: 8px; font-size: 14px; text-decoration: underline; text-underline-offset: 3px; }
+
+.qv-scanner { position: absolute; inset: 0; overflow: hidden; pointer-events: none; container-type: size; }
+.qv-scan-sweep { position: absolute; top: 0; left: 0; right: 0; height: 2px; background: #e3faff; box-shadow: 0 0 8px #8ce4ff, 0 0 18px #b4efff88; animation: qv-scan-sweep 4.8s ease-in-out infinite; }
+.qv-scan-trail { position: absolute; left: 0; right: 0; height: clamp(24px, 12cqh, 84px); background-color: #8bdcf733; background-image: linear-gradient(#c4f5ff22 1px, transparent 1px), linear-gradient(90deg, #c4f5ff22 1px, transparent 1px); background-size: 20px 20px; }
+/* 왕복 방향에 맞춰 빛 띠가 항상 스캔선 뒤를 따르도록 전환합니다. */
+.qv-scan-trail-down { bottom: 100%; mask-image: linear-gradient(transparent, black); animation: qv-scan-trail-down 4.8s linear infinite; }
+.qv-scan-trail-up { top: 100%; mask-image: linear-gradient(black, transparent); opacity: 0; animation: qv-scan-trail-up 4.8s linear infinite; }
+.qv-scan-corners { position: absolute; inset: 8px; color: #d6f5ff; filter: drop-shadow(0 0 3px #35697888); }
+.qv-scan-corners i { position: absolute; width: 24px; height: 24px; border: solid currentColor; }
+.qv-scan-corners i:nth-child(1) { top: 0; left: 0; border-width: 2px 0 0 2px; border-radius: 6px 0 0; }
+.qv-scan-corners i:nth-child(2) { top: 0; right: 0; border-width: 2px 2px 0 0; border-radius: 0 6px 0 0; }
+.qv-scan-corners i:nth-child(3) { bottom: 0; left: 0; border-width: 0 0 2px 2px; border-radius: 0 0 0 6px; }
+.qv-scan-corners i:nth-child(4) { bottom: 0; right: 0; border-width: 0 2px 2px 0; border-radius: 0 0 6px; }
+@keyframes qv-scan-sweep {
+  0%, 100% { top: 0; }
+  50% { top: calc(100% - 2px); }
+}
+@keyframes qv-scan-trail-down {
+  0%, 49.99% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+@keyframes qv-scan-trail-up {
+  0%, 49.99% { opacity: 0; }
+  50%, 100% { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .qv-scan-sweep { top: 50%; animation: none; }
+  .qv-scan-trail { animation: none; opacity: 0.35; }
+}

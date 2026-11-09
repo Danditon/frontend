@@ -767,6 +767,7 @@ test('인증은 URL ID만 사용하고 성공 시 추천·상세·목록·인증
       '@/shared/components/RemotePhoto': { RemotePhoto: 'RemotePhoto' },
     }
     // 분리한 화면도 실제로 렌더링해 부모의 상태·이벤트 연결을 함께 확인합니다.
+    dependencies['./PhotoScanner'] = loadSource('features/quests/pages/verification/PhotoScanner.tsx')
     for (const name of ['VerificationForm', 'VerificationProgress', 'VerificationSuccess', 'VerificationNotice']) {
       dependencies[`./verification/${name}`] = loadSource(`features/quests/pages/verification/${name}.tsx`, dependencies)
     }
@@ -898,6 +899,7 @@ function verificationFlowFixture(options = {}) {
     },
     '@/features/quests/lib/questPhoto': { decodeQuestPhoto: async () => 'blob:selected-photo' },
   }
+  dependencies['./PhotoScanner'] = loadSource('features/quests/pages/verification/PhotoScanner.tsx')
   for (const name of ['VerificationForm', 'VerificationProgress', 'VerificationSuccess', 'VerificationNotice']) {
     dependencies[`./verification/${name}`] = loadSource(`features/quests/pages/verification/${name}.tsx`, dependencies)
   }
@@ -939,10 +941,12 @@ test('인증 위치 조회가 완료된 뒤에만 사진 검증을 시작하고 
     finishLocation(position)
     await flushVerification()
     assert.match(textOf(f.render()), /같은 자리인지비교하고 있어요/)
+    assert.ok(findNode(f.render(), 'div', item => item.className === 'qv-scanner'))
     assert.equal(f.posts.length, 1)
     finishSubmission({ verifyStatus: 'FAILED', similarity: 0.99, message: '유사도 99%' })
     await flushVerification()
     assert.match(textOf(f.render()), /인증 미완료/)
+    assert.equal(findNode(f.render(), 'div', item => item.className === 'qv-scanner'), null)
     assert.doesNotMatch(textOf(f.render()), /99|%/)
     findNode(f.render(), 'Button').props.onClick()
     assert.equal(f.picks, 1)
@@ -1010,7 +1014,7 @@ test('응답 불명에서는 입력 화면으로 돌아와도 POST를 재전송�
       status = pendingStatus
       findNode(f.render(), 'Button').props.onClick()
       assert.match(textOf(f.render()), /전송 결과를 확인하고 있어요/)
-      assert.equal(findNode(f.render(), 'motion.div'), null)
+      assert.equal(findNode(f.render(), 'div', item => item.className === 'qv-scanner'), null)
       await flushVerification()
       assert.equal(f.posts.length, 1)
       assert.match(textOf(f.render()), /아직 확인하지 못했어요/)
@@ -1038,11 +1042,35 @@ test('일반 퀘스트와 전송 결과 조회에는 이미지 스캔을 표시�
     await flushVerification()
     const tree = f.render()
     assert.match(textOf(tree), /안부를 전송하고 있어요/)
-    assert.equal(findNode(tree, 'motion.div'), null)
+    assert.equal(findNode(tree, 'div', item => item.className === 'qv-scanner'), null)
     finishSubmission({ verifyStatus: 'PASSED', similarity: null })
     await flushVerification()
     assert.equal(f.posts[0].body.photo, null)
   } finally { f.unmount() }
+})
+
+test('사진 스캐너는 사진이 있는 이미지 검증에만 표시하고 상태 문구와 분리한다', () => {
+  const { default: Progress } = loadSource('features/quests/pages/verification/VerificationProgress.tsx', {
+    'lucide-react': { MapPin: 'MapPin' },
+    './PhotoScanner': loadSource('features/quests/pages/verification/PhotoScanner.tsx'),
+    './verification.css': {},
+  })
+  for (const phase of ['locating', 'verifying', 'checking-result']) {
+    for (const general of [false, true]) {
+      const tree = renderComponents(Progress({ phase, general, photoUrl: 'photo.jpg' }))
+      const scanner = findNode(tree, 'div', item => item.className === 'qv-scanner')
+      assert.equal(Boolean(scanner), phase === 'verifying' && !general)
+      assert.ok(findNode(tree, 'h1'))
+      assert.equal(findNode(tree, 'img', item => item.className === 'qv-scan-image').props.alt, '인증 장소')
+      if (scanner) {
+        assert.equal(scanner.props['aria-hidden'], 'true')
+        assert.equal(textOf(scanner), '')
+        assert.equal(findNode(scanner, 'button'), null)
+      }
+    }
+  }
+  const withoutPhoto = renderComponents(Progress({ phase: 'verifying', general: false, photoUrl: null }))
+  assert.equal(findNode(withoutPhoto, 'div', item => item.className === 'qv-scanner'), null)
 })
 
 test('AI 서버의 명시적 실패는 입력 복귀 후 사용자가 다시 보낼 수 있고 자동 재전송하지 않는다', async () => {

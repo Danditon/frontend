@@ -72,7 +72,8 @@ export default function LoginEntry() {
   }, [showSplash, reducedMotion])
 
   return (
-    <div className={`relative isolate h-full ${showSplash ? 'overflow-hidden' : ''} ${showLogin ? 'bg-white' : 'bg-[#DBEEF5]'}`}>
+    // cqh로 브라우저 전체가 아닌 실제 로그인 영역 높이에 맞춰 배치합니다.
+    <div className={`relative isolate h-full [container-type:size] ${showSplash ? 'overflow-hidden' : ''} ${showLogin ? 'bg-white' : 'bg-[#D9EDF5]'}`}>
       {/* 폼은 유지해 인증 흐름을 보존하고, 스플래시가 끝날 때까지 클릭·탭 접근을 막습니다. */}
       <motion.div
         className="h-full"

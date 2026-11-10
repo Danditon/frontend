@@ -54,7 +54,7 @@ function fixture() {
         constructor(_element, options) { this.level = options.level; this.levels = []; this.calls = []; this.pans = []; this.bounds = 0; maps.push(this) }
         setLevel(level) { this.level = level; this.levels.push(level); this.calls.push('level') }
         getProjection() { this.calls.push('projection'); return { containerPointFromCoords: ({ lat, lng }) => ({ x: lng, y: lat }), coordsFromContainerPoint: p => p } }
-        relayout() {}
+        relayout() { this.calls.push('relayout') }
         panTo(p) { this.pans.push(p); this.calls.push('pan') }
         setBounds() { this.bounds++ }
       },
@@ -130,6 +130,22 @@ test('카드 선택·재선택은 지도를 재생성하지 않고 보이는 영
   assert.equal(f.markers[0].click, undefined)
   assert.equal(f.markers[0].map, null)
   assert.equal(f.observers[0].disconnected, true)
+})
+
+test('선택한 기록이 없어도 지도·패널 크기 변경은 사용자 확대 수준과 전체 장소 범위를 초기화하지 않는다', () => {
+  const f = fixture()
+  f.render(); f.ready(); f.render()
+  const map = f.maps[0]
+  const bounds = map.bounds
+  assert.equal(bounds, 1, '처음에는 전체 장소가 보이는 범위를 설정한다')
+  map.level = 8
+  for (const observer of f.observers) observer.resize()
+  f.render({ overlayKey: 'peers' })
+  assert.equal(f.maps.length, 1)
+  assert.equal(map.level, 8)
+  assert.equal(map.bounds, bounds)
+  assert.equal(map.calls.at(-1), 'relayout')
+  f.unmount()
 })
 
 test('SDK 준비 전에 선택한 카드도 로딩 완료 후 이동하고, 시간 초과된 콜백은 지도를 만들지 않는다', () => {

@@ -266,7 +266,11 @@ export default function MyPage() {
     const loading = Boolean(token && (sourceQuery.isPending || (greetingQuestId && greetingQuery.isPending)));
     const failed = Boolean(token && (sourceQuery.isError || (greetingQuestId && greetingQuery.isError)));
     const missingRecordGreeting = fromRecords && !loading && !failed && !greeting;
-    const returnOnly = greetingView === "mine" || (greetingView === "others" && (!greeting || greetings.length < 2));
+    const hasNextGreeting = !loading && !failed && Boolean(greeting) && index >= 0 && index < greetings.length - 1;
+    const returnOnly = greetingView === "mine" || (!loading && !failed && !hasNextGreeting);
+    const actionLabel = returnOnly
+      ? greetingView === "mine" ? "내 기록으로 돌아가기" : "목록으로 돌아가기"
+      : greetingView === "others" ? "다음 사람의 안부 보기" : "다음 안부 보기";
     const emptyMessage = !selected ? "선택한 기록을 찾을 수 없어요." : greetingView === "mine" ? "내가 남긴 안부를 찾을 수 없어요."
       : requestedId && !greeting ? "선택한 안부를 찾을 수 없어요." : greetingView === "others" ? "아직 다른 사람의 안부가 없어요." : "아직 도착한 안부가 없어요.";
     return (
@@ -293,12 +297,11 @@ export default function MyPage() {
               likeMutation.mutate({ submissionId: greeting.submissionId, questId: selectedQuestId, token });
             }
           }}
-          actionLabel={greetingView === "mine" ? "내 기록으로 돌아가기" : greetingView === "others"
-            ? returnOnly ? "목록으로 돌아가기" : "다음 사람의 안부 보기" : "다음 안부 보기"}
-          hasNext={returnOnly || greetings.length > 1}
+          actionLabel={actionLabel}
+          hasNext={returnOnly || hasNextGreeting}
           onNext={() => {
             if (returnOnly) void navigate(backTo, { replace: true });
-            else openGreeting((index + 1) % greetings.length);
+            else if (hasNextGreeting) openGreeting(index + 1);
           }}
         />
       </section>

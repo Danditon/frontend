@@ -15,6 +15,7 @@ export function RootLayout() {
 
   const floatingMemoriesNav =
     pathname === "/me" || pathname === "/me/memories";
+  const receivedPanel = floatingMemoriesNav && params.get("panel") === "received";
 
   const isAuthPage = ["/login", "/signup"].includes(
     pathname.replace(/\/+$/, ""),
@@ -50,7 +51,7 @@ export function RootLayout() {
           <Outlet context={{ onNearbyNavigationChange: setNearbyNavigation } satisfies QuestMapOutletContext} />
         </main>
 
-        {!greetingScreen && !isLogoutPage && !isAuthPage && !isQuestRegistration && !isQuestVerificationFlow && (
+        {!greetingScreen && !receivedPanel && !isLogoutPage && !isAuthPage && !isQuestRegistration && !isQuestVerificationFlow && (
           <div
             className={`app-navigation ${
               floatingMemoriesNav

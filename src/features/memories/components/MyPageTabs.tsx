@@ -1,4 +1,4 @@
-import { useRef, type ReactNode } from "react";
+import { useRef, type ReactNode, type RefObject } from "react";
 import { AnimatePresence, motion, useIsPresent, useReducedMotion } from "motion/react";
 
 function TabPanel({ active, restoreScroll, saveScroll, children }: {
@@ -21,13 +21,15 @@ function TabPanel({ active, restoreScroll, saveScroll, children }: {
   );
 }
 
-export default function MyPageTabs({ active, summary, children }: {
+export default function MyPageTabs({ active, summary, children, scrollPositions: savedScroll }: {
   active: "memories" | "history";
   summary: ReactNode;
   children: ReactNode;
+  scrollPositions?: RefObject<{ memories: number; history: number }>;
 }) {
   const reducedMotion = useReducedMotion();
-  const scrollPositions = useRef({ memories: 0, history: 0 });
+  const localScroll = useRef({ memories: 0, history: 0 });
+  const scrollPositions = savedScroll ?? localScroll;
   return (
     <motion.section className="mypage-shell" data-tab={active} aria-label={active === "history" ? "내 수행 기록 지도 화면" : "내 그리움"}
       initial={reducedMotion || typeof document.startViewTransition === "function" ? false : { x: "100%" }}

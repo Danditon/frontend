@@ -82,7 +82,7 @@ function fixture(path = '/me', search = '') {
       return envelope.render(tree.props)
     }
     if (tree.type === 'HistoryRecordCard') return expand(HistoryRecordCard(tree.props))
-    if (tree.type === 'MyPageTabs') return { type: 'section', props: { children: expand([tree.props.summary, tree.props.children]) } }
+    if (tree.type === 'MyPageTabs') { f.tabs = tree.props; return { type: 'section', props: { children: expand([tree.props.summary, tree.props.children]) } } }
     return { ...tree, props: { ...tree.props, children: expand(tree.props?.children) } }
   }
   const mutation = { isPending: false, isError: false, variables: undefined, mutate(value) {
@@ -127,10 +127,12 @@ function fixture(path = '/me', search = '') {
     '../components/MyPageSummary': { __esModule: true, default: 'MyPageSummary' },
     '../components/MemoryQuestCard': { __esModule: true, default: 'MemoryQuestCard' },
     '../components/GreetingEnvelope': { __esModule: true, default: 'GreetingEnvelope' },
+    '../components/ReceivedGreetingsDrawer': { __esModule: true, default: 'ReceivedGreetingsDrawer' },
     '../components/MyPageTabs': { __esModule: true, default: 'MyPageTabs' },
   }, { URLSearchParams, requestAnimationFrame: fn => fn(), localStorage: { removeItem: key => f.removed.push(key) }, sessionStorage: { removeItem: key => f.removed.push(key) } })
   return Object.defineProperty(Object.assign(f, {
     render() { cursor = 0; refCursor = 0; effectCursor = 0; return expand(Page()) },
+    visit(path) { const [pathname, search = ''] = path.split('?'); f.pathname = pathname; params = new URLSearchParams(search) },
     finishLike() { mutationOptions.onSuccess({ submissionId: mutation.variables.submissionId, isLiked: true }, mutation.variables); mutation.isPending = false },
   }), 'params', { get: () => params })
 }
@@ -255,51 +257,130 @@ test('봉투 재생 기준은 퀘스트와 안부 ID이며 좋아요와 같은 �
   assert.notEqual(f.envelopeKey, key)
 })
 
-test('마이페이지 진입은 내 그리움이며 안부가 있는 카드만 해당 퀘스트의 편지로 이동한다', () => {
+test('카드는 받은 안부 목록을 열고 선택한 편지에서 돌아오면 같은 목록과 스크롤을 복원한다', () => {
   const f = fixture()
   let tree = f.render()
   assert.equal(find(tree, 'MyPageSummary').props.active, 'memories')
-  f.client.setQueryData(['quest-greetings', '22', 'token'], { submissions: [] })
+  f.tabs.scrollPositions.current.memories = 260
   find(tree, 'MemoryQuestCard').props.onOpen(memory)
   tree = f.render()
-  assert.equal(find(tree, 'MemoryQuestCard').props.previewStatus, 'empty')
+  let drawer = find(tree, 'ReceivedGreetingsDrawer').props
+  assert.equal(drawer.open, true)
+  assert.equal(drawer.questId, memory.id)
+  assert.deepEqual(Array.from(drawer.greetings, item => item.id), ['2', '1'])
+  assert.equal(find(tree, 'MemoryQuestCard').props.expanded, true)
   assert.equal(f.params.has('message'), false)
-  f.client.setQueryData(['quest-greetings', '22', 'token'], { submissions: [submission(2, '2026-11-02')] })
-  f.render()
+  assert.equal(find(tree, 'GreetingLetter'), undefined)
+  drawer.saveScroll(180)
+  f.visit(drawer.greetingPath(1))
   tree = f.render()
   assert.equal(f.params.get('quest'), '22')
-  assert.equal(find(tree, 'GreetingLetter').props.greeting.id, '2')
-  // 실제 라우터는 상태 변경 후 재렌더링하므로 편지 진입 상태를 한 번 더 반영합니다.
-  f.render()
-  f.params.delete('message')
+  assert.equal(find(tree, 'GreetingLetter').props.greeting.id, '1')
+  const back = find(tree, 'Back').props.to
+  assert.equal(back, '/me?quest=22&panel=received')
+  f.visit(back)
   tree = f.render()
   assert.equal(find(tree, 'GreetingLetter'), undefined)
-  assert.equal(find(tree, 'MemoryQuestCard').props.previewStatus, null)
+  drawer = find(tree, 'ReceivedGreetingsDrawer').props
+  assert.equal(drawer.open, true)
+  const list = { scrollTop: 0 }
+  drawer.restoreScroll(list)
+  assert.equal(list.scrollTop, 180)
+  assert.equal(f.tabs.scrollPositions.current.memories, 260)
+  drawer.onClose()
+  assert.equal(find(f.render(), 'ReceivedGreetingsDrawer').props.open, false)
+  assert.equal(f.params.has('message'), false)
 })
 
-test('다른 카드를 누른 뒤 도착한 이전 응답은 이동하지 않고 카드별 없음·실패·재시도를 구분한다', () => {
+test('다른 카드로 바꾸면 이전 응답을 섞지 않고 목록 안에서 조회 중·없음·실패·재시도를 구분한다', () => {
   const f = fixture()
   f.memories.push({ ...memory, id: '23' })
-  f.client.setQueryData(['quest-greetings', '23', 'token'], { submissions: [] })
+  f.client.setQueryData(['quest-greetings', '23', 'token'], { viewerRole: 'AUTHOR', submissions: [] })
   f.pendingQueries = true
   let tree = f.render()
   const card = (tree, id) => all(tree, 'MemoryQuestCard').find(node => node.props.memory.id === id)
   card(tree, '22').props.onOpen(memory)
   tree = f.render()
-  assert.equal(card(tree, '22').props.previewStatus, 'loading')
+  assert.equal(find(tree, 'ReceivedGreetingsDrawer').props.loading, true)
   card(tree, '23').props.onOpen(f.memories[1])
   f.pendingQueries = false
   tree = f.render()
-  assert.equal(card(tree, '22').props.previewStatus, null)
-  assert.equal(card(tree, '23').props.previewStatus, 'empty')
+  assert.equal(card(tree, '22').props.expanded, false)
+  assert.equal(card(tree, '23').props.expanded, true)
+  f.client.setQueryData(['quest-greetings', '22', 'token'], { viewerRole: 'AUTHOR', submissions: [submission(9, '2026-11-05')] })
+  const empty = find(f.render(), 'ReceivedGreetingsDrawer').props
+  assert.equal(empty.questId, '23')
+  assert.equal(empty.greetings.length, 0)
+  assert.equal(empty.failed, false)
   assert.equal(f.params.has('message'), false)
   f.greetingError = true
   tree = f.render()
-  assert.equal(card(tree, '23').props.previewStatus, 'error')
-  card(tree, '23').props.onRetry()
+  assert.equal(find(tree, 'ReceivedGreetingsDrawer').props.failed, true)
+  find(tree, 'ReceivedGreetingsDrawer').props.onRetry()
   assert.equal(f.retried, true)
-  card(tree, '23').props.onOpen(f.memories[1])
-  assert.equal(card(f.render(), '23').props.previewStatus, null)
+  find(tree, 'ReceivedGreetingsDrawer').props.onClose()
+  assert.equal(find(f.render(), 'ReceivedGreetingsDrawer').props.open, false)
+})
+
+test('소유하지 않은 그리움의 목록은 조회하지 않고 작성자 응답이 아닌 안부는 표시하지 않는다', () => {
+  const f = fixture('/me/memories', 'quest=999&panel=received')
+  let drawer = find(f.render(), 'ReceivedGreetingsDrawer').props
+  assert.equal(drawer.open, true)
+  assert.equal(drawer.failed, true)
+  assert.ok(f.queries.filter(item => item.queryKey[0] === 'quest-greetings').every(item => item.enabled === false))
+  f.questError = true
+  assert.equal(find(f.render(), 'ReceivedGreetingsDrawer').props.errorMessage, '내 그리움을 불러오지 못했어요.')
+  f.questError = false
+  f.visit('/me/memories?quest=22&panel=received')
+  f.client.setQueryData(['quest-greetings', '22', 'token'], { viewerRole: 'PERFORMER', submissions: [submission(2, '2026-11-02')] })
+  drawer = find(f.render(), 'ReceivedGreetingsDrawer').props
+  assert.equal(drawer.failed, true)
+  assert.equal(drawer.greetings.length, 0)
+})
+
+test('받은 안부 Drawer는 사진·작성자·날짜·미리보기를 표시하고 빈 목록·오류·닫기를 처리한다', () => {
+  let closed = 0, retried = 0, scroll = 0
+  const owner = {}
+  const Drawer = load('features/memories/components/ReceivedGreetingsDrawer.tsx', {
+    react: { useRef: () => ({ current: null }) },
+    'react-router': router,
+    'lucide-react': { ChevronRight: 'ChevronRight', Mail: 'Mail', X: 'X' },
+    '@/shared/components/RemotePhoto': photo,
+    '@/shared/components/ui/drawer': Object.fromEntries(['Drawer', 'DrawerClose', 'DrawerContent', 'DrawerDescription', 'DrawerHeader', 'DrawerTitle'].map(name => [name, name])),
+  }, { document: { getElementById: id => id === 'memory-card-22' ? owner : null } })
+  const props = {
+    open: true, questId: '22', title: memory.title, loading: false, failed: false,
+    errorMessage: '안부를 불러오지 못했어요.',
+    greetings: [
+      { id: '1', submissionId: 1, senderName: '민수', createdAt: '2026-11-10', greeting: '잘 있어요', photoUrl: '/photo.jpg' },
+      { id: '2', submissionId: 2, senderName: '지연', createdAt: '2026-11-09', greeting: '그대로예요', photoUrl: null },
+    ],
+    onClose: () => closed++, onRetry: () => retried++,
+    greetingPath: id => `/me?quest=22&panel=received&submission=${id}&message=0`,
+    restoreScroll() {}, saveScroll: top => { scroll = top },
+  }
+  let tree = Drawer(props)
+  assert.match(text(tree), /도착한 안부 2통/)
+  assert.equal(all(tree, 'Link').length, 2)
+  assert.equal(find(tree, 'Link').props.to, '/me?quest=22&panel=received&submission=1&message=0')
+  assert.equal(all(tree, 'RemotePhoto').length, 1)
+  assert.equal(all(tree, 'Mail').length, 1)
+  assert.match(text(tree), /민수 님2026.11.10잘 있어요/)
+  find(tree, 'div', props => props['aria-label'] === '받은 안부 목록').props.onScroll({ currentTarget: { scrollTop: 140 } })
+  assert.equal(scroll, 140)
+  assert.equal(find(tree, 'DrawerContent').props.finalFocus(), owner)
+  find(tree, 'Drawer').props.onOpenChange(false)
+  assert.equal(closed, 1)
+  tree = Drawer({ ...props, greetings: [] })
+  assert.match(text(tree), /아직 도착한 안부가 없어요/)
+  assert.equal(all(tree, 'Link').length, 0)
+  tree = Drawer({ ...props, loading: true })
+  assert.equal(all(tree, 'Link').length, 0)
+  assert.doesNotMatch(text(tree), /도착한 안부 2통/)
+  tree = Drawer({ ...props, failed: true })
+  assert.equal(all(tree, 'Link').length, 0)
+  find(find(tree, 'div', props => props.role === 'alert'), 'button').props.onClick()
+  assert.equal(retried, 1)
 })
 
 test('안부 하단 목록 없이 다음 버튼으로 최신순 이동·순환하며 기록과 복귀 경로를 보존한다', () => {
@@ -629,25 +710,21 @@ test('그리움 카드는 자신의 퀘스트 ID로 상세 사진을 조회하�
   assert.equal(opened, memory)
 })
 
-test('안부 없음 안내는 해당 카드의 버튼 아래에 펼치고 재시도 버튼을 중첩하지 않는다', () => {
-  let retried = false
+test('그리움 카드는 받은 안부 모달을 가리키고 카드 안에 버튼을 중첩하지 않는다', () => {
   const Card = load('features/memories/components/MemoryQuestCard.tsx', {
     'motion/react': { AnimatePresence: 'AnimatePresence', motion: { div: 'div' }, useReducedMotion: () => true },
     '@tanstack/react-query': { useQuery: () => ({ data: {} }) },
     '@/shared/components/RemotePhoto': photo,
     '@/features/quests/api/verification': { getVerificationQuest() {} },
   })
-  const props = { memory, token: 'token', onOpen() {}, onRetry() { retried = true } }
-  let tree = Card({ ...props, previewStatus: 'empty' })
+  const props = { memory, token: 'token', onOpen() {} }
+  const tree = Card({ ...props, expanded: true })
   const button = find(tree, 'button')
   assert.equal(button.props['aria-expanded'], true)
-  assert.equal(find(button, 'div', props => props.role === 'status'), undefined)
-  assert.match(text(tree), /아직 도착한 안부가 없어요/)
-  tree = Card({ ...props, previewStatus: 'error' })
-  const alert = find(tree, 'div', props => props.role === 'alert')
-  assert.doesNotMatch(text(alert), /아직 도착한 안부/)
-  find(alert, 'button').props.onClick()
-  assert.equal(retried, true)
+  assert.equal(button.props['aria-haspopup'], 'dialog')
+  assert.equal(button.props['aria-controls'], 'received-greetings-drawer')
+  assert.equal(button.props.id, 'memory-card-22')
+  assert.equal(find(tree, 'div', props => props.role === 'status'), undefined)
   assert.equal(all(find(tree, 'button'), 'button').length, 1)
 })
 
@@ -711,10 +788,10 @@ test('로그아웃 확인·안부에는 navbar가 없고 일반 마이페이지�
     'react-router': { Outlet: 'Outlet', useLocation: () => ({ pathname }), useSearchParams: () => [new URLSearchParams(search)] },
     '@/shared/components/WireUI': wire,
   })
-  for (const path of ['/me', '/me/memories', '/me/history', '/me/logout', '/me/memories?quest=22&message=0']) {
+  for (const path of ['/me', '/me/memories', '/me/history', '/me/logout', '/me/memories?quest=22&message=0', '/me/memories?quest=22&panel=received', '/me?quest=22&panel=received']) {
     ;[pathname, search = ''] = path.split('?')
     const tree = RootLayout()
-    assert.equal(Boolean(find(tree, 'Bottom')), !path.includes('logout') && !search.includes('message'))
+    assert.equal(Boolean(find(tree, 'Bottom')), !path.includes('logout') && !search.includes('message') && !search.includes('panel=received'))
     assert.equal(find(tree, 'div', props => props['data-memories'] === true).props['data-memories'], true)
   }
 })

@@ -17,6 +17,7 @@ import { getQuestGreetings, getVerificationQuest, toggleSubmissionLike, type Que
 import MyPageSummary from "../components/MyPageSummary";
 import MemoryQuestCard from "../components/MemoryQuestCard";
 import GreetingEnvelope from "../components/GreetingEnvelope";
+import ReceivedGreetingsDrawer from "../components/ReceivedGreetingsDrawer";
 import MyPageTabs from "../components/MyPageTabs";
 import "../styles/mypage.css";
 
@@ -49,7 +50,8 @@ export default function MyPage() {
   const restorePeerFocus = useRef(false);
   const peerScroll = useRef(new Map<string, number>());
   const [historySelection, setHistorySelection] = useState({ key: "", request: 0 });
-  const [previewQuestId, setPreviewQuestId] = useState<string | null>(null);
+  const receivedScroll = useRef(new Map<string, number>());
+  const tabScroll = useRef({ memories: 0, history: 0 });
   const [error, setError] = useState("");
   const queryClient = useQueryClient();
   const { user, retrySession } = useAuth();
@@ -57,6 +59,7 @@ export default function MyPage() {
   const logout = pathname === "/me/logout";
   const history = pathname === "/me/history";
   const message = params.has("message") || params.get("tab") === "messages";
+  const receivedOpen = !history && !message && !logout && params.get("panel") === "received";
   const questsQuery = useQuery({
     queryKey: ["my-quests", user?.userId],
     queryFn: ({ signal }) => getMyQuests(token!, signal),
@@ -69,14 +72,15 @@ export default function MyPage() {
   });
   const memories = token ? questsQuery.data ?? [] : [];
   const records = token ? recordsQuery.data ?? [] : [];
-  const previewMemory = !history && !message && !logout ? memories.find((item) => item.id === previewQuestId) : undefined;
+  const previewMemory = memories.find((item) => item.id === params.get("quest"));
   const previewQuery = useQuery({
     queryKey: ["quest-greetings", previewMemory?.id, token],
     queryFn: ({ signal }) => getQuestGreetings(previewMemory!.id, signal),
-    enabled: Boolean(token && previewMemory),
+    enabled: Boolean(token && receivedOpen && previewMemory),
     retry: false,
   });
-  const previewHasGreetings = Boolean(previewQuery.data?.submissions.some((item) => item.verifyStatus === "PASSED"));
+  const receivedGreetings = token && previewQuery.data?.viewerRole === "AUTHOR"
+    ? greetingViewItems(previewQuery.data.submissions, "received", user?.userId) : [];
   const historyQuestId = history ? params.get("quest") : null;
   const visibleRecords = useMemo(() => {
     const items = token ? recordsQuery.data ?? [] : [];
@@ -163,17 +167,15 @@ export default function MyPage() {
     returnParams.set("panel", "others");
     if (peerExpanded) returnParams.set("expanded", "1");
   }
-  const backTo = fromRecords ? `/me/history${returnParams.size ? `?${returnParams}` : ""}` : "/me/memories";
+  const memoriesPath = pathname === "/me" ? "/me" : "/me/memories";
+  const backTo = fromRecords ? `/me/history${returnParams.size ? `?${returnParams}` : ""}`
+    : params.get("panel") === "received" && selectedQuestId
+      ? `${memoriesPath}?quest=${selectedQuestId}&panel=received` : "/me/memories";
   useEffect(() => {
     if (message) {
       messageTop.current?.scrollIntoView({ block: "start" });
     }
   }, [message, selected?.id, index]);
-  useEffect(() => {
-    // 응답은 클릭한 퀘스트의 쿼리에만 연결해 이전 카드의 늦은 응답을 무시합니다.
-    if (!previewMemory || !previewHasGreetings || previewQuery.isFetching || !previewQuery.isSuccess) return;
-    setParams({ quest: previewMemory.id, message: "0" });
-  }, [previewMemory, previewHasGreetings, previewQuery.isFetching, previewQuery.isSuccess, setParams]);
   useEffect(() => {
     const panel = historyPanel;
     if (!history || !panel) return;
@@ -233,8 +235,6 @@ export default function MyPage() {
       setError("로그아웃하지 못했어요. 다시 시도해 주세요.");
     }
   }
-  // 편지나 다른 탭에서 돌아왔을 때 이전 클릭이 편지를 자동으로 다시 열지 않게 합니다.
-  if (previewQuestId !== null && (history || message || logout)) setPreviewQuestId(null);
   if (enteredPeerId !== null && (!history || message)) setEnteredPeerId(null);
   const summary = (
     <MyPageSummary
@@ -306,7 +306,7 @@ export default function MyPage() {
   }
   if (history) {
     return (
-      <MyPageTabs active="history" summary={summary}>
+      <MyPageTabs active="history" summary={summary} scrollPositions={tabScroll}>
         <div className="mypage-history-map">
           <HistoryMap
             records={visibleRecords}
@@ -388,19 +388,35 @@ export default function MyPage() {
     );
   }
   return (
-    <MyPageTabs active="memories" summary={summary}>
+    <MyPageTabs active="memories" summary={summary} scrollPositions={tabScroll}>
       <div className="mypage-quest-list">
         {memories.map((memory) => (
           <MemoryQuestCard key={memory.id} memory={memory} token={token}
-            previewStatus={previewMemory?.id !== memory.id ? null
-              : previewQuery.isFetching || previewQuery.isPending ? "loading"
-              : previewQuery.isError || !token ? "error" : previewHasGreetings ? "loading" : "empty"}
-            onRetry={() => { void previewQuery.refetch({ cancelRefetch: false }); }}
-            onOpen={(item) => setPreviewQuestId((previous) => previous === item.id ? null : item.id)}
+            expanded={receivedOpen && previewMemory?.id === memory.id}
+            onOpen={item => setParams({ quest: item.id, panel: "received" })}
           />
         ))}
         {memories.length === 0 && <ListStatus query={questsQuery} enabled={Boolean(token)} label="내 그리움을" empty="등록한 그리움이 없어요." />}
       </div>
+      <ReceivedGreetingsDrawer
+        open={receivedOpen} questId={previewMemory?.id}
+        title={previewMemory?.title ?? "받은 안부"}
+        greetings={receivedGreetings}
+        loading={Boolean(token && (questsQuery.isPending || (previewMemory && previewQuery.isPending)))}
+        failed={!token || questsQuery.isError || (!questsQuery.isPending && !previewMemory)
+          || previewQuery.isError || (previewQuery.isSuccess && previewQuery.data?.viewerRole !== "AUTHOR")}
+        errorMessage={!token ? "로그인한 뒤 받은 안부를 확인해주세요."
+          : questsQuery.isError ? "내 그리움을 불러오지 못했어요."
+          : !questsQuery.isPending && !previewMemory ? "선택한 그리움을 찾을 수 없어요." : "안부를 불러오지 못했어요."}
+        onClose={() => setParams(previous => { previous.delete("panel"); return previous; }, { replace: true })}
+        onRetry={() => {
+          if (!token) return;
+          void (!previewMemory || questsQuery.isError ? questsQuery.refetch() : previewQuery.refetch({ cancelRefetch: false }));
+        }}
+        greetingPath={id => `${memoriesPath}?quest=${previewMemory?.id}&panel=received&submission=${id}&message=0`}
+        restoreScroll={element => { if (element && previewMemory) element.scrollTop = receivedScroll.current.get(previewMemory.id) ?? 0; }}
+        saveScroll={top => { if (previewMemory) receivedScroll.current.set(previewMemory.id, top); }}
+      />
     </MyPageTabs>
   );
 }

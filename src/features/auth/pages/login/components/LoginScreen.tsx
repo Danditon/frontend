@@ -86,13 +86,13 @@ export default function LoginScreen() {
   return (
     <section
       aria-labelledby="login-heading"
-      className="flex min-h-full flex-col bg-white px-6 pt-[calc(1rem+env(safe-area-inset-top,0px))] pb-[calc(2.5rem+env(safe-area-inset-bottom,0px))] text-[#242624]"
+      className="flex min-h-full flex-col bg-white px-4 pt-[clamp(80px,17cqh,155px)] pb-[max(48px,env(safe-area-inset-bottom,0px))] text-[#242624]"
       style={{ fontFamily: '"Pretendard", system-ui, sans-serif' }}
     >
       <LoginHeader />
 
       {/* 작은 화면에서는 고정 배치 대신 페이지 스크롤로 폼에 접근합니다. */}
-      <div className="mt-auto pt-24">
+      <div className="mt-auto pt-16">
         {status === 'checking' && (
           <p role="status" className="mb-4 text-center text-sm text-[#66757B]">
             로그인 정보를 확인하는 중이에요.

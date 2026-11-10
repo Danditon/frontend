@@ -1,24 +1,29 @@
-import { motion, useReducedMotion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
-import { Link, useParams } from "react-router";
+import { Link, useNavigate, useParams } from "react-router";
+import { useReducedMotion } from "motion/react";
 import { isAxiosError } from "axios";
-import { ChevronsLeftRight, MapPin, Plus, X } from "lucide-react";
-import { Back, SlideButton } from "@/shared/components/WireUI";
-import { SwipeSheet } from "@/shared/components/SwipeSheet";
+import { Back } from "@/shared/components/WireUI";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getDistanceMeters } from "./home/utils/getNearestQuest";
 import { useGeolocation, type UserPosition } from "@/features/quests/hooks/useGeolocation";
-import { getAccessToken, getVerificationQuest, isQuestId, submitVerification, createSubmissionForm, verificationError, similarityPercent, type VerificationResult } from "@/features/quests/api/verification";
+import { getAccessToken, getVerificationQuest, isQuestId, submitVerification, createSubmissionForm, verificationError } from "@/features/quests/api/verification";
 import { decodeQuestPhoto } from "@/features/quests/lib/questPhoto";
-import { RemotePhoto } from "@/shared/components/RemotePhoto";
-type Step = "capture" | "compare" | "checking" | "success" | "failure";
+import VerificationForm from "./verification/VerificationForm";
+import VerificationProgress from "./verification/VerificationProgress";
+import GreetingDelivery from "./verification/GreetingDelivery";
+import VerificationNotice from "./verification/VerificationNotice";
+type Phase = "editing" | "locating" | "verifying" | "checking-result" | "verified" | "delivering" | "delivered"
+  | "failed" | "out-of-range" | "location-error" | "request-error";
+const PHOTO_VERIFICATION_MS = 3000;
 export default function QuestVerifyPage() {
   const { questId = "" } = useParams();
   const id = isQuestId(questId) ? questId : "";
   return <VerificationScreen key={id} questId={id} />;
 }
 function VerificationScreen({ questId }: { questId: string }) {
-  const reduceMotion = useReducedMotion();
+  const navigate = useNavigate();
+  const reducedMotion = Boolean(useReducedMotion());
+  // 화면 컴포넌트가 바뀌어도 초안과 제출 요청은 부모에서 유지합니다.
   const input = useRef<HTMLInputElement>(null);
   const [photo, setPhoto] = useState("");
   const [photoFile, setPhotoFile] = useState<File | null>(null);
@@ -26,9 +31,8 @@ function VerificationScreen({ questId }: { questId: string }) {
   const [mix, setMix] = useState(50);
   const [error, setError] = useState("");
   const [measuredDistance, setMeasuredDistance] = useState<number | null>(null);
-  const [view, setView] = useState<Step>("capture");
-  const [result, setResult] = useState<VerificationResult | null>(null);
-  const [sending, setSending] = useState(false);
+  const [phase, setPhase] = useState<Phase>("editing");
+  const [needsStatusCheck, setNeedsStatusCheck] = useState(false);
   const submitting = useRef(false);
   const request = useRef<AbortController | null>(null);
   const token = getAccessToken();
@@ -37,13 +41,37 @@ function VerificationScreen({ questId }: { questId: string }) {
   const detail = useQuery({ queryKey: ['verification-quest', questId, token], queryFn: ({ signal }) => getVerificationQuest(questId, signal), enabled: isQuestId(questId) && Boolean(token), retry: false });
   const quest = detail.data;
   const general = quest?.questType === 'GENERAL';
-  const step: Step = sending ? 'checking' : result ? (result.verifyStatus === 'PASSED' ? 'success' : 'failure') : view;
-  const percent = similarityPercent(result?.similarity);
-  const go = (screen: Step) => { setResult(null); setView(screen); };
+  const completed = phase === "verified" || phase === "delivering" || phase === "delivered";
+  const busy = phase === "locating" || phase === "verifying" || phase === "checking-result" || completed;
   useEffect(() => () => { if (photo) URL.revokeObjectURL(photo); }, [photo]);
   useEffect(() => () => request.current?.abort(), []);
+  useEffect(() => {
+    const delay = phase === "verified" ? 700
+      : phase === "delivering" && reducedMotion ? 1200 : null;
+    if (delay === null) return;
+    const timer = window.setTimeout(() => {
+      if (phase === "verified") setPhase("delivering");
+      else setPhase("delivered");
+    }, delay);
+    // 화면 이탈과 단계 변경 시 이전 연출 타이머를 정리합니다.
+    return () => window.clearTimeout(timer);
+  }, [phase, reducedMotion]);
+
+  function invalidateCompletedQuest() {
+    void queryClient.invalidateQueries({ queryKey: ['quest-greetings', questId] });
+    void queryClient.invalidateQueries({ queryKey: ['my-submissions'] });
+    void queryClient.invalidateQueries({ queryKey: ['quests'] });
+    void queryClient.invalidateQueries({ queryKey: ['verification-quest', questId] });
+  }
+
+  function returnToForm() {
+    // 사진·안부와 미확정 전송 상태를 보존한 채 입력 화면으로 돌아갑니다.
+    if (!needsStatusCheck) setError('');
+    setPhase("editing");
+  }
+
   async function submit() {
-    if (submitting.current || !quest) return;
+    if (submitting.current || !quest || needsStatusCheck) return;
     setMeasuredDistance(null);
     if (!note.trim()) { setError('안부를 한 줄 이상 남겨주세요.'); return; }
     if (!general && !photoFile) { setError('인증 사진을 선택해 주세요.'); return; }
@@ -51,41 +79,131 @@ function VerificationScreen({ questId }: { questId: string }) {
     submitting.current = true;
     const controller = new AbortController();
     request.current = controller;
-    setError(''); setSending(true);
+    setError('');
+    setPhase("locating");
     let position: UserPosition | null = null;
+    let postStarted = false;
+    let accepted = false;
+    let responseReceived = false;
+    let scanTimer: number | undefined;
+    let finishScan: (() => void) | undefined;
+    const stopScanTimer = () => {
+      if (scanTimer !== undefined) window.clearTimeout(scanTimer);
+      scanTimer = undefined;
+      finishScan?.();
+    };
+    controller.signal.addEventListener("abort", stopScanTimer, { once: true });
     try {
       position = await location.requestLocation();
       if (controller.signal.aborted) return;
-      if (!position) { setError('현재 위치를 확인하지 못했어요. 위치 권한을 확인하고 다시 시도해 주세요.'); return; }
+      if (!position) {
+        setError('현재 위치를 확인하지 못했어요. 위치 권한을 확인하고 다시 시도해 주세요.');
+        setPhase("location-error");
+        return;
+      }
       const body = createSubmissionForm(quest.questType, note, position, photoFile);
+      setPhase("verifying");
+      // 위치 조회 시간은 제외하고 사진 검증 화면에만 3초를 적용합니다.
+      const scanFinished = !general ? new Promise<void>((resolve) => {
+        finishScan = resolve;
+        scanTimer = window.setTimeout(() => {
+          if (!responseReceived && !controller.signal.aborted && request.current === controller) {
+            controller.abort();
+            request.current = null;
+            submitting.current = false;
+            // 서버 처리는 계속됐을 수 있어 재전송 전 결과를 확인합니다.
+            setNeedsStatusCheck(true);
+            setError('검증이 3초 안에 끝나지 않았어요. 전송 결과를 확인한 뒤 다시 시도해주세요.');
+            setPhase("editing");
+          }
+          resolve();
+        }, PHOTO_VERIFICATION_MS);
+      }) : undefined;
+      postStarted = true;
       const response = await submitVerification(questId, body, controller.signal);
+      responseReceived = true;
       if (controller.signal.aborted) return;
-      setResult(response);
-      if (response.verifyStatus === 'PASSED') {
-        void queryClient.invalidateQueries({ queryKey: ['quest-greetings', questId] });
-        void queryClient.invalidateQueries({ queryKey: ['my-submissions'] });
-        void queryClient.invalidateQueries({ queryKey: ['quests'] });
-        void queryClient.invalidateQueries({ queryKey: ['verification-quest', questId] });
+      // 실제 완료 상태는 즉시 갱신하되, 결과 화면은 3초 뒤 표시합니다.
+      accepted = response.verifyStatus === 'PASSED';
+      if (accepted) invalidateCompletedQuest();
+      await scanFinished;
+      if (controller.signal.aborted) return;
+      if (accepted) {
+        setPhase("verified");
+      } else {
+        setPhase("failed");
       }
     } catch (cause) {
+      responseReceived = true;
       if (!controller.signal.aborted) {
-        const distance = position && isAxiosError(cause) && cause.response?.data?.code === "OUT_OF_RANGE"
+        const code = isAxiosError(cause) ? cause.response?.data?.code : undefined;
+        const distance = position && code === "OUT_OF_RANGE"
           ? getDistanceMeters(position, quest)
           : null;
         setMeasuredDistance(distance);
         setError(verificationError(cause, distance === null ? undefined : { distance }));
+        // 응답이 끊겼어도 전송이 완료됐을 수 있어 확인 전 재제출을 막습니다.
+        const rejected = isAxiosError(cause) && (
+          Boolean(cause.response && cause.response.status >= 400 && cause.response.status < 500 && cause.response.status !== 408)
+          || code === "AI_ERROR" || code === "OUT_OF_RANGE"
+        );
+        setNeedsStatusCheck(code === "ALREADY_PASSED" || (postStarted && !rejected));
+        setPhase(code === "OUT_OF_RANGE" ? "out-of-range" : "request-error");
       }
     } finally {
-      submitting.current = false;
-      if (!controller.signal.aborted) setSending(false);
+      stopScanTimer();
+      controller.signal.removeEventListener("abort", stopScanTimer);
+      if (request.current === controller) {
+        request.current = null;
+        // 성공 후에도 이전 이벤트로 중복 제출되지 않도록 잠금을 유지합니다.
+        if (!accepted) submitting.current = false;
+      }
     }
   }
+
+  async function checkSubmission() {
+    if (submitting.current || !quest) return;
+    submitting.current = true;
+    const controller = new AbortController();
+    request.current = controller;
+    setPhase("checking-result");
+    let confirmed = false;
+    try {
+      // 조회 요청으로만 확인하고 제출 POST를 반복하지 않습니다.
+      const latest = await getVerificationQuest(questId, controller.signal);
+      if (controller.signal.aborted) return;
+      if (latest.myStatus === "PASSED") {
+        confirmed = true;
+        setNeedsStatusCheck(false);
+        setError('');
+        setPhase("verified");
+        invalidateCompletedQuest();
+      } else {
+        // NONE/FAILED만으로 이번 요청의 처리 중 여부를 알 수 없어 재전송하지 않습니다.
+        setError('전송 결과를 아직 확인하지 못했어요. 잠시 후 다시 확인해 주세요.');
+        setPhase("request-error");
+      }
+    } catch (cause) {
+      if (!controller.signal.aborted) {
+        setError(verificationError(cause));
+        setPhase("request-error");
+      }
+    } finally {
+      if (request.current === controller) {
+        request.current = null;
+        if (!confirmed) submitting.current = false;
+      }
+    }
+  }
+
   const pick = () => input.current?.click();
   const fileInput = (
     <input
       ref={input}
       type="file"
       className="sr-only"
+      tabIndex={-1}
+      disabled={busy}
       accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
       aria-label="인증 사진 선택"
       onChange={async (e) => {
@@ -98,14 +216,14 @@ function VerificationScreen({ questId }: { questId: string }) {
           setPhoto(url);
           setPhotoFile(file);
           setError("");
-          go("compare");
+          setPhase("editing");
         } catch (cause) {
           setError(cause instanceof Error ? cause.message : "사진을 열 수 없어요.");
         }
       }}
     />
   );
-  if (!isQuestId(questId) || !token || detail.isPending || detail.isError || !quest) {
+  if (!isQuestId(questId) || !token || detail.isPending || (detail.isError && !completed) || !quest) {
     return <section className="p-6 min-h-full flex flex-col gap-5">
       <Back to="/" /><h1 className="text-xl font-semibold">수행 인증</h1>
       <p role={!token || detail.isError ? "alert" : "status"}>
@@ -116,251 +234,58 @@ function VerificationScreen({ questId }: { questId: string }) {
       <Link to="/" className="underline">홈으로 돌아가기</Link>
     </section>;
   }
-  if (step === "checking")
-    return (
-      <section
-        className="verify-page verify-checking min-h-[790px] flex-1 bg-[#def2f6] relative [&::before]:content-[''] [&::before]:absolute [&::before]:top-[-54px] [&::before]:left-0 [&::before]:right-0 [&::before]:h-[54px] [&::before]:bg-[#def2f6] [&::before]:z-0 max-[500px]:[min-height:calc(100dvh_-_54px)]"
-        aria-live="polite"
-      >
-        {(photo || quest.photoUrl) && <img className="verify-result-background" src={photo || quest.photoUrl || ""} alt="검증 중인 장소" />}
-        <motion.div
-          className="absolute top-[63%] left-0 right-0 h-[3px] bg-[#111]"
-          animate={{ y: reduceMotion ? 0 : [0, -200, 0] }}
-          transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
-        />
-        <div className="checking-card absolute bottom-[27px] left-[15px] right-[15px] bg-[#c9eaf5] rounded-[28px] p-[20px] [&_small]:text-[15px] [&_h1]:text-[28px] [&_h1]:leading-[1.2] [&_h1]:mt-[12px] [&_h1]:font-normal [&_h1]:tracking-[-1px]">
-          <small>{location.isLocating ? "현재 위치 확인 중" : general ? "안부를 전송하고 있어요" : "AI 검증 중"}</small>
-          <h1>
-            {location.isLocating ? "현재 위치를 확인하고 있어요" : general ? "잠시만 기다려 주세요" : <>같은 자리인지<br />비교하고 있어요</>}
-          </h1>
-        </div>
-      </section>
+  let screen;
+  if (phase === "locating" || phase === "verifying" || phase === "checking-result" || phase === "verified") {
+    screen = <VerificationProgress phase={phase} photoUrl={photo || quest.photoUrl} general={general} />;
+  } else if (phase === "delivering" || phase === "delivered") {
+    screen = <GreetingDelivery
+      phase={phase}
+      photoUrl={photo || null}
+      note={note}
+      reducedMotion={reducedMotion}
+      onComplete={() => setPhase(current => current === "delivering" ? "delivered" : current)}
+      onHome={() => navigate('/', { replace: true })}
+    />;
+  } else if (phase === "failed" || phase === "out-of-range" || phase === "location-error" || phase === "request-error") {
+    screen = (
+      <VerificationNotice
+        kind={phase}
+        photoUrl={quest.photoUrl}
+        photo={photo}
+        general={general}
+        message={phase === "location-error" ? location.error?.message || error : error}
+        distance={measuredDistance}
+        needsStatusCheck={needsStatusCheck}
+        onReturn={returnToForm}
+        onRetry={() => {
+          if (phase === "location-error") void submit();
+          else if (phase === "request-error" && needsStatusCheck) void checkSubmission();
+          else {
+            returnToForm();
+            if (phase === "failed" && !general) pick();
+          }
+        }}
+      />
     );
-  if (step === "success")
-    return (
-      <section className={`verify-page verify-${step} ${general ? "verify-general" : ""} [&::before]:content-[''] [&::before]:absolute [&::before]:top-[-54px] [&::before]:left-0 [&::before]:right-0 [&::before]:h-[54px] [&::before]:bg-[#def2f6] [&::before]:z-0 bg-[#def2f6] min-h-[790px] flex-1 relative max-[500px]:[min-height:calc(100dvh_-_54px)]`}>
-        <Link
-          className="h-[54px] w-[54px] rounded-full bg-[#ededed] inline-flex items-center justify-center shrink-0 [&_svg]:[stroke-width:1.25] absolute right-[15px] top-[12px]"
-          to="/me/history"
-          aria-label="닫기"
-        >
-          <X />
-        </Link>
-        {photo && <img className="verify-result-background" src={photo} alt="인증한 장소" />}
-        <SwipeSheet key="success" label="인증 성공 결과" collapsed={0.64} className="success-swipe-sheet">
-        <div className="success-sheet-content">
-
-          <p>
-            인증 성공
-          </p>
-          <div className="text-[112px] leading-[1.15] tracking-[-6px] font-normal [&_span]:text-[36px] [&_span]:tracking-[0]">
-            {percent === null ? "인증 완료" : <>{percent}<span>%</span></>}
-          </div>
-          <small>{percent === null ? "퀘스트 수행을 완료했어요" : "그때 사진과의 유사도"}</small>
-          <h1>
-            {result?.message}
-          </h1>
-          <div className="mt-auto pt-[45px] flex flex-col text-center gap-[17px] text-[14px] [&_>_a:first-of-type]:bg-[#242624] [&_>_a:first-of-type]:rounded-[35px] [&_>_a:first-of-type]:p-[20px] [&_>_button]:text-[10px] [&_>_button]:text-[#555]">
-            <Link to={`/quests/${questId}/greetings`}>다른 수행자의 안부 보기</Link>
-            <Link to="/">지도로 돌아가기</Link>
-          </div>
-          {error && <p role="alert">{error}</p>}
-          {location.error && <p role="alert">{location.error.message}</p>}
-        </div>
-        </SwipeSheet>
-      </section>
+  } else {
+    screen = (
+      <VerificationForm
+        quest={quest}
+        step={photoFile ? "compare" : "capture"}
+        photo={photo}
+        hasPhoto={Boolean(photoFile)}
+        note={note}
+        mix={mix}
+        sending={busy}
+        error={error}
+        needsStatusCheck={needsStatusCheck}
+        onNoteChange={setNote}
+        onMixChange={setMix}
+        onPickPhoto={pick}
+        onSubmit={() => { void (needsStatusCheck ? checkSubmission() : submit()); }}
+      />
     );
-  if (step === "failure")
-    return (
-      <section className={`verify-page verify-${step} ${general ? "verify-general" : ""} [&::before]:content-[''] [&::before]:absolute [&::before]:top-[-54px] [&::before]:left-0 [&::before]:right-0 [&::before]:h-[54px] [&::before]:bg-[#def2f6] [&::before]:z-0 bg-[#def2f6] min-h-[790px] flex-1 relative [padding:68px_15px_25px] flex flex-col [&_>_p_small]:text-[10px] [&_>_p_small]:text-[#666] [&_>_p_small]:ml-[10px] [&_>_p]:text-[17px] [&_>_p]:mb-[16px] [&_>_h1]:text-[40px] [&_>_h1]:leading-[1.15] [&_>_h1]:font-semibold [&_>_h1]:tracking-[-2px] [&_>_h1]:[margin:0_10px_32px] max-[500px]:[min-height:calc(100dvh_-_54px)]`}>
-        <Link
-          className="h-[54px] w-[54px] rounded-full bg-[#ededed] inline-flex items-center justify-center shrink-0 [&_svg]:[stroke-width:1.25] absolute right-[15px] top-[12px]"
-          to="/me/memories"
-          aria-label="닫기"
-        >
-          <X />
-        </Link>
-        <p>
-          인증 실패
-        </p>
-        <h1>
-          조금
-          <br />
-          달라 보여요
-        </h1>
-        <div className="flex gap-[10px] h-[250px] [&_>_div]:relative [&_>_div]:flex-1 [&_>_div]:bg-[#def2f6] [&_>_div]:rounded-[23px] [&_>_div]:overflow-hidden [&_>_div:nth-child(2)]:bg-[#ededed] [&_img]:w-full [&_img]:h-full [&_img]:object-cover [&_span]:absolute [&_span]:left-[13px] [&_span]:top-[16px] [&_span]:bg-[#aaa] [&_span]:rounded-[20px] [&_span]:[padding:4px_10px] [&_span]:text-[12px] [&_span]:z-[1]">
-          <div>
-            <span>과거</span>
-            <RemotePhoto className="past-photo" photoUrl={quest.photoUrl} alt="퀘스트 기준 사진" />
-          </div>
-          <div>
-            <span>지금</span>
-            {photo ? <img src={photo} alt="선택한 사진" /> : <div className="past-photo current-photo" />}
-          </div>
-        </div>
-        <div className="flex items-center gap-[20px] bg-[#ededed] rounded-[24px] [padding:22px_20px] mt-[12px] [&_strong]:text-[46px] [&_strong]:font-normal [&_strong]:tracking-[-2px] [&_strong]:whitespace-nowrap [&_strong_small]:text-[12px] [&_strong_small]:tracking-[0] [&_p]:text-[12px] [&_p]:leading-[1.5]">
-          <strong>
-            {percent === null ? "—" : <>{percent}<small>%</small></>}
-          </strong>
-          <p>
-            {result?.message}
-          </p>
-        </div>
-        <div className="mt-auto pt-[36px] [&_>_p]:text-center [&_>_p]:text-[12px] [&_>_p]:mb-[12px]">
-          <p>적어둔 안부는 그대로 남아 있어요.</p>
-          <SlideButton
-            onClick={() => {
-              go("capture");
-              pick();
-            }}
-          >
-            사진 다시 고르기
-          </SlideButton>
-        </div>
-        {fileInput}
-      </section>
-    );
-  const showComparison = step === "compare" && Boolean(quest.photoUrl?.trim());
-  const basePhoto = showComparison ? quest.photoUrl : photo || quest.photoUrl;
-  return (
-    <section className={`verify-page verify-${step} ${general ? "verify-general" : ""} min-h-[790px] flex-1 flex flex-col relative max-[500px]:[min-height:calc(100dvh_-_54px)]`}>
-      <div
-        className={`verify-photo h-[430px] relative shrink-0 overflow-hidden max-[500px]:h-[48dvh] max-[500px]:min-h-[325px] ${showComparison ? "comparing" : ""}`}
-      >
-        <div className="flex justify-between absolute top-[12px] left-[15px] right-[15px] z-[4]">
-          <Back to="/" />
-          <span className="bg-[#ededed] flex items-center gap-[5px] [padding:0_15px] h-[54px] rounded-[30px] text-[12px] [&_i]:w-[12px] [&_i]:h-[12px] [&_i]:rounded-full [&_i]:bg-[#242624]">
-            <i />
-            {quest.placeName}
-          </span>
-        </div>
-        {basePhoto && (
-          <img
-            className={`absolute inset-0 h-full w-full object-cover ${showComparison ? "compare-past" : ""}`}
-            src={basePhoto}
-            alt={!showComparison && photo ? "인증을 위해 선택한 사진" : "퀘스트 기준 사진"}
-          />
-        )}
-        {step === "capture" ? (
-          <>
-            <div className="absolute left-[38px] right-[38px] top-[100px] h-[183px] grid place-items-center [&_>_i]:absolute [&_>_i]:w-[32px] [&_>_i]:h-[32px] [&_>_i]:[border-color:#111] [&_>_i]:[border-style:solid] [&_>_i:nth-child(1)]:top-0 [&_>_i:nth-child(1)]:left-0 [&_>_i:nth-child(1)]:[border-width:2px_0_0_2px] [&_>_i:nth-child(1)]:[border-radius:9px_0_0_0] [&_>_i:nth-child(2)]:right-0 [&_>_i:nth-child(2)]:top-0 [&_>_i:nth-child(2)]:[border-width:2px_2px_0_0] [&_>_i:nth-child(2)]:[border-radius:0_9px_0_0] [&_>_i:nth-child(3)]:bottom-0 [&_>_i:nth-child(3)]:left-0 [&_>_i:nth-child(3)]:[border-width:0_0_2px_2px] [&_>_i:nth-child(3)]:[border-radius:0_0_0_9px] [&_>_i:nth-child(4)]:bottom-0 [&_>_i:nth-child(4)]:right-0 [&_>_i:nth-child(4)]:[border-width:0_2px_2px_0] [&_>_i:nth-child(4)]:[border-radius:0_0_9px_0] [&_h1]:text-center [&_h1]:text-[20px] [&_h1]:font-normal [&_h1]:leading-[1.3]">
-              <i />
-              <i />
-              <i />
-              <i />
-              <h1>
-                {general ? (
-                  <>
-                    사진도 남기고 싶다면
-                    <br />
-                    함께 올려주세요
-                  </>
-                ) : (
-                  <>
-                    이 구도 그대로
-                    <br />
-                    찍어오세요
-                  </>
-                )}
-              </h1>
-            </div>
-            <button
-              className="absolute bottom-[18px] left-[50%] [transform:translateX(-50%)] h-[54px] rounded-[30px] bg-[#ededed] flex items-center gap-[22px] whitespace-nowrap [padding:5px_24px_5px_6px] text-[12px] [&_>_span]:w-[43px] [&_>_span]:h-[43px] [&_>_span]:bg-[#def2f6] [&_>_span]:rounded-full [&_>_span]:grid [&_>_span]:place-items-center [&_>_span]:text-[#777] [&_svg]:[stroke-width:1]"
-              onClick={pick}
-            >
-              <span>
-                <Plus size={29} />
-              </span>
-              {general ? "사진 추가/선택" : "갤러리에서 고르기"}
-            </button>
-          </>
-        ) : showComparison ? (
-          <>
-            <img
-              className="absolute inset-0 h-full w-full object-cover"
-              src={photo}
-              alt="인증을 위해 선택한 사진"
-              style={{ clipPath: `inset(0 0 0 ${mix}%)` }}
-            />
-            <div
-              className="absolute top-0 bottom-0 [border-left:1px_solid_#ccc] [&_>_span]:absolute [&_>_span]:top-[46%] [&_>_span]:left-0 [&_>_span]:[transform:translateX(-50%)] [&_>_span]:h-[48px] [&_>_span]:w-[48px] [&_>_span]:rounded-full [&_>_span]:bg-[#ddd] [&_>_span]:grid [&_>_span]:place-items-center"
-              style={{ left: `${mix}%` }}
-            >
-              <span>
-                <ChevronsLeftRight />
-              </span>
-            </div>
-            <input
-              className="absolute [inset:70px_0_70px] w-full [height:calc(100%_-_140px)] opacity-0 cursor-ew-resize z-[3]"
-              type="range"
-              min="0"
-              max="100"
-              value={mix}
-              onChange={(e) => setMix(Number(e.target.value))}
-              aria-label="과거와 지금 사진 비교"
-            />
-            <div className="absolute bottom-[16px] left-[16px] right-[16px] flex items-center justify-between text-[11px] [&_>_span]:bg-[#ddd] [&_>_span]:rounded-[20px] [&_>_span]:[padding:5px_13px] [&_>_button]:bg-[#ededed] [&_>_button]:rounded-[30px] [&_>_button]:p-[20px]">
-              <span>과거</span>
-              <button onClick={pick}>다시 고르기</button>
-              <span>지금</span>
-            </div>
-          </>
-        ) : (
-          <button
-            type="button"
-            className="absolute bottom-[16px] left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-[#ededed] px-5 py-3 text-xs"
-            onClick={pick}
-          >
-            사진 다시 고르기
-          </button>
-        )}
-      </div>
-      <SwipeSheet key="capture" label="퀘스트 인증 입력" collapsed={0.50} className="capture-swipe-sheet">
-      <div className="verify-sheet bg-[#fff] [border-radius:46px_46px_0_0] flex-1 min-h-[402px] [padding:27px_20px_24px] flex flex-col [&_h1]:text-[22px] [&_h1]:font-bold [&_h1]:tracking-[-1px] [&_h1]:leading-[1.3] [&_h1]:mt-[3px] [&_>_p]:text-[11px] [&_>_p]:mt-[7px] [&_textarea]:block [&_textarea]:resize-y [&_textarea]:min-h-[90px] [&_textarea]:max-h-[160px] [&_textarea]:w-full [&_textarea]:bg-[#ededed] [&_textarea]:rounded-[24px] [&_textarea]:[padding:22px_10px] [&_textarea]:text-[12px] [&_textarea]:mt-[26px] [&_textarea]:border-0 [&_textarea::placeholder]:text-[#777] max-[500px]:[min-height:calc(52dvh_-_54px)]">
-        <div className="flex justify-between text-[10px]">
-          <span>{general ? "일반" : "이미지"} 퀘스트 | 난이도 {quest.difficulty}</span>
-          <span>{quest.author.nickname} 님의 그리움</span>
-        </div>
-        <h1>{quest.questTitle}</h1>
-        <p>{quest.questDescription}</p>
-        <textarea
-          placeholder="떠난 사람에게 한 줄 안부를 남겨주세요"
-          aria-label="안부 메시지"
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          maxLength={500}
-        />
-        {measuredDistance !== null ? (
-          <div role="alert" className="mt-4 rounded-2xl border border-[#d4e6eb] bg-[#eff8fa] p-4 text-[#243a40]">
-            <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-              <span className="flex items-center gap-1.5 font-medium">
-                <MapPin size={15} aria-hidden="true" />
-                퀘스트까지 측정 거리
-              </span>
-              <span className="rounded-full bg-white px-2.5 py-1">인증 범위 200m 이내</span>
-            </div>
-            <p className="mt-1 text-3xl font-semibold tabular-nums">
-              <span className="mr-1 text-sm font-normal">약</span>
-              {Math.round(measuredDistance).toLocaleString("ko-KR")}
-              <span className="ml-1 text-base">m</span>
-            </p>
-            <p className="mt-1 text-xs leading-relaxed">{error}</p>
-          </div>
-        ) : error && <p role="alert">{error}</p>}
-        {location.error && <p role="alert">{location.error.message}</p>}
-        <div className={measuredDistance === null ? "mt-auto pt-[40px]" : "mt-auto pt-4"}>
-          <SlideButton
-            disabled={sending || !note.trim() || (!photoFile && !general) || quest.isMine || quest.myStatus === "PASSED"}
-            onClick={() => void submit()}
-          >
-            {quest.isMine ? "내 퀘스트는 인증할 수 없어요" : quest.myStatus === "PASSED" ? "이미 인증한 퀘스트예요" : !note.trim() ? "안부를 남겨주세요" : !photoFile && !general ? "사진을 골라주세요" : "인증 보내기"}
-          </SlideButton>
-        </div>
-      </div>
-
-      </SwipeSheet>
-      {fileInput}
-
-    </section>
-  );
+  }
+  // 파일 입력을 유지해 실패 화면에서도 사진 선택창을 바로 열 수 있게 합니다.
+  return <>{fileInput}{screen}</>;
 }

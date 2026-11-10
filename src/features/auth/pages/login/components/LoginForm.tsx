@@ -46,7 +46,7 @@ export default function LoginForm({ initialEmail, signupHref, disabled, onSubmit
 
   return (
     <form onSubmit={submit} noValidate className="w-full">
-      <fieldset disabled={disabled || isSubmitting} className="space-y-3">
+      <fieldset disabled={disabled || isSubmitting} className="space-y-4">
         <div>
           {/* placeholder와 별도로 입력란의 이름을 연결합니다. */}
           <label htmlFor="login-email" className="sr-only">
@@ -65,7 +65,7 @@ export default function LoginForm({ initialEmail, signupHref, disabled, onSubmit
             aria-invalid={Boolean(emailError)}
             aria-describedby={emailError ? 'login-email-error' : undefined}
             required
-            className="h-14 rounded-full border-0 bg-[#F4F4F4] px-6 text-base text-[#242624] shadow-none placeholder:text-[#ADB1B5] md:text-base"
+            className="h-[68px] rounded-full border-0 bg-[#F4F4F4] px-6 text-base text-[#242624] shadow-none placeholder:text-[#ADB1B5] md:text-base"
           />
           {emailError && (
             <p id="login-email-error" role="alert" className="mt-2 px-2 text-xs text-red-600">
@@ -88,7 +88,7 @@ export default function LoginForm({ initialEmail, signupHref, disabled, onSubmit
             aria-invalid={Boolean(passwordError)}
             aria-describedby={passwordError ? 'login-password-error' : undefined}
             required
-            className="h-14 rounded-full border-0 bg-[#F4F4F4] px-6 text-base text-[#242624] shadow-none placeholder:text-[#ADB1B5] md:text-base"
+            className="h-[68px] rounded-full border-0 bg-[#F4F4F4] px-6 text-base text-[#242624] shadow-none placeholder:text-[#ADB1B5] md:text-base"
           />
           {passwordError && (
             <p id="login-password-error" role="alert" className="mt-2 px-2 text-xs text-red-600">
@@ -101,7 +101,7 @@ export default function LoginForm({ initialEmail, signupHref, disabled, onSubmit
       <Button
         type="submit"
         disabled={disabled || !isValid || isSubmitting}
-        className="mt-6 h-14 w-full rounded-[22px] bg-[#D3E7F4] text-base font-medium text-[#242624] hover:bg-[#C7E0F0]"
+        className="mt-7 h-[68px] w-full rounded-[24px] bg-[#D3E7F4] text-base font-medium text-[#242624] hover:bg-[#C7E0F0] disabled:opacity-100"
       >
         {isSubmitting ? '로그인하는 중…' : '로그인'}
       </Button>
@@ -114,7 +114,7 @@ export default function LoginForm({ initialEmail, signupHref, disabled, onSubmit
         {message || (initialEmail ? '회원가입이 완료됐어요. 로그인해주세요.' : '')}
       </p>
 
-      <div className="mt-2 flex justify-center">
+      <div className="mt-2 flex min-h-11 items-center justify-center text-xs">
         {/* 약관 단계 없이 회원가입 입력 화면으로 이동합니다. */}
         <Link
           to={signupHref}
@@ -123,7 +123,7 @@ export default function LoginForm({ initialEmail, signupHref, disabled, onSubmit
           onClick={(event) => {
             if (disabled || isSubmitting) event.preventDefault()
           }}
-          className="inline-flex min-h-11 items-center text-xs text-[#555D61]"
+          className="inline-flex min-h-11 items-center text-[#555D61]"
         >
           회원가입
         </Link>

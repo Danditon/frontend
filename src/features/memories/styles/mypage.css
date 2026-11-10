@@ -28,10 +28,6 @@
 .mypage-quest-card { display: grid; width: 100%; grid-template-columns: minmax(0, 1fr) 72px; align-items: center; gap: 16px; min-height: 120px; padding: 16px 18px; border-radius: 24px; background: #dceef5; text-align: left; }
 .mypage-quest-item:nth-child(3n + 2) .mypage-quest-card { background: #e6ddf1; }
 .mypage-quest-item:nth-child(3n) .mypage-quest-card { background: #f2e3d8; }
-.mypage-quest-notice { overflow: hidden; }
-.mypage-quest-notice > div { padding: 12px 16px 4px; color: #586b73; font-size: 13px; line-height: 1.5; }
-.mypage-quest-notice small { display: block; margin-top: 4px; color: #74848b; font-size: 12px; }
-.mypage-quest-notice button { min-height: 44px; padding-right: 12px; text-decoration: underline; }
 .mypage-quest-copy { min-width: 0; }
 .mypage-quest-copy strong { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; font-size: 16px; font-weight: 500; line-height: 1.45; overflow-wrap: anywhere; }
 .mypage-quest-copy small { display: block; margin-top: 6px; color: #69716e; font-size: 12px; }
@@ -40,6 +36,28 @@
 .mypage-quest-item:nth-child(even) .mypage-quest-photo { transform: rotate(-8deg); }
 .mypage-quest-photo .remote-photo { width: 100%; height: 100%; }
 .mypage-quest-photo .remote-photo > span { padding: 4px; font-size: 10px; }
+
+/* navbar가 있던 아래쪽에서 열리고, 제목은 고정한 채 받은 안부 목록만 스크롤합니다. */
+.received-greetings-drawer { inset-inline: 0; bottom: 24px; width: min(390px, 100%); margin-inline: auto; border-radius: 32px 32px 0 0; background: white; color: #242624; font-family: "Pretendard", system-ui, sans-serif; }
+.received-greetings-header { position: relative; flex: none; padding: 18px 64px 20px 24px; text-align: left; }
+.received-greetings-header [data-slot="drawer-title"] { font-family: inherit; font-size: 20px; font-weight: 700; line-height: 1.45; overflow-wrap: anywhere; }
+.received-greetings-header [data-slot="drawer-description"] { margin-top: 8px; color: #697c86; font-size: 13px; }
+.received-greetings-header > button { position: absolute; top: 12px; right: 12px; display: grid; width: 44px; height: 44px; place-items: center; border-radius: 50%; cursor: pointer; }
+.received-greetings-list { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior-y: contain; padding: 0 20px max(24px, env(safe-area-inset-bottom, 0px)); }
+.received-greetings-list li + li { border-top: 1px solid #e6edf0; }
+.received-greetings-row { display: grid; grid-template-columns: 60px minmax(0, 1fr) 18px; align-items: center; gap: 12px; min-height: 100px; padding: 14px 4px; border-radius: 16px; }
+.received-greetings-row:hover, .received-greetings-row:active { background: #edf6fa; }
+.received-greetings-row .remote-photo, .received-greetings-no-photo { display: grid; width: 60px; height: 72px; place-items: center; overflow: hidden; border-radius: 12px; background: #e4f1f7; color: #7daabd; }
+.received-greetings-row .remote-photo > span { padding: 4px; font-size: 10px; }
+.received-greetings-copy { display: grid; min-width: 0; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 8px; }
+.received-greetings-copy strong { overflow: hidden; font-size: 14px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.received-greetings-copy time { align-self: center; color: #78858b; font-size: 11px; }
+.received-greetings-copy > span { display: -webkit-box; grid-column: 1 / -1; overflow: hidden; -webkit-line-clamp: 2; -webkit-box-orient: vertical; font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
+.received-greetings-status { display: flex; min-height: 180px; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 24px 8px; color: #697c86; font-size: 14px; text-align: center; }
+.received-greetings-status small { font-size: 12px; line-height: 1.5; }
+.received-greetings-status button { min-height: 44px; padding: 8px 16px; text-decoration: underline; cursor: pointer; }
+.received-greetings-drawer :is(a, button):focus-visible, .received-greetings-list:focus-visible { outline: 2px solid #6196a8; outline-offset: -2px; }
+@media (max-width: 500px) { .received-greetings-drawer { bottom: 0; width: 100%; } }
 
 /* 제목이 길 때는 필요한 높이를 확보하고, 그 외에는 화면의 25% 아래에서 편지지가 멈춥니다. */
 .memory-page.mypage-greeting { position: relative; isolation: isolate; display: grid; height: 100%; min-height: 0; grid-template-rows: minmax(max-content, 25%) minmax(0, 1fr); overflow: hidden; background: #f3f4f6; }

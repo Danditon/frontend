@@ -1,0 +1,126 @@
+/* 공용 Drawer와 분리된 인증 입력·진행·안내 화면 스타일입니다. */
+.qv-form {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 640px;
+  color: #242624;
+  background: #e4f1f5;
+}
+
+/* 패널은 내용에 따라 늘어나고, 작은 화면에서는 부모의 스크롤로 접근합니다. */
+.qv-form-photo { position: relative; flex: 1 0 52%; min-height: 260px; overflow: hidden; }
+.qv-photo-image { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.qv-form-header { position: absolute; inset: max(16px, env(safe-area-inset-top, 0px)) 16px auto; z-index: 4; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.qv-form-header > a { width: 44px; height: 44px; }
+.qv-place { display: flex; align-items: center; gap: 8px; min-width: 0; max-width: calc(100% - 56px); min-height: 36px; padding: 8px 14px; border-radius: 999px; background: #242624; color: white; font-size: 12px; line-height: 18px; }
+.qv-place i { width: 10px; height: 10px; flex: none; border-radius: 50%; background: #d3e7f4; }
+.qv-place > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qv-photo-frame { position: absolute; top: 44%; left: 32px; right: 32px; display: grid; place-items: center; height: 180px; max-height: 48%; transform: translateY(-50%); }
+.qv-photo-frame p { padding: 16px; font-size: 20px; font-weight: 500; line-height: 1.4; text-align: center; }
+.qv-photo-frame[data-photo="true"] { color: white; text-shadow: 0 1px 5px #0009; }
+.qv-photo-frame i { position: absolute; width: 28px; height: 28px; border: solid currentColor; }
+.qv-photo-frame i:nth-child(1) { top: 0; left: 0; border-width: 2px 0 0 2px; border-radius: 8px 0 0; }
+.qv-photo-frame i:nth-child(2) { top: 0; right: 0; border-width: 2px 2px 0 0; border-radius: 0 8px 0 0; }
+.qv-photo-frame i:nth-child(3) { bottom: 0; left: 0; border-width: 0 0 2px 2px; border-radius: 0 0 0 8px; }
+.qv-photo-frame i:nth-child(4) { bottom: 0; right: 0; border-width: 0 2px 2px 0; border-radius: 0 0 8px; }
+.qv-pick-photo, .qv-repick-photo { position: absolute; bottom: 40px; left: 50%; z-index: 3; display: inline-flex; min-height: 44px; align-items: center; justify-content: center; gap: 8px; padding: 6px 18px; border-radius: 999px; transform: translateX(-50%); background: white; color: #242624; font-size: 14px; font-weight: 600; white-space: nowrap; box-shadow: 0 2px 8px #0001; }
+.qv-pick-photo { padding-left: 5px; }
+.qv-pick-photo > span { display: grid; width: 36px; height: 36px; flex: none; place-items: center; border-radius: 50%; background: #d3e7f4; }
+.qv-comparison { position: absolute; inset: 0; }
+.qv-comparison-divider { position: absolute; top: 0; bottom: 0; width: 2px; background: white; box-shadow: 0 0 4px #0003; }
+.qv-comparison-divider > span { position: absolute; top: 45%; left: 50%; display: grid; width: 44px; height: 44px; place-items: center; border-radius: 50%; transform: translate(-50%, -50%); background: #d3e7f4; }
+.qv-comparison input { position: absolute; inset: 72px 0 96px; width: 100%; height: calc(100% - 168px); opacity: 0; cursor: ew-resize; }
+.qv-comparison:focus-within .qv-comparison-divider > span { outline: 2px solid #242624; outline-offset: 3px; }
+.qv-comparison-actions { position: absolute; left: 16px; right: 16px; bottom: 40px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.qv-comparison-actions > span { padding: 5px 12px; border-radius: 999px; background: #d3e7f4; font-size: 12px; font-weight: 500; }
+.qv-comparison-actions > button { min-height: 44px; padding: 10px 16px; border-radius: 999px; background: white; font-size: 14px; font-weight: 600; }
+.qv-form-panel { position: relative; z-index: 5; display: flex; flex: 0 0 auto; flex-direction: column; min-height: 360px; margin-top: -24px; padding: 24px 20px max(20px, env(safe-area-inset-bottom, 0px)); border-radius: 32px 32px 0 0; background: white; }
+.qv-form-meta { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; color: #555d61; font-size: 12px; line-height: 18px; }
+.qv-form-meta > span:last-child { min-width: 0; max-width: 46%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qv-form-panel h1 { margin-top: 14px; font-size: 22px; font-weight: 700; line-height: 1.3; letter-spacing: -0.5px; overflow-wrap: anywhere; }
+.qv-description { margin-top: 6px; font-size: 14px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+.qv-note { display: block; flex: none; width: 100%; height: 112px; min-height: 100px; max-height: 180px; margin-top: 16px; padding: 16px; resize: vertical; border: 0; border-radius: 24px; background: #ededed; font-size: 16px; line-height: 1.5; }
+.qv-note::placeholder { color: #858b8e; }
+.qv-submit-area { margin-top: auto; padding-top: 20px; }
+.qv-submit { width: 100%; height: 56px; gap: 8px; border-radius: 999px; background: #242624; color: white; font-size: 16px; font-weight: 600; }
+.qv-submit:hover { background: #383b38; }
+.qv-submit:disabled { background: #ededed; color: #858b8e; opacity: 1; }
+.qv-form-error { margin-top: 12px; color: #a32d2d; font-size: 13px; line-height: 1.5; }
+.qv-distance-notice { margin-top: 16px; padding: 16px; border: 1px solid #d4e6eb; border-radius: 20px; background: #eff8fa; color: #243a40; font-size: 12px; line-height: 1.5; }
+.qv-distance-notice > div { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; }
+.qv-distance-notice > div > span:first-child { display: inline-flex; align-items: center; gap: 4px; }
+.qv-distance-notice > div > span:last-child { padding: 2px 8px; border-radius: 999px; background: white; }
+.qv-distance-notice .qv-distance-value { margin: 8px 0 4px; font-size: 14px; font-variant-numeric: tabular-nums; }
+.qv-distance-value strong { font-size: 30px; font-weight: 600; }
+.qv-progress { position: relative; isolation: isolate; display: flex; flex-direction: column; height: 100%; min-height: 420px; overflow: hidden; background: #e4f1f5; }
+.qv-progress-backdrop { position: absolute; inset: 0; z-index: -1; width: 100%; height: 100%; object-fit: cover; filter: blur(16px); transform: scale(1.08); opacity: 0.45; }
+.qv-progress-visual { position: relative; display: grid; flex: 1; min-height: 0; place-items: center; container-type: size; }
+/* 사진을 자르지 않고 맞춘 뒤, 스캔 범위를 실제 표시된 사진 크기에 맞춥니다. */
+.qv-scan-photo { position: relative; width: fit-content; height: fit-content; max-width: 100%; max-height: 100%; }
+.qv-scan-image { display: block; width: auto; height: auto; max-width: 100cqw; max-height: 100cqh; }
+.qv-location-marker { position: absolute; top: 50%; left: 50%; display: grid; width: 120px; height: 120px; place-items: center; border: 1px solid #fff9; border-radius: 50%; transform: translate(-50%, -50%); background: #d3e7f455; color: #356978; box-shadow: 0 0 0 24px #d3e7f433; }
+.qv-status-card { position: relative; flex: none; min-height: 128px; margin: 16px 16px max(24px, env(safe-area-inset-bottom, 0px)); padding: 20px; border-radius: 28px; background: white; color: #242624; box-shadow: 0 3px 20px #0001; }
+.qv-status-card small { color: #6196a8; font-size: 13px; }
+.qv-status-card h1 { margin-top: 10px; font-size: 22px; font-weight: 600; line-height: 1.35; }
+.qv-status-card p { margin-top: 8px; color: #555d61; font-size: 14px; line-height: 1.5; }
+.qv-notice { display: flex; flex-direction: column; min-height: 100%; padding: max(20px, env(safe-area-inset-top, 0px)) 20px max(24px, env(safe-area-inset-bottom, 0px)); background: linear-gradient(#e4f1f5, white 75%); color: #242624; }
+.qv-notice-back { display: grid; width: 44px; height: 44px; flex: none; place-items: center; margin-bottom: 24px; border-radius: 50%; background: #242624; color: white; }
+.qv-notice-badge { display: inline-flex; padding: 5px 12px; border-radius: 999px; background: #f5e6ac; font-size: 13px; font-weight: 600; }
+.qv-notice h1 { margin-top: 16px; font-size: 28px; font-weight: 600; line-height: 1.3; letter-spacing: -0.5px; }
+.qv-notice-description { margin-top: 12px; font-size: 15px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+.qv-range-illustration { display: flex; width: 150px; height: 150px; flex: none; align-items: center; justify-content: center; gap: 8px; align-self: center; margin: 32px 0 12px; border: 1px solid #b9d9e6; border-radius: 50%; background: #d3e7f477; color: #356978; font-size: 14px; font-weight: 600; }
+.qv-notice .qv-distance-notice { margin-top: 16px; padding: 20px; background: #fff9; text-align: center; }
+.qv-failed-photos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 24px; }
+.qv-failed-photos > div { position: relative; height: 220px; overflow: hidden; border-radius: 24px; background: #ededed; }
+.qv-failed-photos > div > span { position: absolute; top: 10px; left: 10px; z-index: 1; padding: 4px 10px; border-radius: 999px; background: #242624; color: white; font-size: 12px; }
+.qv-failed-photos > div:last-child > span { background: #d3e7f4; color: #242624; }
+.qv-failed-photos .remote-photo, .qv-failed-photos img { width: 100%; height: 100%; object-fit: cover; }
+.qv-failed-guidance { margin-top: 12px; padding: 16px; border-radius: 20px; background: #ededed; font-size: 14px; line-height: 1.6; }
+.qv-notice-actions { margin-top: auto; padding-top: 28px; text-align: center; }
+.qv-notice-actions > p { margin-bottom: 12px; color: #66757b; font-size: 13px; line-height: 1.5; }
+.qv-notice-return { min-height: 44px; margin-top: 8px; font-size: 14px; text-decoration: underline; text-underline-offset: 3px; }
+
+.qv-scanner { position: absolute; inset: 0; overflow: hidden; pointer-events: none; container-type: size; }
+.qv-scan-sweep { position: absolute; top: 0; left: 0; right: 0; height: 2px; background: #e3faff; box-shadow: 0 0 8px #8ce4ff, 0 0 18px #b4efff88; animation: qv-scan-sweep 3s ease-in-out infinite; }
+.qv-scan-trail { position: absolute; left: 0; right: 0; height: clamp(24px, 12cqh, 84px); background-color: #8bdcf733; background-image: linear-gradient(#c4f5ff22 1px, transparent 1px), linear-gradient(90deg, #c4f5ff22 1px, transparent 1px); background-size: 20px 20px; }
+/* 왕복 방향에 맞춰 빛 띠가 항상 스캔선 뒤를 따르도록 전환합니다. */
+.qv-scan-trail-down { bottom: 100%; mask-image: linear-gradient(transparent, black); animation: qv-scan-trail-down 3s linear infinite; }
+.qv-scan-trail-up { top: 100%; mask-image: linear-gradient(black, transparent); opacity: 0; animation: qv-scan-trail-up 3s linear infinite; }
+.qv-scan-corners { position: absolute; inset: 8px; color: #d6f5ff; filter: drop-shadow(0 0 3px #35697888); }
+.qv-scan-corners i { position: absolute; width: 24px; height: 24px; border: solid currentColor; }
+.qv-scan-corners i:nth-child(1) { top: 0; left: 0; border-width: 2px 0 0 2px; border-radius: 6px 0 0; }
+.qv-scan-corners i:nth-child(2) { top: 0; right: 0; border-width: 2px 2px 0 0; border-radius: 0 6px 0 0; }
+.qv-scan-corners i:nth-child(3) { bottom: 0; left: 0; border-width: 0 0 2px 2px; border-radius: 0 0 0 6px; }
+.qv-scan-corners i:nth-child(4) { bottom: 0; right: 0; border-width: 0 2px 2px 0; border-radius: 0 0 6px; }
+@keyframes qv-scan-sweep {
+  0%, 100% { top: 0; }
+  50% { top: calc(100% - 2px); }
+}
+@keyframes qv-scan-trail-down {
+  0%, 49.99% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+@keyframes qv-scan-trail-up {
+  0%, 49.99% { opacity: 0; }
+  50%, 100% { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .qv-scan-sweep { top: 50%; animation: none; }
+  .qv-scan-trail { animation: none; opacity: 0.35; }
+}
+.qv-verified-badge { position: absolute; top: 20%; left: 50%; display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border: 1px solid #fff9; border-radius: 999px; transform: translateX(-50%); background: #242624; color: white; font-size: 16px; font-weight: 600; white-space: nowrap; }
+.qv-delivery { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px; min-height: 100%; padding: max(32px, env(safe-area-inset-top, 0px)) 24px max(32px, env(safe-area-inset-bottom, 0px)); background: linear-gradient(160deg, #e4f1f5, #d3e7f4); color: #242624; text-align: center; }
+.qv-delivery-scene { display: block; width: 360px; max-width: 100%; height: auto; flex: none; }
+.qv-delivery-status { min-height: 78px; }
+.qv-delivery-actions { display: flex; justify-content: center; width: 100%; min-height: 56px; }
+.qv-delivery h1 { font-size: 26px; font-weight: 700; line-height: 1.35; letter-spacing: -0.5px; }
+.qv-delivery p { margin-top: 10px; font-size: 15px; line-height: 1.6; }
+.qv-delivery-home { max-width: 320px; }
+.qv-delivery-preview { position: fixed; inset: 0; z-index: 2147483647; display: grid; place-items: center; padding: 12px; background: #242624aa; }
+.qv-delivery-preview-phone { display: flex; flex-direction: column; width: min(420px, 100%); height: min(850px, 100%); overflow-y: auto; border-radius: 24px; background: #e4f1f5; }
+.qv-delivery-preview-controls { position: sticky; top: 0; z-index: 1; display: flex; flex: none; justify-content: space-between; gap: 12px; padding: 8px 16px; background: #f6fbff; }
+.qv-delivery-preview-controls button { min-height: 44px; padding: 8px 12px; border-radius: 12px; font-size: 14px; }
+.qv-delivery-preview-controls button:focus-visible { outline: 2px solid #356978; }
+.qv-delivery-preview-phone > .qv-delivery { flex: 1 0 auto; min-height: 480px; }

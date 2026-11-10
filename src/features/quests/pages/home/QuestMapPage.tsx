@@ -30,6 +30,7 @@ export default function QuestMapPage() {
   const { position: requestedPosition, isLocating, error: locationError, requestLocation } = useGeolocation()
   const { position, error: liveError } = useLivePosition(requestedPosition)
   const error = locationError ?? liveError
+  const [recenterRequest, setRecenterRequest] = useState(0)
 
   useEffect(() => {
     let active = true
@@ -45,7 +46,7 @@ export default function QuestMapPage() {
     }
   }, [requestLocation])
 
-  // 실시간 GPS 변화는 마커에 반영하고, 검색은 최초 조회·위치 버튼의 좌표를 사용합니다.
+  // 실시간 GPS 변화는 마커에 반영하고, 검색은 일회성 위치 조회의 좌표를 사용합니다.
   const nearbyQuery = useNearbyQuests(requestedPosition)
   const nearbyError = nearbyQuery.isError ? getQuestQueryError(nearbyQuery.error, 'nearby') : null
   // 일시적인 갱신 실패는 기존 마커를 유지하고, 인증·권한 거절 결과는 화면에서 제외합니다.
@@ -206,6 +207,7 @@ export default function QuestMapPage() {
       <QuestMap
         position={requestedPosition}
         userPosition={position}
+        recenterRequest={recenterRequest}
         quests={nearbyQuests}
         selectedQuestId={selectedQuestId}
         drawerTop={drawerTop}
@@ -266,7 +268,9 @@ export default function QuestMapPage() {
             <CurrentLocationButton
               isLocating={isLocating}
               onClick={() => {
-                void requestLocation()
+                // 좌표가 같아도 버튼을 누를 때마다 지도 중심 이동을 요청합니다.
+                if (position) setRecenterRequest(current => current + 1)
+                else void requestLocation()
               }}
             />
           </div>

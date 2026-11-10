@@ -176,7 +176,7 @@ function homeFixture() {
       useState: (initial) => {
         const index = cursor++
         if (!(index in states)) states[index] = initial
-        return [states[index], (next) => { states[index] = next }]
+        return [states[index], (next) => { states[index] = typeof next === 'function' ? next(states[index]) : next }]
       },
     },
     '@/features/quests/hooks/useGeolocation': { useGeolocation: () => ({
@@ -242,7 +242,9 @@ test('홈 진입 시 자동 위치 조회를 한 번 실행하고 StrictMode·�
   f.flushMicrotasks()
   assert.equal(f.locationRequests, 1)
   f.node('CurrentLocationButton').props.onClick()
-  assert.equal(f.locationRequests, 2)
+  f.render()
+  assert.equal(f.locationRequests, 1)
+  assert.equal(f.node('QuestMap').props.recenterRequest, 1)
 })
 
 test('자동 위치 조회를 시작하기 전에 홈을 떠나면 예약된 요청을 실행하지 않는다', () => {
@@ -251,6 +253,54 @@ test('자동 위치 조회를 시작하기 전에 홈을 떠나면 예약된 요
   f.unmount()
   f.flushMicrotasks()
   assert.equal(f.locationRequests, 0)
+})
+
+test('좌표가 있으면 위치 버튼은 GPS 재조회 없이 매번 중심 이동만 요청하고 최신 위치를 전달한다', () => {
+  const f = homeFixture()
+  f.render()
+  f.flushMicrotasks()
+  assert.equal(f.locationRequests, 1)
+  for (const count of [1, 2, 3]) {
+    f.node('CurrentLocationButton').props.onClick()
+    f.render()
+    assert.equal(f.node('QuestMap').props.recenterRequest, count)
+    assert.equal(f.locationRequests, 1)
+  }
+  const moved = { ...position, lat: 35.88, timestamp: 2000 }
+  f.livePosition = moved
+  f.render()
+  assert.equal(f.node('QuestMap').props.recenterRequest, 3)
+  f.node('CurrentLocationButton').props.onClick()
+  f.render()
+  assert.equal(f.node('QuestMap').props.recenterRequest, 4)
+  assert.equal(f.node('QuestMap').props.userPosition, moved)
+  assert.equal(f.node('QuestMap').props.position, position)
+  assert.equal(f.locationRequests, 1)
+  assert.equal(f.nearbyInputs.at(-1), position)
+  f.unmount()
+})
+
+test('좌표가 없을 때만 위치 버튼으로 조회하고 실패 안내와 재시도를 유지한다', () => {
+  const f = homeFixture()
+  f.position = null
+  f.render()
+  f.flushMicrotasks()
+  f.locationError = { code: 'TIMEOUT', message: '위치 확인 시간이 초과됐어요.' }
+  f.render()
+  f.node('CurrentLocationButton').props.onClick()
+  f.render()
+  assert.equal(f.locationRequests, 2)
+  assert.equal(f.node('QuestMap').props.recenterRequest, 0)
+  assert.match(textOf(f.render()), /위치 확인 시간이 초과/)
+  f.position = position
+  f.locationError = null
+  f.render()
+  assert.equal(f.node('QuestMap').props.position, position)
+  f.node('CurrentLocationButton').props.onClick()
+  f.render()
+  assert.equal(f.locationRequests, 2)
+  assert.equal(f.node('QuestMap').props.recenterRequest, 1)
+  f.unmount()
 })
 
 test('위치 조회 실패 시 안내와 수동 재시도를 유지하고 자동으로 반복 요청하지 않는다', () => {
@@ -596,29 +646,77 @@ test('위치 구독 자체가 실패해도 최초 좌표를 유지하고 미리 
   assert.equal(f.render(refreshed).error, null)
 })
 
-test('내 위치의 실시간 변경은 지도 중심을 이동시키지 않고 위치 버튼 조회 때만 이동한다', () => {
+function mapCameraFixture({ deferred = false } = {}) {
   const pans = [], container = { replaceChildren() {} }
-  const map = { panTo: target => pans.push(target) }
+  const created = []
+  const map = { panTo: target => pans.push(target), setLevel: () => assert.fail('중심 이동은 확대 수준을 바꾸면 안 됩니다.') }
+  let ready
   const f = componentFixture('features/quests/pages/home/components/QuestMap.tsx', {
     '@/features/quests/hooks/useVisibleQuests': { useVisibleQuests() {} },
     './UserLocationMarker': { __esModule: true, default: 'UserLocationMarker' },
     './QuestMarkers': { __esModule: true, default: 'QuestMarkers' },
   }, { window: { kakao: { maps: {
-    load: callback => callback(), Map: class { constructor() { return map } },
+    load: callback => { ready = callback; if (!deferred) callback() },
+    Map: class { constructor(_container, options) { created.push(options); return map } },
     LatLng: class { constructor(lat, lng) { Object.assign(this, { lat, lng }) } },
   } } } })
   f.refs[0] = { current: container }
-  const props = { position, userPosition: position, quests: [], selectedQuestId: null, drawerTop: null, onQuestSelect() {}, onVisibleQuestsChange() {} }
-  f.render(props)
-  f.render(props)
-  assert.equal(pans.length, 1)
+  let props = { position, userPosition: position, recenterRequest: 0, quests: [], selectedQuestId: null, drawerTop: null, onQuestSelect() {}, onVisibleQuestsChange() {} }
+  return {
+    pans, created, ready: () => ready(), unmount: () => f.unmount(),
+    render(next = {}) { props = { ...props, ...next }; return f.render(props) },
+  }
+}
+
+test('GPS는 마커만 갱신하고 반복 버튼 요청마다 같은 최신 좌표로 중심을 이동하며 확대 수준은 유지한다', () => {
+  const f = mapCameraFixture()
+  f.render()
+  f.render()
+  assert.equal(f.pans.length, 1)
   const moved = { ...position, lat: 35.88, timestamp: 2000 }
-  const tree = f.render({ ...props, userPosition: moved })
-  assert.equal(pans.length, 1)
+  const tree = f.render({ userPosition: moved })
+  assert.equal(f.pans.length, 1)
   assert.equal(findNode(tree, 'UserLocationMarker').props.position, moved)
-  f.render({ ...props, userPosition: moved, position: moved })
-  assert.equal(pans.length, 2)
-  assert.equal(pans.at(-1).lat, moved.lat)
+  f.render({ recenterRequest: 1 })
+  assert.equal(f.pans.length, 2)
+  assert.equal(f.pans.at(-1).lat, moved.lat)
+  f.render({ recenterRequest: 2 })
+  assert.equal(f.pans.length, 3)
+  assert.equal(f.pans.at(-1).lat, moved.lat)
+  f.render()
+  assert.equal(f.pans.length, 3)
+  f.render({ userPosition: { ...moved, lat: 35.89, timestamp: 3000 } })
+  assert.equal(f.pans.length, 3)
+  f.render({ recenterRequest: 3 })
+  assert.equal(f.pans.length, 4)
+  assert.equal(f.pans.at(-1).lat, 35.89)
+  assert.equal(f.created.length, 1)
+  f.unmount()
+})
+
+test('좌표가 없으면 중심을 이동하지 않고 최초 GPS 조회 성공 시 이동한다', () => {
+  const f = mapCameraFixture()
+  f.render({ position: null, userPosition: null })
+  f.render()
+  assert.equal(f.pans.length, 0)
+  f.render({ position, userPosition: position })
+  assert.equal(f.pans.length, 1)
+  assert.equal(f.pans[0].lat, position.lat)
+  f.unmount()
+})
+
+test('지도 SDK가 늦게 준비되어도 최신 좌표와 대기 중인 중심 이동 요청을 반영한다', () => {
+  const f = mapCameraFixture({ deferred: true })
+  f.render({ position: null, userPosition: null })
+  f.render({ position, userPosition: position, recenterRequest: 1 })
+  const moved = { ...position, lat: 35.88, timestamp: 2000 }
+  f.render({ userPosition: moved })
+  assert.equal(f.pans.length, 0)
+  f.ready()
+  f.render()
+  assert.equal(f.created[0].center.lat, moved.lat)
+  assert.equal(f.pans.length, 1)
+  assert.equal(f.pans[0].lat, moved.lat)
   f.unmount()
 })
 

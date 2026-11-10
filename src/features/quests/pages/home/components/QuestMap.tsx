@@ -15,11 +15,13 @@ type QuestMapProps = {
   quests: NearbyQuest[] // 지도에 표시할 퀘스트 배열
   position: UserPosition | null // 홈에서 조회한 현재 위치
   userPosition?: UserPosition | null // 지도 중심과 별도로 갱신하는 실시간 내 위치
+  recenterRequest?: number // 같은 좌표여도 버튼 클릭마다 증가하는 중심 이동 요청
 }
 
 export default function QuestMap({
   position,
   userPosition = position,
+  recenterRequest = 0,
   quests,
   selectedQuestId,
   drawerTop,
@@ -31,22 +33,26 @@ export default function QuestMap({
   const containerRef = useRef<HTMLDivElement>(null)
   // 지도 생성 완료를 React에 알려 마커 컴포넌트에도 지도 객체를 전달합니다.
   const [map, setMap] = useState<KakaoMap | null>(null)
-  const latestPositionRef = useRef<UserPosition | null>(position)
+  const latestPositionRef = useRef<UserPosition | null>(userPosition)
 
   // 지도 범위의 퀘스트를 계산해 navbar 개수와 목록에 전달합니다.
   useVisibleQuests(map, quests, onVisibleQuestsChange)
 
-  // 위치 조회가 성공하면 기존 지도의 중심만 이동합니다.
+  // GPS 변화는 기억만 하고, 사용자가 보고 있는 지도 중심을 따라 움직이지 않습니다.
   useEffect(() => {
     // SDK 로딩보다 위치 조회가 먼저 끝나도 최신 좌표를 기억합니다.
-    latestPositionRef.current = position
+    latestPositionRef.current = userPosition
+  }, [userPosition])
 
+  // 최초 위치 확인·지도 준비·버튼 클릭 시 최신 좌표로 중심만 이동합니다.
+  useEffect(() => {
+    const target = latestPositionRef.current
     const maps = window.kakao?.maps
 
-    if (!position || !map || !maps) return
+    if (!target || !map || !maps) return
 
-    map.panTo(new maps.LatLng(position.lat, position.lng))
-  }, [map, position])
+    map.panTo(new maps.LatLng(target.lat, target.lng))
+  }, [map, position, recenterRequest])
 
   // React가 div를 화면에 연결한 다음 지도 생성 작업을 실행합니다.
   useEffect(() => {

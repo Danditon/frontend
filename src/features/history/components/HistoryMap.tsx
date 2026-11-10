@@ -99,13 +99,13 @@ export function HistoryMap({
     focusLocation(map, point.location.lat, point.location.lng, container.current);
     return true;
   });
-  const fitMap = useEffectEvent(() => {
+  const fitMap = useEffectEvent((preserveZoom = false) => {
     const map = mapRef.current;
     const element = container.current;
     const maps = window.kakao?.maps;
     if (!overlayReady || !map || !element || !maps || !points.length) return;
     map.relayout();
-    if (focusSelected(map)) return;
+    if (focusSelected(map) || preserveZoom) return;
     const bounds = new maps.LatLngBounds();
     points.forEach(({ location }) => bounds.extend(new maps.LatLng(location.lat, location.lng)));
     const bottom = Math.min(element.clientHeight - 80, coveredHeight(element));
@@ -118,9 +118,9 @@ export function HistoryMap({
     const overlay = container.current?.closest(".mypage-history-map")?.querySelector(".mypage-history-panel, .mypage-peer-drawer");
     if (!overlay) return;
     // Drawer 전환·드래그 때도 지도를 새로 만들지 않고 보이는 영역만 보정합니다.
-    const observer = new ResizeObserver(() => fitMap());
+    const observer = new ResizeObserver(() => fitMap(true));
     observer.observe(overlay);
-    fitMap();
+    fitMap(true);
     return () => observer.disconnect();
   }, [overlayKey, overlayReady, status]);
 
@@ -210,7 +210,7 @@ export function HistoryMap({
           });
           updateMarkerImages();
           fitMap();
-          observer = new ResizeObserver(() => fitMap());
+          observer = new ResizeObserver(() => fitMap(true));
           observer.observe(element);
           clearTimeout(timeout);
           setStatus("ready");

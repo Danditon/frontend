@@ -1,4 +1,5 @@
 .app-phone[data-memories="true"] {
+  container: mypage-viewport / size;
   --mypage-nav-space: calc(124px + env(safe-area-inset-bottom, 0px));
   --history-overlay-space: calc(var(--mypage-nav-space) + 12px);
   font-family: "Pretendard", system-ui, sans-serif;
@@ -95,9 +96,10 @@
 /* 테두리를 그림자로 그려 사진 크기와 내부 여백을 유지합니다. */
 .greeting-letter { position: relative; display: flex; height: 100%; min-height: 0; flex-direction: column; padding: 16px 16px calc(var(--envelope-fold-height) + 16px); border-radius: 12px 12px 0 0; background: radial-gradient(ellipse at 20% 5%, #ffffff70, transparent 65%), linear-gradient(var(--paper-top), var(--paper-bottom)); box-shadow: 0 0 0 1px var(--paper-edge), 0 6px 18px var(--paper-shadow); }
 /* 본문이 V자 앞면에 가려지지 않도록 스크롤 영역은 봉투 입구 위에서 끝냅니다. */
-.greeting-letter-content { display: flex; min-height: 0; flex: 1; flex-direction: column; align-items: center; overflow-y: auto; overscroll-behavior-y: contain; scrollbar-width: thin; scrollbar-color: var(--paper-edge) transparent; padding-bottom: 4px; }
+.greeting-letter-content { display: flex; min-height: 0; flex: 1; flex-direction: column; align-items: center; overflow-y: auto; overscroll-behavior-y: contain; scrollbar-width: thin; scrollbar-color: var(--paper-edge) transparent; padding-bottom: 4px; container-type: size; }
 .greeting-scene[data-opening="true"] .greeting-letter-content { overflow-y: hidden; }
-.greeting-photo { width: 100%; aspect-ratio: 16 / 10; flex: none; border-radius: 14px; }
+.greeting-photo { position: relative; width: 100%; aspect-ratio: 16 / 10; max-height: 100cqh; flex: none; overflow: hidden; border-radius: 14px; background: #eceeed; }
+.greeting-letter .greeting-photo > img { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: contain; object-position: center; }
 .greeting-text { width: 100%; flex: none; margin-top: 26px; font-size: 20px; font-weight: 500; line-height: 1.5; text-align: center; white-space: pre-wrap; overflow-wrap: anywhere; }
 .greeting-text[data-long="true"] { font-size: 16px; font-weight: 400; line-height: 1.65; text-align: left; }
 .greeting-letter-content > .greeting-text:first-child { margin-top: 4px; }
@@ -210,6 +212,21 @@
   .mypage-shell-header { padding-top: 16px; }
   .mypage-stats > a { min-height: 112px; }
   .greeting-header > a { top: 22px; }
+}
+@container mypage-viewport (max-height: 760px) {
+  .mypage-shell-header { padding: 12px 16px 8px; }
+  .mypage-summary > header { margin-bottom: 10px; }
+  .mypage-stats > a { padding: 12px; }
+}
+@container mypage-viewport (max-height: 680px) {
+  .mypage-stats > a { min-height: 80px; padding: 10px 12px; gap: 4px; border-radius: 18px; }
+  .mypage-stats strong { font-size: 28px; }
+}
+@container mypage-viewport (max-height: 600px) {
+  .mypage-stats > a { flex-direction: row; align-items: center; justify-content: flex-start; min-height: 44px; padding: 8px 12px; gap: 8px; border-radius: 14px; }
+  .mypage-stats strong { font-size: 22px; }
+  .mypage-stats small { font-size: 12px; }
+  .mypage-greeting-badge { top: -8px; right: 8px; padding: 2px 6px; font-size: 10px; line-height: 1.2; }
 }
 @media (prefers-reduced-motion: reduce) {
   .mypage-stats > a { transition: none; }

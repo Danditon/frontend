@@ -383,10 +383,10 @@ test('받은 안부 Drawer는 사진·작성자·날짜·미리보기를 표시�
   assert.equal(retried, 1)
 })
 
-test('안부 하단 목록 없이 다음 버튼으로 최신순 이동·순환하며 기록과 복귀 경로를 보존한다', () => {
-  const f = fixture('/me/memories', 'source=records&record=101&quest=22&submission=1&message=0&returnOthers=1')
+test('안부는 최신순으로 한 번씩 이동한 뒤 목록으로 복귀하며 기록과 복귀 경로를 보존한다', () => {
+  const f = fixture('/me/memories', 'source=records&record=101&quest=22&submission=2&message=0&returnOthers=1')
   let tree = f.render()
-  assert.equal(find(tree, 'GreetingLetter').props.greeting.id, '1')
+  assert.equal(find(tree, 'GreetingLetter').props.greeting.id, '2')
   const bottom = find(tree, 'div', props => props.className === 'greeting-envelope-bottom')
   const backdrop = find(bottom, 'div', props => props.className === 'greeting-envelope-front')
   const back = find(bottom, 'div', props => props.className === 'greeting-envelope-flap')
@@ -403,31 +403,58 @@ test('안부 하단 목록 없이 다음 버튼으로 최신순 이동·순환�
   assert.equal(nextButton(tree).props.disabled, false)
   nextButton(tree).props.onClick()
   tree = f.render()
-  assert.equal(find(tree, 'GreetingLetter').props.greeting.id, '2')
-  assert.equal(f.params.get('submission'), '2')
+  assert.equal(find(tree, 'GreetingLetter').props.greeting.id, '1')
+  assert.equal(f.params.get('submission'), '1')
   assert.equal(f.params.get('record'), '101')
   assert.equal(f.params.get('quest'), '22')
   assert.equal(f.params.get('source'), 'records')
   assert.equal(f.scrolls.length, 2)
+  assert.equal(text(nextButton(tree)), '목록으로 돌아가기')
   nextButton(tree).props.onClick()
-  assert.equal(find(f.render(), 'GreetingLetter').props.greeting.id, '1')
+  assert.equal(f.navigations[0][0], '/me/history?record=101&panel=others')
+  assert.equal(f.navigations[0][1].replace, true)
 })
 
-test('안부 0·1개에서는 다음을 잠그며 조회 실패 안내와 재시도는 남긴다', () => {
+test('받은 안부 3통은 1→2→3까지만 이동하고 원래 받은 안부 목록으로 돌아간다', () => {
+  const f = fixture('/me/memories', 'quest=22&panel=received&submission=3&message=0')
+  f.client.setQueryData(['quest-greetings', '22', 'token'], { viewerRole: 'AUTHOR', submissions: [
+    submission(1, '2026-11-01'), submission(2, '2026-11-02'), submission(3, '2026-11-03'),
+  ] })
+  for (const [index, id] of ['3', '2', '1'].entries()) {
+    const tree = f.render()
+    assert.equal(find(tree, 'GreetingLetter').props.greeting.id, id)
+    assert.match(text(tree), new RegExp(`도착한 안부 ${index + 1}/3`))
+    assert.equal(text(nextButton(tree)), index === 2 ? '목록으로 돌아가기' : '다음 안부 보기')
+    nextButton(tree).props.onClick()
+  }
+  assert.equal(f.navigations.length, 1)
+  assert.equal(f.navigations[0][0], '/me/memories?quest=22&panel=received')
+})
+
+test('안부 0·1개에서는 목록으로 복귀하고 조회 중·실패 시 이동을 잠그며 재시도를 제공한다', () => {
   const f = fixture('/me/memories', 'quest=22&message=0')
   for (const submissions of [[], [submission(1, '2026-11-01')]]) {
     f.client.setQueryData(['quest-greetings', '22', 'token'], { viewerRole: 'AUTHOR', submissions })
     const tree = f.render()
-    assert.equal(nextButton(tree).props.disabled, true)
+    assert.equal(nextButton(tree).props.disabled, false)
+    assert.equal(text(nextButton(tree)), '목록으로 돌아가기')
+    nextButton(tree).props.onClick()
+    assert.equal(f.navigations.at(-1)[0], '/me/memories')
     assert.equal(Boolean(find(tree, 'div', props => props.className === 'greeting-envelope-flap')), submissions.length > 0)
   }
   f.client.setQueryData(['quest-greetings', '22', 'token'], { submissions: [] })
   f.greetingError = true
-  const letter = find(f.render(), 'GreetingLetter').props
+  let tree = f.render()
+  assert.equal(nextButton(tree).props.disabled, true)
+  const letter = find(tree, 'GreetingLetter').props
   assert.equal(letter.failed, true)
   assert.match(letter.statusMessage, /불러오지 못했어요/)
   letter.onRetry()
   assert.equal(f.retried, true)
+  f.greetingError = false
+  f.pendingQueries = true
+  tree = f.render()
+  assert.equal(nextButton(tree).props.disabled, true)
 })
 
 test('좋아요는 작성자에게만 허용하고 중복 요청을 막으며 해당 안부의 캐시만 갱신한다', () => {
@@ -564,27 +591,28 @@ test('누락되거나 다른 작성자의 안부 ID를 대신 열지 않으며 �
   }
 })
 
-test('다른 사람 편지는 내 글을 제외하고 순환하며 펼친 Drawer로 복귀한다', () => {
-  const f = fixture('/me/memories', 'source=records&view=others&record=101&quest=22&submission=1&message=0&expanded=1')
+test('다른 사람 편지는 내 글을 제외하고 마지막 안부에서 펼친 Drawer로 복귀한다', () => {
+  const f = fixture('/me/memories', 'source=records&view=others&record=101&quest=22&submission=2&message=0&expanded=1')
   f.client.setQueryData(['quest-greetings', '22', 'token'], { viewerRole: 'COMPLETED', submissions: [
     submission(101, '2026-11-10', { performer: { userId: 7, nickname: '나' } }),
     submission(1, '2026-11-01'), submission(2, '2026-11-02'),
   ] })
   let tree = f.render()
-  assert.equal(find(tree, 'GreetingLetter').props.greeting.id, '1')
-  assert.match(text(tree), /다른 사람이 남긴 안부 2\/2/)
+  assert.equal(find(tree, 'GreetingLetter').props.greeting.id, '2')
+  assert.match(text(tree), /다른 사람이 남긴 안부 1\/2/)
   assert.equal(text(nextButton(tree)), '다음 사람의 안부 보기')
   assert.equal(find(tree, 'Back').props.to, '/me/history?record=101&panel=others&expanded=1')
   nextButton(tree).props.onClick()
   tree = f.render()
-  assert.equal(find(tree, 'GreetingLetter').props.greeting.id, '2')
+  assert.equal(find(tree, 'GreetingLetter').props.greeting.id, '1')
+  assert.equal(text(nextButton(tree)), '목록으로 돌아가기')
   nextButton(tree).props.onClick()
-  assert.equal(find(f.render(), 'GreetingLetter').props.greeting.id, '1')
+  assert.equal(f.navigations[0][0], '/me/history?record=101&panel=others&expanded=1')
   f.client.setQueryData(['quest-greetings', '22', 'token'], { submissions: [submission(1, '2026-11-01')] })
   tree = f.render()
   assert.equal(text(nextButton(tree)), '목록으로 돌아가기')
   nextButton(tree).props.onClick()
-  assert.equal(f.navigations[0][0], '/me/history?record=101&panel=others&expanded=1')
+  assert.equal(f.navigations.at(-1)[0], '/me/history?record=101&panel=others&expanded=1')
 })
 
 test('다른 사람 목록 조회 실패·없음은 Drawer 안에서 처리하며 다른 장소로 바꾸면 이전 응답을 쓰지 않는다', () => {
